@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
+	"regexp"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/logger"
@@ -25,6 +28,7 @@ type ErrorResponse struct {
 const (
 	LoggerKey      ContextKey = "logger"
 	CorrelationKey ContextKey = "correlation_id"
+	RequestIDKey   ContextKey = "request_id"
 )
 
 func GetLoggerFromContext(ctx context.Context) *slog.Logger {
@@ -34,43 +38,64 @@ func GetLoggerFromContext(ctx context.Context) *slog.Logger {
 	return logger.Logger().With("warning", "missing logger in context")
 }
 
-func WriteLoggerToConText(ctx context.Context, logger *slog.Logger) context.Context {
+func WriteLoggerToContext(ctx context.Context, logger *slog.Logger) context.Context {
 	return context.WithValue(ctx, LoggerKey, logger)
 }
 
 func LoggerMiddleware(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		correlationId := r.Header.Get("X-Correlation-Id")
+		requestId := r.Header.Get("X-Request-Id")
+
 		if correlationId == "" {
 			correlationId = uuid.New().String()
 		}
+		if requestId == "" {
+			requestId = uuid.New().String()
+		}
 
+		w.Header().Set("X-Request-Id", requestId)
 		w.Header().Set("X-Correlation-Id", correlationId)
-		log := logger.Logger().With("correlation-Id", correlationId)
 
-		ctx := context.WithValue(r.Context(), LoggerKey, log)
+		log := logger.Logger()
+		log = log.With(
+			slog.String("correlation_id", correlationId),
+			slog.String("request_id", requestId),
+		)
+
+
+		ctx := WriteLoggerToContext(r.Context(), log)
+		ctx = context.WithValue(ctx, RequestIDKey, requestId)
 
 		rw := responseWriter(w)
 		start := time.Now()
-		log.Info(
-			"Request started: Method=%s, Path=%s, RemoteAddr=%s, UserAgent=%s",
-			r.Method,
-			r.URL.Path,
-			r.RemoteAddr,
-			r.UserAgent(),
+		path := sanitizePath(r.URL.Path)
+
+		log.Info("request_started",
+			slog.String("method", r.Method),
+			slog.String("path", path),
+			slog.String("remote_addr", sanitizeIP(r.RemoteAddr)),
+			slog.String("user_agent", r.UserAgent()),
 		)
 
 		h.ServeHTTP(rw, r.WithContext(ctx))
 		duration := time.Since(start)
 
-		logString := fmt.Sprintf("Request Response: Method=%s, Path=%s, Status=%d, Duration=%s, Size=%d", r.Method, r.URL.Path, rw.status, duration.String(), rw.size)
+		attrs := []slog.Attr{
+			slog.String("method", r.Method),
+			slog.String("path", path),
+			slog.Int("status", rw.status),
+			slog.Int64("duration_ms", duration.Milliseconds()),
+			slog.Int("size", rw.size),
+		}
 
-		if rw.status >= 500 {
-			log.Error(logString)
-		} else if rw.status >= 400 {
-			log.Debug(logString)
-		} else {
-			log.Info(logString)
+		switch {
+		case rw.status >= 500:
+			log.LogAttrs(r.Context(), slog.LevelError, "request_completed", attrs...)
+		case rw.status >= 400:
+			log.LogAttrs(r.Context(), slog.LevelWarn, "request_completed", attrs...)
+		default:
+			log.LogAttrs(r.Context(), slog.LevelInfo, "request_completed", attrs...)
 		}
 	})
 }
@@ -140,4 +165,42 @@ func ErrorHandlerMiddleware(next http.Handler) http.Handler {
 		}()
 		next.ServeHTTP(rw, r)
 	})
+}
+
+func sanitizeIP(ipAddress string) string {
+	ip, _, _ := net.SplitHostPort(ipAddress)
+	if ip == "" {
+		ip = ipAddress
+	}
+
+	parts := strings.Split(ip, ".")
+	if len(parts) == 4 {
+		return fmt.Sprintf("%s.%s.*.*", parts[0], parts[1])
+	}
+	if strings.Contains(ip, ":") {
+		parts := strings.Split(ip, ":")
+		if len(parts) >= 2 {
+			return fmt.Sprintf("%s:%s:*", parts[0], parts[1])
+		}
+	}
+	return "[REDACTED]"
+}
+
+func sanitizePath(path string) string {
+	sensitivePatterns := []struct {
+		pattern     *regexp.Regexp
+		replacement string
+	}{
+		{regexp.MustCompile(`/users/([^/]+)`), "/users/[REDACTED]"},
+		{regexp.MustCompile(`/wallets/([^/]+)`), "/wallets/[REDACTED]"},
+		{regexp.MustCompile(`/invoices/([^/]+)`), "/invoices/[REDACTED]"},
+		{regexp.MustCompile(`/reset-password/([^/]+)`), "/reset-password/[REDACTED]"},
+		{regexp.MustCompile(`/verify/([^/]+)`), "/verify/[REDACTED]"},
+	}
+
+	sanitized := path
+	for _, sp := range sensitivePatterns {
+		sanitized = sp.pattern.ReplaceAllString(sanitized, sp.replacement)
+	}
+	return sanitized
 }
