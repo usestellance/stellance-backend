@@ -50,7 +50,7 @@ func SetServerConfig() *Server {
 	log := logger.Logger()
 
 	server := &http.Server{
-		Addr:         ":4040",
+		Addr:         ":4000",
 		Handler:      handler,
 		ReadTimeout:  120 * time.Second,
 		WriteTimeout: 3 * time.Minute,

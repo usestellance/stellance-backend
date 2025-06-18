@@ -18,7 +18,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ctx = middleware.WriteLoggerToConText(ctx, log)
+	ctx = middleware.WriteLoggerToContext(ctx, log)
 
 	if os.Getenv("STAGE") != "prod" {
 		err := godotenv.Load(".env")
