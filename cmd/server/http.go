@@ -168,7 +168,7 @@ func checkPostgresStatus() HealthComponentStatus {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	if err := container.Database.Ping(ctx); err != nil {
+	if err := container.Postgres.Ping(ctx); err != nil {
 		status.Status = "unhealthy"
 		status.Error = err.Error()
 	}
@@ -178,25 +178,21 @@ func checkPostgresStatus() HealthComponentStatus {
 }
 
 func checkRedis() HealthComponentStatus {
-	return HealthComponentStatus{
+	start := time.Now()
+	status := HealthComponentStatus{
 		Name:   "redis",
-		Status: "not_configured",
-		Error:  "Redis connection not yet configured",
+		Status: "healthy",
 	}
-	// start := time.Now()
-	// status := HealthComponentStatus{
-	//     Name:   "redis",
-	//     Status: "healthy",
-	// }
-	//
-	// ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	// defer cancel()
-	//
-	// if err := redisClient.Ping(ctx).Err(); err != nil {
-	//     status.Status = "unhealthy"
-	//     status.Error = err.Error()
-	// }
-	//
-	// status.Latency = time.Since(start).String()
-	// return status
+	
+	container := config.GetAppContainer()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	
+	if err := container.Redis.Ping(ctx).Err(); err != nil {
+		status.Status = "unhealthy"
+		status.Error = err.Error()
+	}
+	
+	status.Latency = fmt.Sprintf("%.2fms", time.Since(start).Seconds()*1000)
+	return status
 }
