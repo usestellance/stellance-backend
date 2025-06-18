@@ -173,7 +173,7 @@ func checkPostgresStatus() HealthComponentStatus {
 		status.Error = err.Error()
 	}
 
-	status.Latency = fmt.Sprintf("%.2fms", float64(time.Since(start).Microseconds()/1000))
+	status.Latency = fmt.Sprintf("%.2fms", time.Since(start).Seconds()*1000)
 	return status
 }
 
