@@ -9,25 +9,35 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-var validate = validator.New()
+type AuthHandler struct {
+	service   *AuthServiceConfig
+	validator *validator.Validate
+}
 
-func (config *AuthServiceConfig) SignUpHandler(w http.ResponseWriter, r *http.Request) {
+func NewAuthHandler(config *AuthServiceConfig) *AuthHandler {
+	return &AuthHandler{
+		service:   config,
+		validator: validator.New(),
+	}
+}
+
+func (handler *AuthHandler) SignUpHandler(w http.ResponseWriter, r *http.Request) {
 	var dto AuthRequestDto
 	if err := json.NewDecoder(r.Body).Decode(&dto); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
 
-	if err := validate.Struct(dto); err != nil {
+	if err := handler.validator.Struct(dto); err != nil {
 		utils.HandleValidationError(w, err)
 		return
 	}
 
-	data := NewAuthService().CreateNewUser(r.Context(), dto)
+	data := handler.service.CreateNewUser(r.Context(), dto)
 	utils.WriteToJson(w, http.StatusCreated, data)
 }
 
-func (config *AuthServiceConfig) LoginHandler(w http.ResponseWriter, r *http.Request) {
+func (h *AuthHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var dto AuthRequestDto
 
 	if err := json.NewDecoder(r.Body).Decode(&dto); err != nil {
@@ -35,16 +45,16 @@ func (config *AuthServiceConfig) LoginHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if err := validate.Struct(dto); err != nil {
+	if err := h.validator.Struct(dto); err != nil {
 		utils.HandleValidationError(w, err)
 		return
 	}
 
-	data := NewAuthService().Login(r.Context(), dto)
+	data := h.service.Login(r.Context(), dto)
 	utils.WriteToJson(w, http.StatusOK, data)
 }
 
-func (config *AuthServiceConfig) RefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
+func (h *AuthHandler) RefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
 		http.Error(w, "missing or malformed Authorization header", http.StatusUnauthorized)
@@ -52,18 +62,17 @@ func (config *AuthServiceConfig) RefreshTokenHandler(w http.ResponseWriter, r *h
 	}
 
 	accessToken := strings.TrimPrefix(authHeader, "Bearer ")
-	data := NewAuthService().GenerateRefreshToken(r.Context(), accessToken)
+	data := h.service.GenerateRefreshToken(r.Context(), accessToken)
 	utils.WriteToJson(w, http.StatusOK, data)
 }
 
-func (config *AuthServiceConfig) ValidateEmailHandler(w http.ResponseWriter, r *http.Request) {
+func (h *AuthHandler) ValidateEmailHandler(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
 	if token == "" {
 		http.Error(w, "invalid request! auth token not found", http.StatusBadRequest)
 		return
 	}
 
-	data := NewAuthService().ValidateEmail(r.Context(), token)
+	data := h.service.ValidateEmail(r.Context(), token)
 	utils.WriteToJson(w, http.StatusOK, data)
-
 }

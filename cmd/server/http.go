@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/The-True-Hooha/stellance-backend.git/internal/auth"
 	"github.com/The-True-Hooha/stellance-backend.git/internal/middleware"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/config"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/httpx"
@@ -71,18 +72,10 @@ func (server *Server) AddHttpRoutes() {
 	apiV1 := httpx.AddNewRouteGroup("/api/v1")
 	apiV1.HandleFunc("GET /health", runHealthCheck)
 
-	usersGroup := apiV1.AddGroup("/users")
-	// usersGroup.HandleFunc("GET /", server.handleUserList)
-	// usersGroup.HandleFunc("POST /", server.handleUserCreate)
-
-	invoicesGroup := apiV1.AddGroup("/invoices")
-	// invoicesGroup.HandleFunc("GET /", server.handleInvoiceList)
-	// invoicesGroup.HandleFunc("POST /", server.handleInvoiceCreate)
-
+	authService:= auth.NewAuthService()
+	auth.RegisterAuthRoutes(apiV1, server.router, authService)
+	
 	apiV1.Inject(server.router)
-	usersGroup.Inject(server.router)
-	invoicesGroup.Inject(server.router)
-	// server.router.HandleFunc("GET /health", runHealthCheck)
 }
 
 func (server *Server) StartHttpServer(ctx context.Context) {
