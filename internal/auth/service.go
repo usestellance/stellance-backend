@@ -14,6 +14,7 @@ import (
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/config"
 	jwt_ "github.com/The-True-Hooha/stellance-backend.git/pkg/jwt"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/utils"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
@@ -101,7 +102,7 @@ func (config *AuthServiceConfig) CreateNewUser(ctx context.Context, dto AuthRequ
 			Error:      err.Error(),
 		}
 	}
-	// TODO: send email here
+	// emailToken := CreateEmailToken(email, user.ID)
 	userCache, _ := json.Marshal(user)
 	err = redis.Set(ctx, user.ID, userCache, userCacheTime).Err()
 	if err != nil {
@@ -174,28 +175,94 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 	}
 }
 
-func (config *AuthServiceConfig) ValidateEmail(ctx context.Context, email string) *utils.ApiResponse {
-	const query = ` UPDATE USERS SET email_verified = TRUE, email_verified_at = NOW() WHERE email = $1`
-
-	data, err := config.postgres.Exec(ctx, query, strings.ToLower(email))
+func (config *AuthServiceConfig) ValidateEmail(ctx context.Context, token string) *utils.ApiResponse {
+	email, _, err := ParseVerificationToken(token)
 	if err != nil {
-		config.log.Error("failed to update user record to set email verified to true", "error", err)
 		return &utils.ApiResponse{
 			StatusCode: http.StatusInternalServerError,
-			Message:    "contact support",
+			Message:    "sever unavailable to validate email, try again!",
+		}
+	}
+	email = strings.ToLower(email)
+	tx, err := config.postgres.Begin(ctx)
+	if err != nil {
+		config.log.Error("failed to begin transaction", "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to process request. Please try again.",
+		}
+	}
+	defer tx.Rollback(ctx)
+
+	var user struct {
+		ID            string
+		EmailVerified bool
+	}
+
+	const checkQuery = `
+		SELECT id, email_verified 
+		FROM users 
+		WHERE email = $1
+		FOR UPDATE
+	`
+
+	err = tx.QueryRow(ctx, checkQuery, email).Scan(
+		&user.ID,
+		&user.EmailVerified,
+	)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusNotFound,
+				Message:    "No account found with this email address. Please sign up first.",
+			}
+		}
+		config.log.Error("failed to fetch user", "error", err, "email", email)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to validate email. Please try again later.",
 		}
 	}
 
-	if data.RowsAffected() == 0 {
+	if user.EmailVerified {
 		return &utils.ApiResponse{
-			StatusCode: http.StatusForbidden,
-			Message:    "Oops! It seems you haven't created your account yet. Credentials not found",
+			StatusCode: http.StatusOK,
+			Message:    "Your email is already verified. You can log in to your account.",
 		}
 	}
-	config.log.Debug(fmt.Sprintf("email address for user %s verified successfully", email))
+
+	const updateQuery = `
+		UPDATE users 
+		SET email_verified = TRUE, 
+		    email_verified_at = NOW(),
+		WHERE id = $1
+	`
+
+	_, err = tx.Exec(ctx, updateQuery, user.ID)
+	if err != nil {
+		config.log.Error("failed to update verification", "error", err, "user_id", user.ID)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to verify email. Please contact support.",
+		}
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		config.log.Error("failed to commit transaction", "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to complete verification. Please try again.",
+		}
+	}
+
+	config.log.Info("email verified successfully",
+		"email", email,
+		"user_id", user.ID,
+	)
+
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
-		Message:    "Email address verified successfully",
+		Message:    fmt.Sprintf("Welcome %s! Your email has been verified successfully.", email),
 	}
 }
 
@@ -216,4 +283,23 @@ func (config *AuthServiceConfig) GenerateRefreshToken(ctx context.Context, acces
 			RefreshTokenExpiry: time.Now().Add(7 * 24 * time.Hour).Unix(),
 		},
 	}
+}
+
+func CreateEmailToken(email string, userID string) (string, error) {
+	payload := fmt.Sprintf("%s|%s|%d", email, userID, time.Now().Unix())
+	return utils.EncryptEmail(payload)
+}
+
+func ParseVerificationToken(token string) (email string, userID string, err error) {
+	payload, err := utils.DecryptEmail(token)
+	if err != nil {
+		return "", "", err
+	}
+	var timestamp int64
+	_, err = fmt.Sscanf(payload, "%s|%s|%d", &email, &userID, &timestamp)
+	if err != nil {
+		return "", "", fmt.Errorf("invalid token payload")
+	}
+
+	return email, userID, nil
 }

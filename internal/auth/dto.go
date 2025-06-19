@@ -10,7 +10,7 @@ type AuthRequestDto struct {
 }
 
 type AuthResponseDto struct {
-	User               user.UserResponseDto `json:"user"`
+	User               user.UserResponseDto `json:"user,omitempty"`
 	AccessToken        string               `json:"access_token,omitempty"`
 	RefreshToken       string               `json:"refresh_token,omitempty"`
 	ExpiresIn          int64                `json:"expires_in,omitempty"`
