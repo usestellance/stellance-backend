@@ -23,6 +23,16 @@ var (
 	keyErr   error
 )
 
+type CurrencyType string
+type OrderByType string
+
+const (
+	USDC        CurrencyType = "usdc"
+	XLM         CurrencyType = "xlm"
+	OrderByDESC OrderByType  = "DESC"
+	OrderByASC  OrderByType  = "ASC"
+)
+
 type ApiResponse struct {
 	StatusCode int    `json:"status_code"`
 	Message    string `json:"message"`
@@ -148,18 +158,21 @@ func initEmailKey() {
 	emailKey, keyErr = fernet.DecodeKey(keyString)
 }
 
-
-func GetUserIDFromContext(ctx context.Context)(string, bool){
+func GetUserIDFromContext(ctx context.Context) (string, bool) {
 	userId, ok := ctx.Value(middleware.UserIDKey).(string)
-	return  userId, ok
+	return userId, ok
 }
 
-func GetUserEmailFromContext(ctx context.Context)(string, bool){
+func GetUserEmailFromContext(ctx context.Context) (string, bool) {
 	email, ok := ctx.Value(middleware.UserEmailKey).(string)
-	return  email, ok
+	return email, ok
 }
 
-func GetRoleFromContext(ctx context.Context)(string, bool){
-	role, ok :=ctx.Value(middleware.RoleKey).(string)
+func GetRoleFromContext(ctx context.Context) (string, bool) {
+	role, ok := ctx.Value(middleware.RoleKey).(string)
 	return role, ok
+}
+
+func GetBaseURL() string {
+	return os.Getenv("BASE_URL")
 }

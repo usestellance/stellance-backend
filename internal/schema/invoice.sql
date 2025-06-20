@@ -7,26 +7,32 @@ CREATE TYPE invoice_status AS ENUM (
     'cancelled',
     'refunded'
 );
-CREATE TYPE currency_type AS ENUM ('usdc', 'xlm')
+CREATE TYPE currency_type AS ENUM ('usdc', 'xlm');
 CREATE TYPE wallet_chain AS ENUM ('stellar');
-
-
-CREATE TABLE IF NOT EXISTS invoices (
+CREATE TABLE IF NOT EXISTS invoice_counters(
+    user_id UUID NOT NULL,
+    year INTEGER NOT NULL,
+    last_number INTEGER NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (user_id, year)
+);
+CREATE TABLE IF NOT EXISTS invoice (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    invoice_number VARCHAR(32) NOT NULL UNIQUE,
+    invoice_number VARCHAR(50) NOT NULL UNIQUE,
     invoice_url TEXT NOT NULL UNIQUE,
     created_by_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     payer_id UUID REFERENCES users(id),
     payer_email TEXT,
-    payer_wallet_address VARCHAR(128),
-    total NUMERIC(20, 6) NOT NULL CHECK (total >= 0),
+    payer_wallet_address VARCHAR(128), -- to be updated later when the transaction has been confirmed to get payer wallet address
+    sub_total NUMERIC(20, 6) NOT NULL CHECK (sub_total >= 0),
     service_fee NUMERIC(20, 6) DEFAULT 0 CHECK (service_fee >= 0),
-    amount_payable NUMERIC(20, 6) GENERATED ALWAYS AS (total - service_fee) STORED,
+    total NUMERIC(20, 6) NOT NULL,
     currency currency_type NOT NULL DEFAULT 'usdc',
     title VARCHAR(200),
     description TEXT,
     status invoice_status NOT NULL DEFAULT 'draft',
     due_date DATE,
+    address_country VARCHAR(60),
     paid_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -41,7 +47,9 @@ CREATE TABLE IF NOT EXISTS invoices (
         )
     )
 );
+CREATE INDEX idx_invoice_counter_user_year ON invoice_counters(user_id, year);
 CREATE INDEX idx_invoices_created_by ON invoices(created_by_id);
+CREATE INDEX idx_invoices_url ON invoices(invoice_url);
 CREATE INDEX idx_invoices_payer_id ON invoices(payer_id)
 WHERE payer_id IS NOT NULL;
 CREATE INDEX idx_invoices_status ON invoices(status);
@@ -50,6 +58,5 @@ WHERE status IN ('sent', 'viewed');
 CREATE INDEX idx_invoices_created_at ON invoices(created_at DESC);
 CREATE INDEX idx_invoices_number ON invoices(invoice_number);
 CREATE INDEX idx_payer_wallet_address ON invoices(payer_wallet_address);
-
 CREATE TRIGGER set_invoices_updated_at BEFORE
 UPDATE ON invoices FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

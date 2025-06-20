@@ -35,7 +35,7 @@ func (handler *AuthHandler) SignUpHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	data := handler.service.CreateNewUser(r.Context(), dto, user.RoleUser)
-	utils.WriteToJson(w, http.StatusCreated, data)
+	utils.WriteToJson(w, data.StatusCode, data)
 }
 
 func (handler *AuthHandler) AdminRegister(w http.ResponseWriter, r *http.Request) {
@@ -51,7 +51,7 @@ func (handler *AuthHandler) AdminRegister(w http.ResponseWriter, r *http.Request
 	}
 
 	data := handler.service.CreateNewUser(r.Context(), dto, user.RoleAdmin)
-	utils.WriteToJson(w, http.StatusCreated, data)
+	utils.WriteToJson(w, data.StatusCode, data)
 }
 
 func (h *AuthHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
@@ -68,7 +68,7 @@ func (h *AuthHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := h.service.Login(r.Context(), dto)
-	utils.WriteToJson(w, http.StatusOK, data)
+	utils.WriteToJson(w, data.StatusCode, data)
 }
 
 func (h *AuthHandler) RefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
@@ -80,7 +80,7 @@ func (h *AuthHandler) RefreshTokenHandler(w http.ResponseWriter, r *http.Request
 
 	accessToken := strings.TrimPrefix(authHeader, "Bearer ")
 	data := h.service.GenerateRefreshToken(r.Context(), accessToken)
-	utils.WriteToJson(w, http.StatusOK, data)
+	utils.WriteToJson(w, data.StatusCode, data)
 }
 
 func (h *AuthHandler) ValidateEmailHandler(w http.ResponseWriter, r *http.Request) {
@@ -91,5 +91,5 @@ func (h *AuthHandler) ValidateEmailHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	data := h.service.ValidateEmail(r.Context(), token)
-	utils.WriteToJson(w, http.StatusOK, data)
+	utils.WriteToJson(w, data.StatusCode, data)
 }
