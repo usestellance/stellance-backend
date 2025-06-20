@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     transaction_hash VARCHAR(128) UNIQUE,
     amount NUMERIC(20, 6) NOT NULL,
     currency currency_type NOT NULL,
-    status VARCHAR(20) NOT NULL,
+    status transaction_status NOT NULL DEFAULT 'pending',
     network_fee NUMERIC(20, 6),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     confirmed_at TIMESTAMPTZ
