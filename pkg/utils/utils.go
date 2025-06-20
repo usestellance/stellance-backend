@@ -24,10 +24,13 @@ var (
 )
 
 type CurrencyType string
+type OrderByType string
 
 const (
-	USDC CurrencyType = "usdc"
-	XLM  CurrencyType = "xlm"
+	USDC        CurrencyType = "usdc"
+	XLM         CurrencyType = "xlm"
+	OrderByDESC OrderByType  = "DESC"
+	OrderByASC  OrderByType  = "ASC"
 )
 
 type ApiResponse struct {

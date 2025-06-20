@@ -60,7 +60,7 @@ func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvo
 		}
 	}
 	defer tx.Rollback(ctx)
-	
+
 	var businessName sql.NullString
 
 	const businessNameQ = `SELECT business_name FROM users WHERE id = $1 AND is_active = true`
@@ -264,4 +264,178 @@ func (is *InvoiceService) validateAndCalculateInvoice(dto CreateInvoiceDTO) (sub
 	serviceFee = math.Round(serviceFee*100) / 100
 	total = subtotal + serviceFee
 	return subtotal, serviceFee, total, nil
+}
+
+func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFiltersDto, user_id string) *utils.ApiResponse {
+	if dto.Page < 1 {
+		dto.Page = 1
+	}
+	if dto.Count < 1 || dto.Count > 10 {
+		dto.Count = 10
+	}
+
+	if dto.OrderBy == "" {
+		dto.OrderBy = utils.OrderByDESC
+	}
+
+	if dto.Status != "" {
+		validStatuses := map[InvoiceStatus]bool{
+			InvoiceStatusDraft:     true,
+			InvoiceStatusSent:      true,
+			InvoiceStatusPaid:      true,
+			InvoiceStatusOverdue:   true,
+			InvoiceStatusCancelled: true,
+			InvoiceStatusRefunded:  true,
+			InvoiceStatusViewed:    true,
+		}
+		if !validStatuses[dto.Status] {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusBadRequest,
+				Message:    fmt.Sprintf("Invalid status: %s", dto.Status),
+			}
+		}
+	}
+
+	query, args := is.buildInvoiceQuery(dto, user_id)
+
+	countQuery := `
+		SELECT COUNT(*)
+		FROM invoice i
+		WHERE i.created_by_id = $1
+		%s
+	`
+
+	var whereClause string
+	countArgs := []interface{}{user_id}
+	argCount := 1
+	if dto.Status != "" {
+		argCount++
+		whereClause += fmt.Sprintf(" AND i.status = $%d", argCount)
+		countArgs = append(countArgs, dto.Status)
+	}
+
+	var totalItems int
+	err := is.postgres.QueryRow(ctx, fmt.Sprintf(countQuery, whereClause), countArgs...).Scan(&totalItems)
+	if err != nil {
+		is.log.Error("failed to get invoice count", "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to fetch invoices",
+		}
+	}
+
+	rows, err := is.postgres.Query(ctx, query, args...)
+	if err != nil {
+		is.log.Error("failed to fetch invoices", "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to fetch invoices",
+		}
+	}
+	defer rows.Close()
+
+	invoices := []InvoiceResponse{}
+	for rows.Next() {
+		var invoice InvoiceResponse
+		var payerName sql.NullString
+		var title sql.NullString
+		var paidAt sql.NullTime
+
+		err := rows.Scan(
+			&invoice.ID,
+			&invoice.InvoiceNumber,
+			&invoice.InvoiceURL,
+			&title,
+			&invoice.PayerEmail,
+			&payerName,
+			&invoice.SubTotal,
+			&invoice.ServiceFee,
+			&invoice.Total,
+			&invoice.Currency,
+			&invoice.Status,
+			&invoice.DueDate,
+			&paidAt,
+			&invoice.CreatedAt,
+			&invoice.UpdatedAt,
+		)
+		if err != nil {
+			is.log.Error("failed to scan invoice", "error", err)
+			continue
+		}
+
+		if title.Valid {
+			invoice.Title = title.String
+		}
+		if payerName.Valid {
+			invoice.PayerName = payerName.String
+		}
+		if paidAt.Valid {
+			invoice.PaidAt = &paidAt.Time
+		}
+
+		invoices = append(invoices, invoice)
+	}
+	totalPages := int(math.Ceil(float64(totalItems) / float64(dto.Count)))
+	response := InvoiceListResponseDto{
+		Invoice: invoices,
+		Meta: PaginationMeta{
+			Page:       dto.Page,
+			Count:      dto.Count,
+			TotalItems: totalItems,
+			TotalPages: totalPages,
+		},
+	}
+	return &utils.ApiResponse{
+		StatusCode: http.StatusOK,
+		Message:    "successful",
+		Data:       response,
+	}
+}
+
+func (is *InvoiceService) buildInvoiceQuery(filters InvoiceFiltersDto, userId string) (string, []interface{}) {
+	offset := (filters.Page - 1) * filters.Count
+
+	query := `
+		SELECT 
+			i.id,
+			i.invoice_number,
+			i.invoice_url,
+			i.title,
+			i.payer_email,
+			i.payer_name,
+			i.sub_total,
+			i.service_fee,
+			i.total,
+			i.currency,
+			i.status,
+			i.due_date,
+			i.paid_at,
+			i.created_at,
+			i.updated_at
+		FROM invoice i
+		WHERE i.created_by_id = $1
+	`
+	args := []interface{}{userId}
+	argCount := 1
+
+	if filters.Status != "" {
+		argCount++
+		query += fmt.Sprintf(" AND i.status = $%d", argCount)
+		args = append(args, filters.Status)
+		if filters.Status == "overdue" {
+			query += " AND i.due_date < CURRENT_DATE AND i.status != 'paid'"
+		}
+	}
+
+	query += fmt.Sprintf("ORDER BY i.created_at %s", filters.OrderBy)
+
+	argCount++
+	query += fmt.Sprintf(" LIMIT $%d", argCount)
+	args = append(args, filters.Count)
+
+	argCount++
+	query += fmt.Sprintf(" OFFSET $%d", argCount)
+	args = append(args, offset)
+
+	return query, args
 }

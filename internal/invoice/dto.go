@@ -1,6 +1,10 @@
 package invoice
 
-import "time"
+import (
+	"time"
+
+	"github.com/The-True-Hooha/stellance-backend.git/pkg/utils"
+)
 
 type InvoiceType string
 type InvoiceStatus string
@@ -51,5 +55,27 @@ type InvoiceResponse struct {
 	Status        string         `json:"status"`
 	DueDate       string         `json:"due_date"`
 	CreatedAt     time.Time      `json:"created_at"`
+	UpdatedAt     time.Time      `json:"updated_at,omitempty"`
+	PaidAt        *time.Time     `json:"paid_at,omitempty"`
 	Items         []InvoiceItems `json:"items"`
+}
+
+type InvoiceListResponseDto struct {
+	Invoice []InvoiceResponse `json:"invoice"`
+	Meta    PaginationMeta    `json:"meta"`
+}
+
+type PaginationMeta struct {
+	Page       int `json:"page"`
+	Count      int `json:"count"`
+	TotalItems int `json:"total_items"`
+	TotalPages int `json:"total_pages"`
+}
+
+type InvoiceFiltersDto struct {
+	Status  InvoiceStatus     `json:"status,omitempty"`
+	UserId  string            `json:"user_id,omitempty"`
+	Page    int               `json:"page"`
+	Count   int               `json:"count"`
+	OrderBy utils.OrderByType `json:"order_by"`
 }

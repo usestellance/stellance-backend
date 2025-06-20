@@ -3,8 +3,10 @@ package invoice
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
 
+	"github.com/The-True-Hooha/stellance-backend.git/internal/user"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/utils"
 	"github.com/go-playground/validator/v10"
 )
@@ -61,4 +63,71 @@ func (handler *InvoiceHandler) CreateNewInvoiceHandler(w http.ResponseWriter, r 
 
 	response := handler.service.GenerateNewInvoice(ctx, dto, userID)
 	utils.WriteToJson(w, response.StatusCode, response)
+}
+
+func (handler *InvoiceHandler) GetManyInvoiceHandler(w http.ResponseWriter, r *http.Request) {
+
+	log := handler.service.log
+	ctx := r.Context()
+
+	reqUserId, ok := utils.GetUserIDFromContext(ctx)
+	if !ok {
+		http.Error(w, "invalid request! not allowed", http.StatusUnauthorized)
+		return
+	}
+
+	role, ok := utils.GetRoleFromContext(ctx)
+	if !ok {
+		http.Error(w, "Unauthorized: missing role", http.StatusUnauthorized)
+		return
+	}
+
+	userID := r.URL.Query().Get("user_id")
+
+	if userID != reqUserId && role != string(user.RoleAdmin) {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	var queryUserId string
+	if role == string(user.RoleAdmin) {
+		queryUserId = userID
+	} else {
+		queryUserId = reqUserId
+	}
+
+	dto := InvoiceFiltersDto{
+		Status: InvoiceStatus(r.URL.Query().Get("status")),
+		UserId: queryUserId,
+	}
+
+	page := r.URL.Query().Get("page")
+	if page != "" {
+		if p, err := strconv.Atoi(page); err == nil {
+			dto.Page = p
+		}
+	}
+
+	pageCount := r.URL.Query().Get("page_size")
+	if pageCount != "" {
+		if ps, err := strconv.Atoi(pageCount); err == nil {
+			dto.Count = ps
+		}
+	}
+
+	orderBy := r.URL.Query().Get("order_by")
+	if orderBy == "" {
+		dto.OrderBy = utils.OrderByDESC
+	} else {
+		dto.OrderBy = utils.OrderByType(orderBy)
+	}
+
+	log.Info("fetching invoices",
+		"user_id", userID,
+		"filters", dto,
+	)
+
+	response := handler.service.GetManyInvoice(ctx, dto, queryUserId)
+	utils.WriteToJson(w, response.StatusCode, response)
+
 }
