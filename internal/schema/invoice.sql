@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS invoice (
     description TEXT,
     status invoice_status NOT NULL DEFAULT 'draft',
     due_date DATE,
+    address_country VARCHAR(60),
     paid_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -48,6 +49,7 @@ CREATE TABLE IF NOT EXISTS invoice (
 );
 CREATE INDEX idx_invoice_counter_user_year ON invoice_counters(user_id, year);
 CREATE INDEX idx_invoices_created_by ON invoices(created_by_id);
+CREATE INDEX idx_invoices_url ON invoices(invoice_url);
 CREATE INDEX idx_invoices_payer_id ON invoices(payer_id)
 WHERE payer_id IS NOT NULL;
 CREATE INDEX idx_invoices_status ON invoices(status);

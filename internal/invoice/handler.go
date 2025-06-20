@@ -131,3 +131,36 @@ func (handler *InvoiceHandler) GetManyInvoiceHandler(w http.ResponseWriter, r *h
 	utils.WriteToJson(w, response.StatusCode, response)
 
 }
+
+func (h *InvoiceHandler) GetInvoiceByID(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	reqUserId, ok := utils.GetUserIDFromContext(ctx)
+	if !ok {
+		http.Error(w, "invalid request! not allowed", http.StatusUnauthorized)
+		return
+	}
+
+	role, ok := utils.GetRoleFromContext(ctx)
+	if !ok {
+		http.Error(w, "Unauthorized: missing role", http.StatusUnauthorized)
+		return
+	}
+
+	invoiceID := r.URL.Query().Get("id")
+	invoiceUrl := r.URL.Query().Get("url")
+
+	if (invoiceID == "" && invoiceUrl == "") || (invoiceID != "" && invoiceUrl != "") {
+		http.Error(w, "You can only provide either 'id' or 'url', not both or none", http.StatusBadRequest)
+		return
+	}
+
+	if invoiceID != "" {
+		response := h.service.GetInvoiceById(ctx, invoiceID, reqUserId, role)
+		utils.WriteToJson(w, response.StatusCode, response)
+		return
+	}
+
+	response := h.service.GetInvoiceByUrl(ctx, invoiceUrl, reqUserId, role)
+	utils.WriteToJson(w, response.StatusCode, response)
+
+}

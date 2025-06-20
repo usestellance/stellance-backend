@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/The-True-Hooha/stellance-backend.git/internal/user"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/config"
 	jwt_ "github.com/The-True-Hooha/stellance-backend.git/pkg/jwt"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/utils"
@@ -111,13 +112,13 @@ func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvo
 	}
 	const invoiceQ = `
 	INSERT INTO invoice(invoice_number, invoice_url, created_by_id, payer_email, 
-	sub_total, service_fee, total, currency, title, status,due_date)
-	VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)RETURNING id, created_at`
+	sub_total, service_fee, total, currency, title, status,due_date, address_country)
+	VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)RETURNING id, created_at`
 
 	var invoiceId string
 	var createdAt time.Time
 
-	err = tx.QueryRow(ctx, invoiceQ, invoiceNumber, invoice_url, userId, dto.Email, subtotal, serviceFee, total, utils.USDC, dto.Title, InvoiceStatusDraft, dueDate).Scan(&invoiceId, &createdAt)
+	err = tx.QueryRow(ctx, invoiceQ, invoiceNumber, invoice_url, userId, dto.Email, subtotal, serviceFee, total, utils.USDC, dto.Title, InvoiceStatusDraft, dueDate, dto.Country).Scan(&invoiceId, &createdAt)
 	if err != nil {
 		is.log.Error("failed to create invoice", "error", err)
 		return &utils.ApiResponse{
@@ -232,7 +233,6 @@ func (is *InvoiceService) GenerateAndFormatInvoiceNumber(ctx context.Context, us
 
 func (is *InvoiceService) GenerateInvoiceURL(ctx context.Context, invoiceID string) (string, error) {
 	shortID, err := gonanoid.Generate(invoiceID, 8)
-	baseURL := utils.GetBaseURL()
 	if err != nil {
 		is.log.Warn("failed to generate url from nano id returning to default")
 		b := make([]byte, 8)
@@ -243,9 +243,9 @@ func (is *InvoiceService) GenerateInvoiceURL(ctx context.Context, invoiceID stri
 			}
 			b[i] = invoiceID[n.Int64()]
 		}
-		return fmt.Sprintf("%s/invoice/%s", baseURL, string(b)), nil
+		return string(b), nil
 	}
-	return fmt.Sprintf("%s/invoice/%s", baseURL, shortID), nil
+	return shortID, nil
 }
 
 func (is *InvoiceService) validateAndCalculateInvoice(dto CreateInvoiceDTO) (subtotal, serviceFee, total float64, err error) {
@@ -340,6 +340,7 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 		var payerName sql.NullString
 		var title sql.NullString
 		var paidAt sql.NullTime
+		var Country sql.NullString
 
 		err := rows.Scan(
 			&invoice.ID,
@@ -357,9 +358,10 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 			&paidAt,
 			&invoice.CreatedAt,
 			&invoice.UpdatedAt,
+			&Country,
 		)
 		if err != nil {
-			is.log.Error("failed to scan invoice", "error", err)
+			is.log.Error("failed to retrieve invoice", "error", err)
 			continue
 		}
 
@@ -411,7 +413,8 @@ func (is *InvoiceService) buildInvoiceQuery(filters InvoiceFiltersDto, userId st
 			i.due_date,
 			i.paid_at,
 			i.created_at,
-			i.updated_at
+			i.updated_at,
+			i.address_country
 		FROM invoice i
 		WHERE i.created_by_id = $1
 	`
@@ -438,4 +441,196 @@ func (is *InvoiceService) buildInvoiceQuery(filters InvoiceFiltersDto, userId st
 	args = append(args, offset)
 
 	return query, args
+}
+
+func (is *InvoiceService) GetInvoiceById(ctx context.Context, invoiceId, userId, role string) *utils.ApiResponse {
+	log := is.log
+
+	const checkQ = `
+		SELECT created_by_id
+		FROM invoice
+		WHERE id = $1
+	`
+	var invoice_owner string
+	err := is.postgres.QueryRow(ctx, checkQ, invoiceId).Scan(&invoice_owner)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusNotFound,
+				Message:    "Invoice data not found",
+			}
+		}
+		log.Error("failed to to get user invoice", "error", err, "user_id", userId, "invoice_id", invoiceId)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to get invoice",
+		}
+	}
+	if userId != invoice_owner && role != string(user.RoleAdmin) {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusForbidden,
+			Message:    "Invoice data not found",
+		}
+	}
+
+	const query = `
+		SELECT
+			id,
+			invoice_number,
+			invoice_url,
+			title,
+			payer_email,
+			payer_name,
+			sub_total,
+			service_fee,
+			total,
+			currency,
+			status,
+			due_date,
+			paid_at,
+			created_at,
+			updated_at,
+			address_country
+		FROM invoice WHERE id = $1 AND created_by_id = $2
+	`
+	var invoice InvoiceResponse
+	var payerName sql.NullString
+	var title sql.NullString
+	var paidAt sql.NullTime
+	var Country sql.NullString
+
+	err = is.postgres.QueryRow(ctx, query, invoiceId, userId).Scan(
+		&invoice.ID,
+		&invoice.InvoiceNumber,
+		&invoice.InvoiceURL,
+		&title,
+		&invoice.PayerEmail,
+		&payerName,
+		&invoice.SubTotal,
+		&invoice.ServiceFee,
+		&invoice.Total,
+		&invoice.Currency,
+		&invoice.Status,
+		&invoice.DueDate,
+		&paidAt,
+		&invoice.CreatedAt,
+		&invoice.UpdatedAt,
+		&Country,
+	)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusNotFound,
+				Message:    "Invoice data not found",
+			}
+		}
+		log.Error("failed to to get user invoice", "error", err, "user_id", userId, "invoice_id", invoiceId)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to get invoice",
+		}
+	}
+
+	return &utils.ApiResponse{
+		StatusCode: http.StatusOK,
+		Message:    "successful",
+		Data:       invoice,
+	}
+}
+
+func (is *InvoiceService) GetInvoiceByUrl(ctx context.Context, invoiceUrl, userId, role string) *utils.ApiResponse {
+	log := is.log
+
+	const checkQ = `
+		SELECT created_by_id
+		FROM invoice
+		WHERE invoice_url = $1
+	`
+	var invoice_owner string
+	err := is.postgres.QueryRow(ctx, checkQ, invoiceUrl).Scan(&invoice_owner)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusNotFound,
+				Message:    "Invoice data not found",
+			}
+		}
+		log.Error("failed to to get user invoice", "error", err, "user_id", userId, "invoice_url", invoiceUrl)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to get invoice",
+		}
+	}
+	if userId != invoice_owner && role != string(user.RoleAdmin) {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusForbidden,
+			Message:    "Invoice data not found",
+		}
+	}
+
+	const query = `
+		SELECT
+			id,
+			invoice_number,
+			invoice_url,
+			title,
+			payer_email,
+			payer_name,
+			sub_total,
+			service_fee,
+			total,
+			currency,
+			status,
+			due_date,
+			paid_at,
+			created_at,
+			updated_at,
+			address_country
+		FROM invoice WHERE invoice_url = $1 AND created_by_id = $2
+	`
+	var invoice InvoiceResponse
+	var payerName sql.NullString
+	var title sql.NullString
+	var paidAt sql.NullTime
+	var Country sql.NullString
+
+	err = is.postgres.QueryRow(ctx, query, invoiceUrl, userId).Scan(
+		&invoice.ID,
+		&invoice.InvoiceNumber,
+		&invoice.InvoiceURL,
+		&title,
+		&invoice.PayerEmail,
+		&payerName,
+		&invoice.SubTotal,
+		&invoice.ServiceFee,
+		&invoice.Total,
+		&invoice.Currency,
+		&invoice.Status,
+		&invoice.DueDate,
+		&paidAt,
+		&invoice.CreatedAt,
+		&invoice.UpdatedAt,
+		&Country,
+	)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusNotFound,
+				Message:    "Invoice data not found",
+			}
+		}
+		log.Error("failed to to get user invoice", "error", err, "user_id", userId, "invoice_url", invoiceUrl)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to get invoice",
+		}
+	}
+
+	return &utils.ApiResponse{
+		StatusCode: http.StatusOK,
+		Message:    "successful",
+		Data:       invoice,
+	}
 }

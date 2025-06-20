@@ -46,8 +46,8 @@ type InvoiceResponse struct {
 	InvoiceURL    string         `json:"invoice_url"`
 	Title         string         `json:"title,omitempty"`
 	PayerEmail    string         `json:"payer_email"`
-	PayerName     string         `json:"payer_name"`
-	Country       string         `json:"country"`
+	PayerName     string         `json:"payer_name,omitempty"`
+	Country       string         `json:"country,omitempty"`
 	SubTotal      float64        `json:"sub_total"`
 	ServiceFee    float64        `json:"service_fee"`
 	Total         float64        `json:"total"`
