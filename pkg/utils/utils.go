@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/The-True-Hooha/stellance-backend.git/internal/middleware"
 	"github.com/fernet/fernet-go"
 	"github.com/go-playground/validator/v10"
 	"golang.org/x/crypto/bcrypt"
@@ -144,4 +146,20 @@ func initEmailKey() {
 	}
 
 	emailKey, keyErr = fernet.DecodeKey(keyString)
+}
+
+
+func GetUserIDFromContext(ctx context.Context)(string, bool){
+	userId, ok := ctx.Value(middleware.UserIDKey).(string)
+	return  userId, ok
+}
+
+func GetUserEmailFromContext(ctx context.Context)(string, bool){
+	email, ok := ctx.Value(middleware.UserEmailKey).(string)
+	return  email, ok
+}
+
+func GetRoleFromContext(ctx context.Context)(string, bool){
+	role, ok :=ctx.Value(middleware.RoleKey).(string)
+	return role, ok
 }

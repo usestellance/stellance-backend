@@ -31,6 +31,9 @@ const (
 	LoggerKey      ContextKey = "logger"
 	CorrelationKey ContextKey = "correlation_id"
 	RequestIDKey   ContextKey = "request_id"
+	UserIDKey      ContextKey = "user_id"
+	UserEmailKey   ContextKey = "user_email"
+	RoleKey        ContextKey = "role"
 )
 
 func GetLoggerFromContext(ctx context.Context) *slog.Logger {

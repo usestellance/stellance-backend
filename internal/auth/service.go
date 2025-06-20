@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/The-True-Hooha/stellance-backend.git/internal/user"
+	"github.com/The-True-Hooha/stellance-backend.git/mail"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/config"
 	jwt_ "github.com/The-True-Hooha/stellance-backend.git/pkg/jwt"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/utils"
@@ -18,6 +19,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
+
+
 
 var (
 	userCacheTime         = 1 * time.Hour
@@ -29,6 +32,7 @@ type AuthServiceConfig struct {
 	log      *slog.Logger
 	postgres *pgxpool.Pool
 	redis    *redis.Client
+	jwt      *jwt_.JwtTokenServiceConfig
 }
 
 func NewAuthService() *AuthServiceConfig {
@@ -36,10 +40,11 @@ func NewAuthService() *AuthServiceConfig {
 		log:      config.GetAppContainer().Log,
 		postgres: config.GetAppContainer().Postgres,
 		redis:    config.GetAppContainer().Redis,
+		jwt:      jwt_.JwtTokenService(),
 	}
 }
 
-func (config *AuthServiceConfig) CreateNewUser(ctx context.Context, dto AuthRequestDto) *utils.ApiResponse {
+func (config *AuthServiceConfig) CreateNewUser(ctx context.Context, dto AuthRequestDto, role user.UserRole) *utils.ApiResponse {
 	db := config.postgres
 	redis := config.redis
 	log := config.log
@@ -109,7 +114,7 @@ func (config *AuthServiceConfig) CreateNewUser(ctx context.Context, dto AuthRequ
 		log.Error("failed to add new user record to cache", "error", err)
 	}
 
-	accessToken, err := jwt_.JwtTokenService().GenerateNewAccessToken(user.ID, user.Email)
+	accessToken, err := config.jwt.GenerateNewAccessToken(user.ID, user.Email, string(role))
 	if err != nil {
 		log.Error(fmt.Sprintf("error generating access token for user with Id =>> %s", user.ID), "error", err)
 		return &utils.ApiResponse{
@@ -150,7 +155,7 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 				Data:       existingUser,
 			}
 		}
-		accessToken, err := jwt_.JwtTokenService().GenerateNewAccessToken(existingUser.ID, existingUser.Email)
+		accessToken, err := config.jwt.GenerateNewAccessToken(existingUser.ID, existingUser.Email, string(existingUser.Role))
 		if err != nil {
 			config.log.Error(fmt.Sprintf("error generating access token for user with Id =>> %s", existingUser.ID), "error", err)
 			return &utils.ApiResponse{
@@ -176,7 +181,7 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 }
 
 func (config *AuthServiceConfig) ValidateEmail(ctx context.Context, token string) *utils.ApiResponse {
-	email, _, err := ParseVerificationToken(token)
+	email, _, err := mail.ParseVerificationToken(token)
 	if err != nil {
 		return &utils.ApiResponse{
 			StatusCode: http.StatusInternalServerError,
@@ -267,7 +272,7 @@ func (config *AuthServiceConfig) ValidateEmail(ctx context.Context, token string
 }
 
 func (config *AuthServiceConfig) GenerateRefreshToken(ctx context.Context, accessToken string) *utils.ApiResponse {
-	token, err := jwt_.JwtTokenService().GenerateRefreshToken(accessToken)
+	token, err := config.jwt.GenerateRefreshToken(accessToken)
 	if err != nil {
 		return &utils.ApiResponse{
 			StatusCode: http.StatusUnauthorized,
@@ -283,23 +288,4 @@ func (config *AuthServiceConfig) GenerateRefreshToken(ctx context.Context, acces
 			RefreshTokenExpiry: time.Now().Add(7 * 24 * time.Hour).Unix(),
 		},
 	}
-}
-
-func CreateEmailToken(email string, userID string) (string, error) {
-	payload := fmt.Sprintf("%s|%s|%d", email, userID, time.Now().Unix())
-	return utils.EncryptEmail(payload)
-}
-
-func ParseVerificationToken(token string) (email string, userID string, err error) {
-	payload, err := utils.DecryptEmail(token)
-	if err != nil {
-		return "", "", err
-	}
-	var timestamp int64
-	_, err = fmt.Sscanf(payload, "%s|%s|%d", &email, &userID, &timestamp)
-	if err != nil {
-		return "", "", fmt.Errorf("invalid token payload")
-	}
-
-	return email, userID, nil
 }

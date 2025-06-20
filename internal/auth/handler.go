@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/The-True-Hooha/stellance-backend.git/internal/user"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/utils"
 	"github.com/go-playground/validator/v10"
 )
@@ -33,7 +34,23 @@ func (handler *AuthHandler) SignUpHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	data := handler.service.CreateNewUser(r.Context(), dto)
+	data := handler.service.CreateNewUser(r.Context(), dto, user.RoleUser)
+	utils.WriteToJson(w, http.StatusCreated, data)
+}
+
+func (handler *AuthHandler) AdminRegister(w http.ResponseWriter, r *http.Request) {
+	var dto AuthRequestDto
+	if err := json.NewDecoder(r.Body).Decode(&dto); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	if err := handler.validator.Struct(dto); err != nil {
+		utils.HandleValidationError(w, err)
+		return
+	}
+
+	data := handler.service.CreateNewUser(r.Context(), dto, user.RoleAdmin)
 	utils.WriteToJson(w, http.StatusCreated, data)
 }
 
