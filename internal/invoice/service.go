@@ -2,12 +2,10 @@ package invoice
 
 import (
 	"context"
-	"crypto/rand"
 	"database/sql"
 	"fmt"
 	"log/slog"
 	"math"
-	"math/big"
 	"net/http"
 	"strings"
 	"time"
@@ -18,7 +16,6 @@ import (
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/utils"
 	"github.com/jackc/pgx"
 	"github.com/jackc/pgx/v5/pgxpool"
-	gonanoid "github.com/matoous/go-nanoid/v2"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -94,7 +91,7 @@ func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvo
 		}
 	}
 
-	invoice_url, err := is.GenerateInvoiceURL(ctx, invoiceNumber)
+	invoice_url, err := utils.GenerateShortURL(fmt.Sprintf("%s%s", invoiceNumber, userId), is.log)
 	if err != nil {
 		is.log.Error("failed to generate invoice url", "error", err)
 		return &utils.ApiResponse{
@@ -229,23 +226,6 @@ func (is *InvoiceService) GenerateAndFormatInvoiceNumber(ctx context.Context, us
 	invoiceNumber := fmt.Sprintf("%s-%d-%s-%s", prefix, year, num, userSuffix)
 	is.log.Debug("new invoice number generated", "invoice_number", invoiceNumber, "userId", userId)
 	return invoiceNumber, nil
-}
-
-func (is *InvoiceService) GenerateInvoiceURL(ctx context.Context, invoiceID string) (string, error) {
-	shortID, err := gonanoid.Generate(invoiceID, 8)
-	if err != nil {
-		is.log.Warn("failed to generate url from nano id returning to default")
-		b := make([]byte, 8)
-		for i := range b {
-			n, err := rand.Int(rand.Reader, big.NewInt(int64(len(invoiceID))))
-			if err != nil {
-				return "", err
-			}
-			b[i] = invoiceID[n.Int64()]
-		}
-		return string(b), nil
-	}
-	return shortID, nil
 }
 
 func (is *InvoiceService) validateAndCalculateInvoice(dto CreateInvoiceDTO) (subtotal, serviceFee, total float64, err error) {
