@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/The-True-Hooha/stellance-backend.git/internal/user"
-	"github.com/The-True-Hooha/stellance-backend.git/mail"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/config"
 	jwt_ "github.com/The-True-Hooha/stellance-backend.git/pkg/jwt"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/utils"
@@ -20,10 +19,9 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-
-
 var (
 	userCacheTime         = 1 * time.Hour
+	emailCacheTime        = 24 * 7 * time.Hour
 	ErrUserAlreadyExists  = errors.New("user already exists")
 	ErrInvalidCredentials = errors.New("invalid credentials")
 )
@@ -86,11 +84,13 @@ func (config *AuthServiceConfig) CreateNewUser(ctx context.Context, dto AuthRequ
 	}
 	defer tx.Rollback(ctx)
 
-	const createNewUserQ = `INSERT INTO USERS(email, password) VALUES ($1, $2) RETURNING id, email, created_at`
-	var user user.UserResponseDto
+	const createNewUserQ string = `INSERT INTO USERS(email, password) VALUES ($1, $2) RETURNING id, email, created_at, is_active`
+	var user user.UserProfileDto
 	err = tx.QueryRow(ctx, createNewUserQ, email, hash).Scan(&user.ID,
 		&user.Email,
-		&user.CreatedAt)
+		&user.CreatedAt,
+		&user.IsActive,
+	)
 	if err != nil {
 		return &utils.ApiResponse{
 			StatusCode: http.StatusInternalServerError,
@@ -107,7 +107,24 @@ func (config *AuthServiceConfig) CreateNewUser(ctx context.Context, dto AuthRequ
 			Error:      err.Error(),
 		}
 	}
-	// emailToken := CreateEmailToken(email, user.ID)
+	emailToken, err := utils.GenerateShortURL(fmt.Sprintf("%s%s", email, user.ID), log)
+	if err != nil {
+		log.Error(fmt.Sprintf("error failed to generate email token for userId =>> %s", user.ID), "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "service unavailable, kindly contact support",
+			Error:      err.Error(),
+		}
+	}
+	err = redis.Set(ctx, fmt.Sprintf("email_%s", emailToken), email, emailCacheTime).Err()
+	if err != nil {
+		log.Error("failed to add email token to redis", "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "service unavailable",
+		}
+	}
+
 	userCache, _ := json.Marshal(user)
 	err = redis.Set(ctx, user.ID, userCache, userCacheTime).Err()
 	if err != nil {
@@ -132,6 +149,7 @@ func (config *AuthServiceConfig) CreateNewUser(ctx context.Context, dto AuthRequ
 			User:        user,
 			AccessToken: accessToken,
 			ExpiresIn:   time.Now().Add(1 * time.Hour).Unix(),
+			EmailToken:  emailToken,
 		},
 	}
 }
@@ -171,6 +189,7 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 				User:        *existingUser,
 				AccessToken: accessToken,
 				ExpiresIn:   time.Now().Add(1 * time.Hour).Unix(),
+				// EmailToken: ,
 			},
 		}
 	}
@@ -181,11 +200,13 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 }
 
 func (config *AuthServiceConfig) ValidateEmail(ctx context.Context, token string) *utils.ApiResponse {
-	email, _, err := mail.ParseVerificationToken(token)
+	email, err := config.redis.Get(ctx, fmt.Sprintf("email_%s", token)).Result()
+	fmt.Println(email, "this is the user email")
 	if err != nil {
+		// todo: send email here
 		return &utils.ApiResponse{
-			StatusCode: http.StatusInternalServerError,
-			Message:    "sever unavailable to validate email, try again!",
+			StatusCode: http.StatusBadRequest,
+			Message:    "your email verification link has expired, a new email has been sent to you",
 		}
 	}
 	email = strings.ToLower(email)
@@ -204,7 +225,7 @@ func (config *AuthServiceConfig) ValidateEmail(ctx context.Context, token string
 		EmailVerified bool
 	}
 
-	const checkQuery = `
+	const checkQuery string = `
 		SELECT id, email_verified 
 		FROM users 
 		WHERE email = $1
@@ -239,13 +260,12 @@ func (config *AuthServiceConfig) ValidateEmail(ctx context.Context, token string
 	const updateQuery = `
 		UPDATE users 
 		SET email_verified = TRUE, 
-		    email_verified_at = NOW(),
+		    email_verified_at = NOW()
 		WHERE id = $1
 	`
-
 	_, err = tx.Exec(ctx, updateQuery, user.ID)
 	if err != nil {
-		config.log.Error("failed to update verification", "error", err, "user_id", user.ID)
+		config.log.Info("failed to update verification", "error", err, "user_id", user.ID)
 		return &utils.ApiResponse{
 			StatusCode: http.StatusInternalServerError,
 			Message:    "Failed to verify email. Please contact support.",
@@ -283,9 +303,9 @@ func (config *AuthServiceConfig) GenerateRefreshToken(ctx context.Context, acces
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
 		Message:    "successful",
-		Data: &AuthResponseDto{
-			RefreshToken:       token,
-			RefreshTokenExpiry: time.Now().Add(7 * 24 * time.Hour).Unix(),
+		Data: map[string]interface{}{
+			"refresh_token":        token,
+			"refresh_token_expiry": time.Now().Add(7 * 24 * time.Hour).Unix(),
 		},
 	}
 }

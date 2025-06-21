@@ -2,18 +2,23 @@ package utils
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log/slog"
+	"math/big"
 	"net/http"
 	"os"
 	"strconv"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/The-True-Hooha/stellance-backend.git/internal/middleware"
 	"github.com/fernet/fernet-go"
 	"github.com/go-playground/validator/v10"
+	gonanoid "github.com/matoous/go-nanoid/v2"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -175,4 +180,92 @@ func GetRoleFromContext(ctx context.Context) (string, bool) {
 
 func GetBaseURL() string {
 	return os.Getenv("BASE_URL")
+}
+
+func ValidatePassword(fl validator.FieldLevel) bool {
+	password := fl.Field().String()
+
+	if len(password) < 8 {
+		return false
+	}
+
+	var (
+		hasUpper   bool
+		hasLower   bool
+		hasNumber  bool
+		hasSpecial bool
+	)
+
+	for _, char := range password {
+		switch {
+		case unicode.IsUpper(char):
+			hasUpper = true
+		case unicode.IsLower(char):
+			hasLower = true
+		case unicode.IsNumber(char):
+			hasNumber = true
+		case unicode.IsPunct(char) || unicode.IsSymbol(char):
+			hasSpecial = true
+		}
+	}
+
+	return hasUpper && hasLower && hasNumber && hasSpecial
+}
+
+func CheckPasswordRequirements(password string) (bool, string) {
+	if len(password) < 8 {
+		return false, "Password must be at least 8 characters long"
+	}
+	var (
+		hasUpper   bool
+		hasLower   bool
+		hasNumber  bool
+		hasSpecial bool
+	)
+
+	for _, char := range password {
+		switch {
+		case unicode.IsUpper(char):
+			hasUpper = true
+		case unicode.IsLower(char):
+			hasLower = true
+		case unicode.IsNumber(char):
+			hasNumber = true
+		case unicode.IsPunct(char) || unicode.IsSymbol(char):
+			hasSpecial = true
+		}
+	}
+
+	if !hasUpper {
+		return false, "Password must contain at least one uppercase letter"
+	}
+	if !hasLower {
+		return false, "Password must contain at least one lowercase letter"
+	}
+	if !hasNumber {
+		return false, "Password must contain at least one number"
+	}
+	if !hasSpecial {
+		return false, "Password must contain at least one special character"
+	}
+
+	return true, ""
+}
+
+func GenerateShortURL(data string, log *slog.Logger) (string, error) {
+	shortID, err := gonanoid.Generate(data, 30)
+	if err != nil {
+		log.Warn("failed to generate url from nano id returning to default")
+		b := make([]byte, 30)
+		for i := range b {
+			n, err := rand.Int(rand.Reader, big.NewInt(int64(len(data))))
+			if err != nil {
+				return "", err
+			}
+			b[i] = data[n.Int64()]
+		}
+		return string(b), nil
+	}
+	log.Debug("generate url from go nano id")
+	return shortID, nil
 }
