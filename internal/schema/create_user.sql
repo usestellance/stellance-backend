@@ -1,4 +1,3 @@
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE TABLE users(
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email TEXT NOT NULL UNIQUE,
@@ -26,4 +25,3 @@ WHERE email_verified = FALSE;
 CREATE INDEX idx_email ON users(email);
 CREATE INDEX idx_users_created_at ON users(created_at DESC);
 CREATE INDEX idx_country ON users(country);
-CREATE TYPE permission AS ENUM ('user', 'admin');

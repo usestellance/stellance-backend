@@ -1,4 +1,3 @@
-CREATE TYPE invoice_item_type AS ENUM ('per_hour', 'per_unit');
 CREATE TABLE IF NOT EXISTS invoice_items(
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     invoice_id UUID NOT NULL REFERENCES invoice(id) ON DELETE CASCADE,
@@ -9,7 +8,7 @@ CREATE TABLE IF NOT EXISTS invoice_items(
     discount INT,
     amount NUMERIC(20, 6) NOT NULL CHECK(amount > 0),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 

@@ -1,13 +1,6 @@
-CREATE TYPE transaction_status AS ENUM (
-    'pending',
-    'confirmed',
-    'failed',
-    'aborted',
-    'refunded'
-);
 CREATE TABLE IF NOT EXISTS transactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    invoice_id UUID NOT NULL REFERENCES invoices(id),
+    invoice_id UUID NOT NULL REFERENCES invoice(id),
     wallet_id UUID REFERENCES wallets(id),
     transaction_hash VARCHAR(128) UNIQUE,
     amount NUMERIC(20, 6) NOT NULL,
@@ -20,5 +13,4 @@ CREATE TABLE IF NOT EXISTS transactions (
 CREATE INDEX idx_transactions_invoice ON transactions(invoice_id);
 CREATE INDEX idx_transactions_wallet ON transactions(wallet_id)
 WHERE wallet_id IS NOT NULL;
-CREATE INDEX idx_transactions_hash ON transactions(transaction_hash);
 CREATE INDEX idx_transactions_status ON transactions(status);

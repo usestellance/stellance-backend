@@ -1,14 +1,3 @@
-CREATE TYPE invoice_status AS ENUM (
-    'draft',
-    'sent',
-    'viewed',
-    'paid',
-    'overdue',
-    'cancelled',
-    'refunded'
-);
-CREATE TYPE currency_type AS ENUM ('usdc', 'xlm');
-CREATE TYPE wallet_chain AS ENUM ('stellar');
 CREATE TABLE IF NOT EXISTS invoice_counters(
     user_id UUID NOT NULL,
     year INTEGER NOT NULL,
@@ -48,15 +37,15 @@ CREATE TABLE IF NOT EXISTS invoice (
     )
 );
 CREATE INDEX idx_invoice_counter_user_year ON invoice_counters(user_id, year);
-CREATE INDEX idx_invoices_created_by ON invoices(created_by_id);
-CREATE INDEX idx_invoices_url ON invoices(invoice_url);
-CREATE INDEX idx_invoices_payer_id ON invoices(payer_id)
+CREATE INDEX idx_invoice_created_by ON invoice(created_by_id);
+CREATE INDEX idx_invoice_url ON invoice(invoice_url);
+CREATE INDEX idx_invoice_payer_id ON invoice(payer_id)
 WHERE payer_id IS NOT NULL;
-CREATE INDEX idx_invoices_status ON invoices(status);
-CREATE INDEX idx_invoices_due_date ON invoices(due_date)
+CREATE INDEX idx_invoice_status ON invoice(status);
+CREATE INDEX idx_invoice_due_date ON invoice(due_date)
 WHERE status IN ('sent', 'viewed');
-CREATE INDEX idx_invoices_created_at ON invoices(created_at DESC);
-CREATE INDEX idx_invoices_number ON invoices(invoice_number);
-CREATE INDEX idx_payer_wallet_address ON invoices(payer_wallet_address);
-CREATE TRIGGER set_invoices_updated_at BEFORE
-UPDATE ON invoices FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE INDEX idx_invoice_created_at ON invoice(created_at DESC);
+CREATE INDEX idx_invoice_number ON invoice(invoice_number);
+CREATE INDEX idx_payer_wallet_address ON invoice(payer_wallet_address);
+CREATE TRIGGER set_invoice_updated_at BEFORE
+UPDATE ON invoice FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

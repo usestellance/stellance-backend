@@ -11,10 +11,12 @@ CREATE TABLE IF NOT EXISTS wallets (
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT unique_wallet_address UNIQUE(address, chain),
-    CONSTRAINT unique_user_tag UNIQUE(user_id, tag)
-    WHERE tag IS NOT NULL
+    CONSTRAINT unique_wallet_address UNIQUE(address, chain)
 );
+
+CREATE UNIQUE INDEX unique_user_tag ON wallets(user_id, tag)
+WHERE tag IS NOT NULL;
+
 CREATE INDEX idx_wallets_user_id ON wallets(user_id);
 CREATE INDEX idx_wallets_chain_currency ON wallets(chain, currency);
 CREATE INDEX idx_wallets_user_primary ON wallets(user_id, is_primary)
