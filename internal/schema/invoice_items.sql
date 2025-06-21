@@ -1,4 +1,4 @@
-CREATE TYPE invoice_item_type AS ENUM ('hour', 'unit');
+CREATE TYPE invoice_item_type AS ENUM ('per_hour', 'per_unit');
 CREATE TABLE IF NOT EXISTS invoice_items(
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     invoice_id UUID NOT NULL REFERENCES invoice(id) ON DELETE CASCADE,
