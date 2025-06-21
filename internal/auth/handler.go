@@ -16,9 +16,11 @@ type AuthHandler struct {
 }
 
 func NewAuthHandler(config *AuthServiceConfig) *AuthHandler {
+	v := validator.New()
+	v.RegisterValidation("passwd", utils.ValidatePassword)
 	return &AuthHandler{
 		service:   config,
-		validator: validator.New(),
+		validator: v,
 	}
 }
 
@@ -31,6 +33,11 @@ func (handler *AuthHandler) SignUpHandler(w http.ResponseWriter, r *http.Request
 
 	if err := handler.validator.Struct(dto); err != nil {
 		utils.HandleValidationError(w, err)
+		return
+	}
+
+	if valid, errMsg := utils.CheckPasswordRequirements(dto.Password); !valid {
+		http.Error(w, errMsg, http.StatusBadRequest)
 		return
 	}
 
@@ -56,7 +63,6 @@ func (handler *AuthHandler) AdminRegister(w http.ResponseWriter, r *http.Request
 
 func (h *AuthHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var dto AuthRequestDto
-
 	if err := json.NewDecoder(r.Body).Decode(&dto); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
