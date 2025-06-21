@@ -9,19 +9,21 @@ const (
 	RoleAdmin UserRole = "admin"
 )
 
-type UserResponseDto struct {
-	ID              string    `json:"id"`
-	Email           string    `json:"email,omitempty"`
-	Password        string    `json:"password,omitempty"`
+type UserProfileDto struct {
+	ID              string     `json:"id"`
+	Email           string     `json:"email,omitempty"`
+	Password        string     `json:"password,omitempty"`
 	FirstName       string    `json:"first_name,omitempty"`
 	LastName        string    `json:"last_name,omitempty"`
-	BusinessName    string    `json:"business_name,omitempty"`
-	PhoneNumber     string    `json:"phone_number,omitempty"`
-	Country         string    `json:"country,omitempty"`
-	EmailVerified   bool      `json:"email_verified,omitempty"`
-	EmailVerifiedAt time.Time `json:"email_verified_at,omitempty"`
-	CreatedAt       time.Time `json:"created_at,omitempty"`
-	Role            UserRole  `json:"role,omitempty"`
+	BusinessName    *string    `json:"business_name,omitempty"`
+	PhoneNumber     *string    `json:"phone_number,omitempty"`
+	Country         *string    `json:"country,omitempty"`
+	IsActive        bool       `json:"is_active"`
+	EmailVerified   bool       `json:"email_verified,omitempty"`
+	EmailVerifiedAt *time.Time `json:"email_verified_at,omitempty"`
+	CreatedAt       time.Time  `json:"created_at,omitempty"`
+	UpdatedAt       *time.Time `json:"updated_at,omitempty"`
+	Role            UserRole   `json:"role,omitempty"`
 }
 
 type CompleteProfileRequestDto struct {
@@ -38,18 +40,4 @@ type UpdateProfileDto struct {
 	BusinessName *string `json:"business_name,omitempty" validate:"omitempty,max=50"`
 	PhoneNumber  *string `json:"phone_number,omitempty" validate:"omitempty,max=15"`
 	Country      *string `json:"country,omitempty" validate:"omitempty,max=25"`
-}
-
-type UserProfileResponse struct {
-	ID            string    `json:"id"`
-	Email         string    `json:"email"`
-	FirstName     string    `json:"first_name"`
-	LastName      string    `json:"last_name"`
-	BusinessName  *string   `json:"business_name,omitempty"`
-	PhoneNumber   *string   `json:"phone_number,omitempty"`
-	Country       *string   `json:"country,omitempty"`
-	EmailVerified bool      `json:"email_verified"`
-	IsActive      bool      `json:"is_active"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
 }
