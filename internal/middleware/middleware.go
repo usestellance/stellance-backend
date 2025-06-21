@@ -217,13 +217,14 @@ func RateLimitGuardMiddleware(redis *redis.Client) func(http.Handler) http.Handl
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var config ratelimiter.RateLimitConfig
 			switch {
-			case strings.HasPrefix(r.URL.Path, "/auth/login"),
-				strings.HasPrefix(r.URL.Path, "/auth/signup"):
+			case strings.HasPrefix(r.URL.Path, "/api/v1/auth/login"),
+				strings.HasPrefix(r.URL.Path, "/api/v1/auth/signup"):
+				fmt.Println("strict limit is been used")
 				config = ratelimiter.StrictLimit
 			case r.Context().Value("user_id") != nil:
+				fmt.Println("the authenticated limit is been used")
 				config = ratelimiter.AuthenticatedLimit
 			default:
-				fmt.Println("the default rate limit is been used")
 				config = ratelimiter.DefaultLimit
 			}
 
