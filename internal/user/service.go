@@ -33,14 +33,14 @@ func NewUserService() *UserService {
 	}
 }
 
-func (s *UserService) FindUserByEmail(ctx context.Context, email string) (*UserResponseDto, error) {
+func (s *UserService) FindUserByEmail(ctx context.Context, email string) (*UserProfileDto, error) {
 	email = strings.ToLower(email)
-	const query = `
+	const query string = `
 		SELECT id, email, created_at, password, permission
 		FROM users
 		WHERE email = $1
 	`
-	var user UserResponseDto
+	var user UserProfileDto
 	err := s.postgres.QueryRow(ctx, query, email).Scan(
 		&user.ID,
 		&user.Email,
@@ -58,10 +58,10 @@ func (s *UserService) FindUserByEmail(ctx context.Context, email string) (*UserR
 	return &user, nil
 }
 
-func (s *UserService) CheckUserVerification(ctx context.Context, email string) (*UserResponseDto, error) {
+func (s *UserService) CheckUserVerification(ctx context.Context, email string) (*UserProfileDto, error) {
 	email = strings.ToLower(email)
 	const query = `SELECT id, email, email_verified, email_verified_at FROM USERS WHERE email = $1`
-	var user UserResponseDto
+	var user UserProfileDto
 	err := s.postgres.QueryRow(ctx, query, email).Scan(&user.ID, &user.Email, &user.EmailVerified, &user.EmailVerifiedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -143,7 +143,6 @@ func (s *UserService) CompleteUserProfile(ctx context.Context, email string, dto
 			Message:    "Please verify your email first. A verification email has been sent to your address.",
 		}
 	}
-
 	const updateQuery = `
 		UPDATE users 
 		SET 
@@ -243,7 +242,7 @@ func (s *UserService) GetProfileByID(ctx context.Context, userID string, request
 		WHERE id = $1 AND is_active = true
 	`
 
-	var profile UserProfileResponse
+	var profile UserProfileDto
 	err := s.postgres.QueryRow(ctx, query, userID).Scan(
 		&profile.ID,
 		&profile.Email,
@@ -381,7 +380,7 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID string, dto Upda
 			email_verified, is_active, created_at, updated_at
 	`, strings.Join(updateFields, ", "))
 
-	var updatedProfile UserProfileResponse
+	var updatedProfile UserProfileDto
 	err = tx.QueryRow(ctx, updateQuery, args...).Scan(
 		&updatedProfile.ID,
 		&updatedProfile.Email,
