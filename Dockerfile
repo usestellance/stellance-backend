@@ -8,7 +8,6 @@ RUN go mod download
 
 COPY . .
 
-
 RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/api
 
 FROM alpine:latest
@@ -22,6 +21,6 @@ COPY --from=builder /app/main .
 ENV STAGE=prod
 ENV APP_ENV=prod
 
-EXPOSE 8000
+EXPOSE 4000
 
 CMD ["./main"]
