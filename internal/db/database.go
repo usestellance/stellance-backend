@@ -32,6 +32,7 @@ func CreateNewPostgresConnection(ctx context.Context, config PostgresConfig) (*P
 
 	url := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
 		config.User, config.Password, config.Host, config.Port, config.Name, sslMode)
+		fmt.Println(url)
 	pg, err := pgxpool.ParseConfig(url)
 	if err != nil {
 		return nil, err

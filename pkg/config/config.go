@@ -27,7 +27,7 @@ func InitializeContainer(ctx context.Context, dbConfig database.PostgresConfig, 
 	once.Do(func() {
 		pool, err := database.CreateNewPostgresConnection(ctx, dbConfig)
 		if err != nil {
-			log.Error("failed to initialize postgres pool", "error", err)
+			log.Error("failed to initialize postgres pool", "error", err.Error())
 			initError = err
 			return
 		}
