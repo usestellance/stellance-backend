@@ -50,11 +50,14 @@ Run `migrations` with with [go-migrate](https://github.com/golang-migrate/migrat
 
 ## 🏃‍♂️ Running the Application
 
-Development Mode
-bash# Run with hot reload (install air first)
-go install github.com/cosmtrek/air@latest
-air
+- Development Mode
 
-### Or run directly
+Run with hot reload (install air first)
 
-go run cmd/api/main.go
+cmd: `go install github.com/cosmtrek/air@latest`
+
+cmd: `air`
+
+- Or run directly
+
+`go run cmd/api/main.go`
