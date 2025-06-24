@@ -344,7 +344,7 @@ func (c *AuthServiceConfig) GenerateAndSendEmail(ctx context.Context, email, use
 	go func() {
 		ee := url.QueryEscape(email)
 		eu := url.QueryEscape(emailToken)
-		email_url := fmt.Sprintf("https://usestellance.com/sign-up/verify-email?email=%s&token=%s", ee, eu)
+		email_url := fmt.Sprintf("https://usestellance.com/auth/sign-up/verify-email?email=%s&token=%s", ee, eu)
 		err := c.mail.SendVerificationEmail(email, email_url)
 		if err != nil {
 			log.Warn("error sending email to user", "error", err)
