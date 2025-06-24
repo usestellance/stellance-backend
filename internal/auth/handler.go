@@ -97,11 +97,12 @@ func (h *AuthHandler) RefreshTokenHandler(w http.ResponseWriter, r *http.Request
 
 func (h *AuthHandler) ValidateEmailHandler(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
+	email_ := r.URL.Query().Get("email")
 	if token == "" {
 		http.Error(w, "invalid request! auth token not found", http.StatusBadRequest)
 		return
 	}
 
-	data := h.service.ValidateEmail(r.Context(), token)
+	data := h.service.ValidateEmail(r.Context(), token, email_)
 	utils.WriteToJson(w, data.StatusCode, data)
 }

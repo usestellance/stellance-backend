@@ -36,7 +36,7 @@ func NewUserService() *UserService {
 func (s *UserService) FindUserByEmail(ctx context.Context, email string) (*UserProfileDto, error) {
 	email = strings.ToLower(email)
 	const query string = `
-		SELECT id, email, created_at, password, permission
+		SELECT id, email, password, permission, email_verified, first_name, last_name
 		FROM users
 		WHERE email = $1
 	`
@@ -44,9 +44,11 @@ func (s *UserService) FindUserByEmail(ctx context.Context, email string) (*UserP
 	err := s.postgres.QueryRow(ctx, query, email).Scan(
 		&user.ID,
 		&user.Email,
-		&user.CreatedAt,
 		&user.Password,
 		&user.Role,
+		&user.EmailVerified,
+		&user.FirstName,
+		&user.LastName,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -271,7 +273,7 @@ func (s *UserService) GetProfileByID(ctx context.Context, userID string, request
 		}
 	}
 
-	profileComplete := profile.FirstName != "" && profile.LastName != ""
+	profileComplete := profile.FirstName != nil && profile.LastName != nil
 
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
@@ -279,6 +281,7 @@ func (s *UserService) GetProfileByID(ctx context.Context, userID string, request
 		Data: map[string]interface{}{
 			"profile":          profile,
 			"profile_complete": profileComplete,
+			"email_verified":   !profile.EmailVerified,
 		},
 	}
 }

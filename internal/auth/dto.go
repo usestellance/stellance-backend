@@ -13,5 +13,6 @@ type AuthResponseDto struct {
 	RefreshToken       string              `json:"refresh_token,omitempty"`
 	ExpiresIn          int64               `json:"expires_in,omitempty"`
 	RefreshTokenExpiry int64               `json:"refresh_token_expiry,omitempty"`
-	EmailToken         string              `json:"email_token,omitempty"`
+	EmailVerified      bool                `json:"email_verified"`
+	ProfileComplete    bool                `json:"profile_complete"`
 }
