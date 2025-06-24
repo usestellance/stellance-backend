@@ -2,9 +2,9 @@ package mail
 
 import (
 	"bytes"
+	"embed"
 	"fmt"
 	"html/template"
-	"embed"
 	"log/slog"
 	"os"
 	"time"
@@ -16,7 +16,8 @@ import (
 
 var (
 	verification_Email_Sender = "noreply@usestellance.com"
-	templateFs embed.FS
+	//go:embed templates/email_verification.html
+	templateFs                embed.FS
 )
 
 type Mailer struct {
@@ -53,14 +54,14 @@ func ParseVerificationToken(token string) (email string, userID string, err erro
 
 func (m *Mailer) SendVerificationEmail(email, url string) error {
 	subject := "Complete Email Verification"
-	t, err := template.ParseFS(templateFs, "mail/templates/email_verification.html")
+	t, err := template.ParseFS(templateFs, "templates/email_verification.html")
 	if err != nil {
 		return fmt.Errorf("failed to read welcome email template: %w", err)
 	}
 
 	var body bytes.Buffer
 	if err := t.Execute(&body, map[string]interface{}{
-		"URL":  url,
+		"URL": url,
 	}); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)
 	}
