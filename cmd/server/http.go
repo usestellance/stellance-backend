@@ -15,6 +15,7 @@ import (
 	"github.com/The-True-Hooha/stellance-backend.git/internal/auth"
 	"github.com/The-True-Hooha/stellance-backend.git/internal/middleware"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/config"
+	"github.com/The-True-Hooha/stellance-backend.git/pkg/config/cors_config"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/httpx"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/logger"
 )
@@ -48,7 +49,10 @@ var (
 func SetServerConfig() *Server {
 	router := http.NewServeMux()
 	redis := config.GetAppContainer().Redis
-	handler := middleware.ErrorHandlerMiddleware(router)
+	config := cors_config.GetCorsConfig()
+	cm := middleware.CORSMiddleware(config)
+	handler := cm(router)
+	handler = middleware.ErrorHandlerMiddleware(handler)
 	handler = middleware.LoggerMiddleware(handler)
 	handler = middleware.RateLimitGuardMiddleware(redis)(handler)
 	log := logger.Logger()
@@ -72,9 +76,9 @@ func (server *Server) AddHttpRoutes() {
 	apiV1 := httpx.AddNewRouteGroup("/api/v1")
 	apiV1.HandleFunc("GET /health", runHealthCheck)
 
-	authService:= auth.NewAuthService()
+	authService := auth.NewAuthService()
 	auth.RegisterAuthRoutes(apiV1, server.router, authService)
-	
+
 	apiV1.Inject(server.router)
 }
 
