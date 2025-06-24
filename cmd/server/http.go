@@ -14,6 +14,7 @@ import (
 
 	"github.com/The-True-Hooha/stellance-backend.git/internal/auth"
 	"github.com/The-True-Hooha/stellance-backend.git/internal/middleware"
+	"github.com/The-True-Hooha/stellance-backend.git/internal/user"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/config"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/config/cors_config"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/httpx"
@@ -78,6 +79,8 @@ func (server *Server) AddHttpRoutes() {
 
 	authService := auth.NewAuthService()
 	auth.RegisterAuthRoutes(apiV1, server.router, authService)
+	profileService := user.NewUserService()
+	user.RegisterUserRoutes(apiV1, server.router, profileService)
 
 	apiV1.Inject(server.router)
 }

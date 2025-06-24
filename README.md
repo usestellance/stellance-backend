@@ -30,3 +30,5 @@ cmd: `air`
 - Or run directly
 
 `go run cmd/api/main.go`
+
+`//go:embed templates/**`

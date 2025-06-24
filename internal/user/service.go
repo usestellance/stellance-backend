@@ -131,21 +131,12 @@ func (s *UserService) CompleteUserProfile(ctx context.Context, email string, dto
 	}
 
 	if !user.EmailVerified {
-		// Send verification email asynchronously
-		go func() {
-			// emailToken, err := mail.CreateEmailToken(user.Email, user.ID)
-			if err != nil {
-				log.Error("failed to create email token", "error", err)
-				return
-			}
-		}()
-
 		return &utils.ApiResponse{
 			StatusCode: http.StatusForbidden,
-			Message:    "Please verify your email first. A verification email has been sent to your address.",
+			Message:    "Please verify your email first",
 		}
 	}
-	const updateQuery = `
+	updateQuery := `
 		UPDATE users 
 		SET 
 			first_name = $2,
