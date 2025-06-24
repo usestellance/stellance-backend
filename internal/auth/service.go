@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/The-True-Hooha/stellance-backend.git/internal/user"
+	"github.com/The-True-Hooha/stellance-backend.git/mail"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/config"
 	jwt_ "github.com/The-True-Hooha/stellance-backend.git/pkg/jwt"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/utils"
@@ -31,6 +33,7 @@ type AuthServiceConfig struct {
 	postgres *pgxpool.Pool
 	redis    *redis.Client
 	jwt      *jwt_.JwtTokenServiceConfig
+	mail     *mail.Mailer
 }
 
 func NewAuthService() *AuthServiceConfig {
@@ -39,6 +42,18 @@ func NewAuthService() *AuthServiceConfig {
 		postgres: config.GetAppContainer().Postgres,
 		redis:    config.GetAppContainer().Redis,
 		jwt:      jwt_.JwtTokenService(),
+		mail:     mail.NewMailer(),
+	}
+}
+
+func (c *AuthServiceConfig) ClearRedis(ctx context.Context) *utils.ApiResponse {
+	err := c.redis.FlushDB(ctx).Err()
+	if err != nil {
+		panic(err)
+	}
+	return &utils.ApiResponse{
+		StatusCode: http.StatusOK,
+		Message:    "Cleared Successfully",
 	}
 }
 
@@ -140,6 +155,16 @@ func (config *AuthServiceConfig) CreateNewUser(ctx context.Context, dto AuthRequ
 			Error:      err.Error(),
 		}
 	}
+
+	go func() {
+		ee := url.QueryEscape(email)
+		eu := url.QueryEscape(emailToken)
+		email_url := fmt.Sprintf("https://usestellance.com/sign-up/verify-email?email=%s&token=%s", ee, eu)
+		err := config.mail.SendVerificationEmail(email, email_url)
+		if err != nil {
+			log.Warn("error sending email to user", "error", err)
+		}
+	}()
 
 	log.Debug(fmt.Sprintf("new user with ID %s created successfully", user.ID))
 	return &utils.ApiResponse{

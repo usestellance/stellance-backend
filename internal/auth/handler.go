@@ -24,6 +24,12 @@ func NewAuthHandler(config *AuthServiceConfig) *AuthHandler {
 	}
 }
 
+func (h *AuthHandler) ClearRedisHandler(w http.ResponseWriter, r *http.Request) {
+	data := h.service.ClearRedis(r.Context())
+
+	utils.WriteToJson(w, data.StatusCode, data)
+}
+
 func (handler *AuthHandler) SignUpHandler(w http.ResponseWriter, r *http.Request) {
 	var dto AuthRequestDto
 	if err := json.NewDecoder(r.Body).Decode(&dto); err != nil {
