@@ -106,3 +106,14 @@ func (h *AuthHandler) ValidateEmailHandler(w http.ResponseWriter, r *http.Reques
 	data := h.service.ValidateEmail(r.Context(), token, email_)
 	utils.WriteToJson(w, data.StatusCode, data)
 }
+
+func (h *AuthHandler) ResendEmailVerification(w http.ResponseWriter, r *http.Request) {
+	email := r.URL.Query().Get("email")
+	if email == "" {
+		http.Error(w, "invalid request! auth email not found", http.StatusBadRequest)
+		return
+	}
+
+	data := h.service.ResendEmail(r.Context(), email)
+	utils.WriteToJson(w, data.StatusCode, data)
+}

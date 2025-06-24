@@ -352,3 +352,24 @@ func (c *AuthServiceConfig) GenerateAndSendEmail(ctx context.Context, email, use
 	}()
 	return nil
 }
+
+func (c *AuthServiceConfig) ResendEmail(ctx context.Context, email string) *utils.ApiResponse {
+	token, err := utils.GenerateSecureToken(16)
+	if err != nil {
+		c.log.Info("error trying to generate random string")
+		token = "idnaskfnakfnpdmffadfaerfwfgsgsgwsbesnh"
+	}
+
+	err = c.GenerateAndSendEmail(ctx, email, token, c.log)
+
+	if err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Server is currently unavailable",
+		}
+	}
+	return &utils.ApiResponse{
+		StatusCode: http.StatusOK,
+		Message:    "Email has been sent",
+	}
+}
