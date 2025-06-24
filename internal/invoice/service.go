@@ -61,13 +61,19 @@ func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvo
 
 	var businessName sql.NullString
 
-	const businessNameQ = `SELECT business_name FROM users WHERE id = $1 AND is_active = true`
+	const businessNameQ string = `SELECT business_name FROM users WHERE id = $1
+		AND is_active = true
+		AND email_verified = true
+		AND first_name IS NOT NULL 
+		AND first_name <> '' 
+		AND last_name IS NOT NULL 
+		AND last_name <> ''`
 	err = tx.QueryRow(ctx, businessNameQ, userId).Scan(&businessName)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return &utils.ApiResponse{
-				StatusCode: http.StatusNotFound,
-				Message:    "User not found or inactive",
+				StatusCode: http.StatusForbidden,
+				Message:    "Please contact support, your profile is not yet complete",
 			}
 		}
 		is.log.Error("failed to fetch user", "error", err, "user_id", userId)
