@@ -344,11 +344,32 @@ func (c *AuthServiceConfig) GenerateAndSendEmail(ctx context.Context, email, use
 	go func() {
 		ee := url.QueryEscape(email)
 		eu := url.QueryEscape(emailToken)
-		email_url := fmt.Sprintf("https://usestellance.com/sign-up/verify-email?email=%s&token=%s", ee, eu)
+		email_url := fmt.Sprintf("https://usestellance.com/auth/sign-up/verify-email?email=%s&token=%s", ee, eu)
 		err := c.mail.SendVerificationEmail(email, email_url)
 		if err != nil {
 			log.Warn("error sending email to user", "error", err)
 		}
 	}()
 	return nil
+}
+
+func (c *AuthServiceConfig) ResendEmail(ctx context.Context, email string) *utils.ApiResponse {
+	token, err := utils.GenerateSecureToken(16)
+	if err != nil {
+		c.log.Info("error trying to generate random string")
+		token = "idnaskfnakfnpdmffadfaerfwfgsgsgwsbesnh"
+	}
+
+	err = c.GenerateAndSendEmail(ctx, email, token, c.log)
+
+	if err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Server is currently unavailable",
+		}
+	}
+	return &utils.ApiResponse{
+		StatusCode: http.StatusOK,
+		Message:    "Email has been sent",
+	}
 }
