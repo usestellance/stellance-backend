@@ -42,17 +42,6 @@ type InvoiceItems struct {
 	CreatedAt   *time.Time  `json:"created_at,omitempty"`
 }
 
-// type InvoiceItemsResponseDto struct {
-// 	ItemId      string      `json:"item_id,omitempty"`
-// 	InvoiceType InvoiceType `json:"invoice_type"`
-// 	Description string      `json:"description"`
-// 	Quantity    int64       `json:"quantity"`
-// 	UnitPrice   float64     `json:"unit_price"`
-// 	Discount    int64       `json:"discount,omitempty"`
-// 	Amount      float64     `json:"amount"`
-// 	CreatedAt   *time.Time  `json:"created_at,omitempty"`
-// }
-
 type InvoiceResponse struct {
 	ID                 string                    `json:"id"`
 	InvoiceNumber      string                    `json:"invoice_number"`
