@@ -2,8 +2,10 @@ package invoice
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/The-True-Hooha/stellance-backend.git/internal/user"
@@ -13,14 +15,33 @@ import (
 
 type InvoiceHandler struct {
 	service   *InvoiceService
-	validator validator.Validate
+	validator *validator.Validate
 }
 
 func NewInvoiceHandler(is *InvoiceService) *InvoiceHandler {
+	v := validator.New()
+	RegisterInvoiceFiltersValidation(v)
 	return &InvoiceHandler{
 		service:   is,
-		validator: *validator.New(),
+		validator: v,
 	}
+}
+
+func RegisterInvoiceFiltersValidation(v *validator.Validate) {
+	v.RegisterValidation("invoice_status", func(fl validator.FieldLevel) bool {
+		status := fl.Field().String()
+		switch status {
+		case "", "draft", "sent", "viewed", "paid", "overdue", "cancelled", "refunded":
+			return true
+		default:
+			return false
+		}
+	})
+
+	v.RegisterValidation("order_by", func(fl validator.FieldLevel) bool {
+			order := strings.ToLower(fl.Field().String())
+		return order == "asc" || order == "desc"
+	})
 }
 
 func (handler *InvoiceHandler) CreateNewInvoiceHandler(w http.ResponseWriter, r *http.Request) {
@@ -71,6 +92,7 @@ func (handler *InvoiceHandler) GetManyInvoiceHandler(w http.ResponseWriter, r *h
 	ctx := r.Context()
 
 	reqUserId, ok := utils.GetUserIDFromContext(ctx)
+	fmt.Println(reqUserId, "the request user id")
 	if !ok {
 		http.Error(w, "invalid request! not allowed", http.StatusUnauthorized)
 		return
@@ -83,6 +105,10 @@ func (handler *InvoiceHandler) GetManyInvoiceHandler(w http.ResponseWriter, r *h
 	}
 
 	userID := r.URL.Query().Get("user_id")
+
+	if userID == "" {
+		userID = reqUserId
+	}
 
 	if userID != reqUserId && role != string(user.RoleAdmin) {
 		http.Error(w, "Forbidden", http.StatusForbidden)
@@ -106,6 +132,8 @@ func (handler *InvoiceHandler) GetManyInvoiceHandler(w http.ResponseWriter, r *h
 		if p, err := strconv.Atoi(page); err == nil {
 			dto.Page = p
 		}
+	}else {
+		dto.Page = 1
 	}
 
 	pageCount := r.URL.Query().Get("page_size")
@@ -113,6 +141,8 @@ func (handler *InvoiceHandler) GetManyInvoiceHandler(w http.ResponseWriter, r *h
 		if ps, err := strconv.Atoi(pageCount); err == nil {
 			dto.Count = ps
 		}
+	}else{
+		dto.Count = 10
 	}
 
 	orderBy := r.URL.Query().Get("order_by")

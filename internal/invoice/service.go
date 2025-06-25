@@ -115,13 +115,13 @@ func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvo
 	}
 	const invoiceQ = `
 	INSERT INTO invoice(invoice_number, invoice_url, created_by_id, payer_email, 
-	sub_total, service_fee, total, currency, title, status,due_date, address_country)
-	VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)RETURNING id, created_at`
+	sub_total, service_fee, total, currency, title, status,due_date, address_country, payer_name)
+	VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)RETURNING id, created_at`
 
 	var invoiceId string
 	var createdAt time.Time
 
-	err = tx.QueryRow(ctx, invoiceQ, invoiceNumber, invoice_url, userId, dto.Email, subtotal, serviceFee, total, utils.USDC, dto.Title, InvoiceStatusDraft, dueDate, dto.Country).Scan(&invoiceId, &createdAt)
+	err = tx.QueryRow(ctx, invoiceQ, invoiceNumber, invoice_url, userId, dto.Email, subtotal, serviceFee, total, utils.USDC, dto.Title, InvoiceStatusDraft, dueDate, dto.Country, dto.RecipientName).Scan(&invoiceId, &createdAt)
 	if err != nil {
 		is.log.Error("failed to create invoice", "error", err)
 		return &utils.ApiResponse{
@@ -176,7 +176,7 @@ func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvo
 		Total:         total,
 		Currency:      string(utils.USDC),
 		Status:        string(InvoiceStatusDraft),
-		DueDate:       dueDate.Format("2006-01-02"),
+		DueDate:       dueDate,
 		CreatedAt:     createdAt,
 		Items:         dto.InvoiceItems,
 	}
@@ -253,17 +253,6 @@ func (is *InvoiceService) validateAndCalculateInvoice(dto CreateInvoiceDTO) (sub
 }
 
 func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFiltersDto, user_id string) *utils.ApiResponse {
-	if dto.Page < 1 {
-		dto.Page = 1
-	}
-	if dto.Count < 1 || dto.Count > 10 {
-		dto.Count = 10
-	}
-
-	if dto.OrderBy == "" {
-		dto.OrderBy = utils.OrderByDESC
-	}
-
 	if dto.Status != "" {
 		validStatuses := map[InvoiceStatus]bool{
 			InvoiceStatusDraft:     true,
@@ -283,14 +272,12 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 	}
 
 	query, args := is.buildInvoiceQuery(dto, user_id)
-
 	countQuery := `
 		SELECT COUNT(*)
 		FROM invoice i
 		WHERE i.created_by_id = $1
 		%s
 	`
-
 	var whereClause string
 	countArgs := []interface{}{user_id}
 	argCount := 1
@@ -309,7 +296,6 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 			Message:    "Failed to fetch invoices",
 		}
 	}
-
 	rows, err := is.postgres.Query(ctx, query, args...)
 	if err != nil {
 		is.log.Error("failed to fetch invoices", "error", err)
@@ -321,12 +307,14 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 	defer rows.Close()
 
 	invoices := []InvoiceResponse{}
+	invoiceIDs := []string{}
+
 	for rows.Next() {
 		var invoice InvoiceResponse
-		var payerName sql.NullString
+		var payerWalletAddress sql.NullString
 		var title sql.NullString
 		var paidAt sql.NullTime
-		var Country sql.NullString
+		var country sql.NullString
 
 		err := rows.Scan(
 			&invoice.ID,
@@ -334,7 +322,8 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 			&invoice.InvoiceURL,
 			&title,
 			&invoice.PayerEmail,
-			&payerName,
+			&invoice.PayerName,
+			&payerWalletAddress,
 			&invoice.SubTotal,
 			&invoice.ServiceFee,
 			&invoice.Total,
@@ -344,25 +333,44 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 			&paidAt,
 			&invoice.CreatedAt,
 			&invoice.UpdatedAt,
-			&Country,
+			&country,
 		)
 		if err != nil {
-			is.log.Error("failed to retrieve invoice", "error", err)
+			is.log.Error("failed to scan invoice", "error", err)
 			continue
 		}
 
 		if title.Valid {
 			invoice.Title = title.String
 		}
-		if payerName.Valid {
-			invoice.PayerName = payerName.String
+		if payerWalletAddress.Valid {
+			invoice.PayerWalletAddress = payerWalletAddress.String
 		}
 		if paidAt.Valid {
 			invoice.PaidAt = &paidAt.Time
 		}
+		if country.Valid {
+			invoice.Country = country.String
+		}
 
 		invoices = append(invoices, invoice)
+		invoiceIDs = append(invoiceIDs, invoice.ID)
 	}
+
+	itemMap, err := is.fetchAllInvoiceItems(ctx, invoiceIDs)
+	if err != nil {
+		is.log.Error("failed to fetch invoice items", "error", err)
+
+	}
+
+	for i := range invoices {
+		if items, ok := itemMap[invoices[i].ID]; ok {
+			invoices[i].Items = items
+		} else {
+			invoices[i].Items = []InvoiceItems{}
+		}
+	}
+
 	totalPages := int(math.Ceil(float64(totalItems) / float64(dto.Count)))
 	response := InvoiceListResponseDto{
 		Invoice: invoices,
@@ -373,11 +381,70 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 			TotalPages: totalPages,
 		},
 	}
+
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
-		Message:    "successful",
+		Message:    "Invoices fetched successfully",
 		Data:       response,
 	}
+}
+
+func (is *InvoiceService) fetchAllInvoiceItems(ctx context.Context, invoiceIDs []string) (map[string][]InvoiceItems, error) {
+	if len(invoiceIDs) == 0 {
+		return map[string][]InvoiceItems{}, nil
+	}
+
+	const query string = `
+		SELECT 
+			invoice_id,
+			id, 
+			item_type, 
+			description, 
+			quantity, 
+			unit_price, 
+			discount, 
+			amount, 
+			created_at
+		FROM invoice_items
+		WHERE invoice_id = ANY($1)
+		ORDER BY invoice_id, created_at
+	`
+
+	rows, err := is.postgres.Query(ctx, query, invoiceIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query invoice items: %w", err)
+	}
+	defer rows.Close()
+
+	itemMap := make(map[string][]InvoiceItems)
+
+	for rows.Next() {
+		var item InvoiceItems
+		var invoiceID string
+
+		err := rows.Scan(
+			&invoiceID,
+			&item.ItemId,
+			&item.InvoiceType,
+			&item.Description,
+			&item.Quantity,
+			&item.UnitPrice,
+			&item.Discount,
+			&item.Amount,
+			&item.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan invoice item: %w", err)
+		}
+
+		itemMap[invoiceID] = append(itemMap[invoiceID], item)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating invoice items: %w", err)
+	}
+
+	return itemMap, nil
 }
 
 func (is *InvoiceService) buildInvoiceQuery(filters InvoiceFiltersDto, userId string) (string, []interface{}) {
@@ -391,6 +458,7 @@ func (is *InvoiceService) buildInvoiceQuery(filters InvoiceFiltersDto, userId st
 			i.title,
 			i.payer_email,
 			i.payer_name,
+			i.payer_wallet_address,
 			i.sub_total,
 			i.service_fee,
 			i.total,
@@ -416,7 +484,7 @@ func (is *InvoiceService) buildInvoiceQuery(filters InvoiceFiltersDto, userId st
 		}
 	}
 
-	query += fmt.Sprintf("ORDER BY i.created_at %s", filters.OrderBy)
+	query += fmt.Sprintf(" ORDER BY i.created_at %s", filters.OrderBy)
 
 	argCount++
 	query += fmt.Sprintf(" LIMIT $%d", argCount)
