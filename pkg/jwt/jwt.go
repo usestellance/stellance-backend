@@ -93,7 +93,7 @@ func (config *JwtTokenServiceConfig) GenerateRefreshToken(accessToken string) (s
 		},
 	}
 	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
-	tokenString, err := refreshToken.SignedString([]byte(config.refreshTokenSecret))
+	tokenString, err := refreshToken.SignedString([]byte(config.secret))
 	if err != nil {
 		return "", fmt.Errorf("failed to sign refresh token: %w", err)
 	}
