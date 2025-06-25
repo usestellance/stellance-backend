@@ -1,0 +1,2 @@
+ALTER TABLE invoice
+ADD COLUMN payer_name TEXT NOT NULL;
