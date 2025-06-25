@@ -19,7 +19,6 @@ CREATE TABLE IF NOT EXISTS invoice (
     total NUMERIC(20, 6) NOT NULL,
     currency currency_type NOT NULL DEFAULT 'usdc',
     title VARCHAR(200),
-    description TEXT,
     status invoice_status NOT NULL DEFAULT 'draft',
     due_date DATE,
     address_country VARCHAR(60),
