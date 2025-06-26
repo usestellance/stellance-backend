@@ -6,33 +6,62 @@ import (
 )
 
 type RouteGroup struct {
-	prefix string
-	mux    *http.ServeMux
+	prefix      string
+	router      *http.ServeMux
+	middlewares []func(http.Handler) http.Handler
 }
 
-func AddNewRouteGroup(prefix string) *RouteGroup {
-	prefix = strings.TrimRight(prefix, "/")
+func NewRouteGroup(router *http.ServeMux, prefix string) *RouteGroup {
 	return &RouteGroup{
-		prefix: strings.TrimRight(prefix, "/"),
-		mux:    http.NewServeMux(),
+		prefix:      strings.TrimRight(prefix, "/"),
+		router:      router,
+		middlewares: []func(http.Handler) http.Handler{},
 	}
 }
 
-func (rg *RouteGroup) Handle(path string, handler http.HandlerFunc) {
-	rg.mux.HandleFunc(path, handler)
-}
+func (rg *RouteGroup) HandleFunc(pattern string, handler http.HandlerFunc) {
+	parts := strings.SplitN(pattern, " ", 2)
+	method := ""
+	path := pattern
 
-func (rg *RouteGroup) Inject(root *http.ServeMux) {
-	root.Handle(rg.prefix+"/", http.StripPrefix(rg.prefix, rg.mux))
-}
+	if len(parts) == 2 {
+		method = parts[0]
+		path = strings.TrimSpace(parts[1])
+	}
 
-func (rg *RouteGroup) HandleFunc(path string, handlerFunc http.HandlerFunc) {
-	rg.mux.HandleFunc(path, handlerFunc)
+	fullPattern := method
+	if method != "" {
+		fullPattern += " "
+	}
+
+	if path == "/" || path == "" {
+		fullPattern += rg.prefix
+	} else {
+		fullPattern += rg.prefix + path
+	}
+
+	h := http.Handler(handler)
+	for i := len(rg.middlewares) - 1; i >= 0; i-- {
+		h = rg.middlewares[i](h)
+	}
+
+	rg.router.HandleFunc(fullPattern, h.ServeHTTP)
 }
 
 func (rg *RouteGroup) AddGroup(path string) *RouteGroup {
-	return &RouteGroup{
-		prefix: rg.prefix + "/" + strings.Trim(path, "/"),
-		mux:    http.NewServeMux(),
+	path = strings.Trim(path, "/")
+	newPrefix := rg.prefix
+	if path != "" {
+		newPrefix = rg.prefix + "/" + path
 	}
+
+	return &RouteGroup{
+		prefix:      newPrefix,
+		router:      rg.router,
+		middlewares: append([]func(http.Handler) http.Handler{}, rg.middlewares...),
+	}
+}
+
+func (rg *RouteGroup) Use(middleware func(http.Handler) http.Handler) {
+	rg.middlewares = append(rg.middlewares, middleware)
 }

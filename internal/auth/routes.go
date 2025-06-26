@@ -15,11 +15,7 @@ func RegisterAuthRoutes(apiV1 *httpx.RouteGroup, router *http.ServeMux, authServ
 	authGroup.HandleFunc("POST /signup", authHandler.SignUpHandler)
 	authGroup.HandleFunc("POST /clear", authHandler.ClearRedisHandler)
 	authGroup.HandleFunc("GET /resend-email", authHandler.ResendEmailVerification)
-	// authGroup.HandleFunc("POST /admin", authHandler.AdminRegister)
 	authGroup.HandleFunc("POST /login", authHandler.LoginHandler)
 	authGroup.HandleFunc("GET /validate", authHandler.ValidateEmailHandler)
-
 	authGroup.HandleFunc("POST /token", authMiddleware.Authenticate(http.HandlerFunc(authHandler.RefreshTokenHandler)).ServeHTTP)
-
-	authGroup.Inject(router)
 }

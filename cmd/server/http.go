@@ -75,7 +75,7 @@ func SetServerConfig() *Server {
 
 func (server *Server) AddHttpRoutes() {
 	atomic.StoreInt32(&health, 1)
-	apiV1 := httpx.AddNewRouteGroup("/api/v1")
+	apiV1 := httpx.NewRouteGroup(server.router, "/api/v1")
 	apiV1.HandleFunc("GET /health", runHealthCheck)
 
 	authService := auth.NewAuthService()
@@ -85,8 +85,6 @@ func (server *Server) AddHttpRoutes() {
 
 	invoiceService := invoice.NewInvoiceService()
 	invoice.RegisterInvoiceRoutes(apiV1, server.router, invoiceService)
-
-	apiV1.Inject(server.router)
 }
 
 func (server *Server) StartHttpServer(ctx context.Context) {
