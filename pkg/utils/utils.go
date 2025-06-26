@@ -279,3 +279,10 @@ func GenerateSecureToken(length int) (string, error) {
 	}
 	return base64.URLEncoding.EncodeToString(b), nil
 }
+
+func GetStellarStage() string {
+	if os.Getenv("STAGE") == "dev" {
+		return "testnet"
+	}
+	return "mainnet"
+}

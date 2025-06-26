@@ -2,6 +2,8 @@ package server
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -77,6 +79,7 @@ func (server *Server) AddHttpRoutes() {
 	atomic.StoreInt32(&health, 1)
 	apiV1 := httpx.NewRouteGroup(server.router, "/api/v1")
 	apiV1.HandleFunc("GET /health", runHealthCheck)
+	apiV1.HandleFunc("GET /key", generateKey)
 
 	authService := auth.NewAuthService()
 	auth.RegisterAuthRoutes(apiV1, server.router, authService)
@@ -128,6 +131,21 @@ func runHealthCheck(w http.ResponseWriter, r *http.Request) {
 	statusCode, healthResponse := getHealthStatus()
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(healthResponse)
+}
+
+func generateKey(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	key := make([]byte, 32)
+	_, err := rand.Read(key)
+	if err != nil {
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	data := map[string]interface{}{
+		"key":    key,
+		"base64": base64.URLEncoding.EncodeToString(key),
+	}
+	json.NewEncoder(w).Encode(data)
 }
 
 func getHealthStatus() (int, ServerHealthResponse) {
