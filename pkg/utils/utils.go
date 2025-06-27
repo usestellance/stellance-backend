@@ -281,7 +281,7 @@ func GenerateSecureToken(length int) (string, error) {
 }
 
 func GetStellarStage() string {
-	if os.Getenv("STAGE") == "dev" {
+	if os.Getenv("STELLAR_STAGE") == "dev" {
 		return "testnet"
 	}
 	return "mainnet"
