@@ -175,25 +175,11 @@ func (h *InvoiceHandler) GetInvoiceByIDHandler(w http.ResponseWriter, r *http.Re
 		http.Error(w, "Unauthorized: missing role", http.StatusUnauthorized)
 		return
 	}
-
-	invoiceID := r.URL.Query().Get("id")
-	invoiceUrl := r.URL.Query().Get("url")
-
-	if (invoiceID == "" && invoiceUrl == "") || (invoiceID != "" && invoiceUrl != "") {
-		http.Error(w, "You can only provide either 'id' or 'url', not both or none", http.StatusBadRequest)
-		return
-	}
-
-	if invoiceID != "" {
-		response := h.service.GetInvoiceById(ctx, invoiceID, reqUserId, role)
-		utils.WriteToJson(w, response.StatusCode, response)
-		return
-	}
-
-	response := h.service.GetInvoiceByUrl(ctx, invoiceUrl, reqUserId, role)
+	invoiceID := r.PathValue("id")
+	response := h.service.GetInvoiceById(ctx, invoiceID, reqUserId, role)	
 	utils.WriteToJson(w, response.StatusCode, response)
-
 }
+
 func (h *InvoiceHandler) GetInvoiceSearchHandler(w http.ResponseWriter, r *http.Request) {
 	//TODO: make this route a bit secured by checking if the viewer email syncs with the payer email or some secured phrase
 	ctx := r.Context()
