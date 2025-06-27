@@ -81,17 +81,22 @@ func HandleValidationError(w http.ResponseWriter, err error) {
 	res := ErrorResponse{
 		Status:  http.StatusBadRequest,
 		Message: "failed! invalid request details sent",
+		Errors:  make([]ValidationError, 0),
 	}
-
-	if ve, ok := err.(validator.ValidationErrors); ok {
-		for _, err := range ve {
-			res.Errors = append(res.Errors, ValidationError{
-
-				Field:   err.Field(),
-				Message: parseValidationErrorMessage(err),
-			})
+	switch ve := err.(type) {
+	case validator.ValidationErrors:
+		seen := make(map[string]bool)
+		for _, e := range ve {
+			field := e.Field()
+			if !seen[field] {
+				res.Errors = append(res.Errors, ValidationError{
+					Field:   field,
+					Message: parseValidationErrorMessage(e),
+				})
+				seen[field] = true
+			}
 		}
-	} else {
+	default:
 		res.Errors = append(res.Errors, ValidationError{
 			Field:   "unknown",
 			Message: err.Error(),
@@ -101,22 +106,24 @@ func HandleValidationError(w http.ResponseWriter, err error) {
 	_ = json.NewEncoder(w).Encode(res)
 }
 
+
 func parseValidationErrorMessage(e validator.FieldError) string {
 	switch e.Tag() {
 	case "required":
-		return "is required"
+		return fmt.Sprintf("%s is required", e.Field())
 	case "email":
-		return "must be a valid email"
+		return fmt.Sprintf("%s must be a valid email address", e.Field())
 	case "min":
-		return "must be at least " + e.Param() + " characters"
+		return fmt.Sprintf("%s must be at least %s characters long", e.Field(), e.Param())
 	case "max":
-		return "must be at most " + e.Param() + " characters"
+		return fmt.Sprintf("%s must be at most %s characters long", e.Field(), e.Param())
 	case "len":
-		return "must be exactly " + e.Param() + " characters"
+		return fmt.Sprintf("%s must be exactly %s characters long", e.Field(), e.Param())
 	default:
-		return "is invalid"
+		return fmt.Sprintf("%s is invalid", e.Field())
 	}
 }
+
 
 func WriteToJson(w http.ResponseWriter, code int, data any) {
 	w.Header().Set("Content-Type", "application/json")
