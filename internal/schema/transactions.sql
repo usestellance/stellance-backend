@@ -8,7 +8,8 @@ CREATE TABLE IF NOT EXISTS transactions (
     status transaction_status NOT NULL DEFAULT 'pending',
     network_fee NUMERIC(20, 6),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    confirmed_at TIMESTAMPTZ
+    confirmed_at TIMESTAMPTZ,
+    token_type currency_type NOT NULL
 );
 CREATE INDEX idx_transactions_invoice ON transactions(invoice_id);
 CREATE INDEX idx_transactions_wallet ON transactions(wallet_id)
