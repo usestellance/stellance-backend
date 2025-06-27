@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/The-True-Hooha/stellance-backend.git/internal/transactions"
+	"github.com/The-True-Hooha/stellance-backend.git/internal/user"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/config"
 	jwt_ "github.com/The-True-Hooha/stellance-backend.git/pkg/jwt"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/utils"
@@ -250,11 +251,17 @@ func (ws *WalletService) CreateWallet(ctx context.Context, userId string) *utils
 	}
 }
 
-func (ws *WalletService) GetUserWallet(ctx context.Context, userId, walletId string) *utils.ApiResponse {
+func (ws *WalletService) GetUserWallet(ctx context.Context, userId, walletId string, role user.UserRole) *utils.ApiResponse {
 	cachedKey := ws.GetWalletCacheKey(walletId)
 	cached, err := ws.redis.Get(ctx, cachedKey).Result()
 	if err == nil {
-		var wallet any
+		var wallet WalletResponseDto
+		if wallet.UserID != userId && role != user.RoleAdmin {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusUnauthorized,
+				Message:    "oops, please contact support",
+			}
+		}
 		if err := json.Unmarshal([]byte(cached), &wallet); err == nil {
 			return &utils.ApiResponse{
 				Message: "successful",
@@ -293,6 +300,13 @@ func (ws *WalletService) GetUserWallet(ctx context.Context, userId, walletId str
 		return &utils.ApiResponse{
 			Message:    "Sever unavailable, failed to fetch wallet",
 			StatusCode: http.StatusInternalServerError,
+		}
+	}
+
+	if wallet.UserID != userId && role != user.RoleAdmin {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusUnauthorized,
+			Message:    "oops, please contact support",
 		}
 	}
 
@@ -399,16 +413,24 @@ func (ws *WalletService) GetWalletCacheKey(walletId string) string {
 	return fmt.Sprintf("wallet:%s", walletId)
 }
 
-func (ws *WalletService) ExportWalletKeys(ctx context.Context, walletID, userID, password string) *utils.ApiResponse {
+func (ws *WalletService) ExportWalletKeys(ctx context.Context, walletID, userID string, role user.UserRole) *utils.ApiResponse {
 
 	var encryptedSeed string
 	var walletAddress string
-	const query string = `SELECT private_key, address, FROM wallets WHERE id = $1 AND user_id = $2`
-	err := ws.postgres.QueryRow(ctx, query, walletID, userID).Scan(&encryptedSeed, &walletAddress)
+	var userId string
+	const query string = `SELECT private_key, address, user_id, FROM wallets WHERE id = $1 AND user_id = $2`
+	err := ws.postgres.QueryRow(ctx, query, walletID, userID).Scan(&encryptedSeed, &walletAddress, &userId)
 	if err != nil {
 		return &utils.ApiResponse{
 			StatusCode: http.StatusNotFound,
 			Message:    "Wallet details not found",
+		}
+	}
+
+	if userID != userId && role != user.RoleAdmin {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusUnauthorized,
+			Message:    "oops, please contact support",
 		}
 	}
 
