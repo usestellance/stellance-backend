@@ -60,6 +60,7 @@ type InvoiceResponse struct {
 	CreatedAt          time.Time      `json:"created_at"`
 	UpdatedAt          time.Time      `json:"updated_at,omitempty"`
 	PaidAt             *time.Time     `json:"paid_at,omitempty"`
+	CreatedBy          *string        `json:"created_by,omitempty"`
 	Items              []InvoiceItems `json:"items"`
 }
 
