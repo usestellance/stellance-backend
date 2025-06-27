@@ -3,6 +3,7 @@ package invoice
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"math"
@@ -14,6 +15,7 @@ import (
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/config"
 	jwt_ "github.com/The-True-Hooha/stellance-backend.git/pkg/jwt"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/utils"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
@@ -375,10 +377,10 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 	response := InvoiceListResponseDto{
 		Invoice: invoices,
 		Meta: PaginationMeta{
-			Page:       dto.Page,
-			Count:      dto.Count,
-			TotalItems: totalItems,
-			TotalPages: totalPages,
+			Page:              dto.Page,
+			PageCount:         dto.Count,
+			TotalInvoiceCount: totalItems,
+			TotalPages:        totalPages,
 		},
 	}
 
@@ -500,191 +502,378 @@ func (is *InvoiceService) buildInvoiceQuery(filters InvoiceFiltersDto, userId st
 func (is *InvoiceService) GetInvoiceById(ctx context.Context, invoiceId, userId, role string) *utils.ApiResponse {
 	log := is.log
 
-	const checkQ = `
-		SELECT created_by_id
-		FROM invoice
-		WHERE id = $1
-	`
-	var invoice_owner string
-	err := is.postgres.QueryRow(ctx, checkQ, invoiceId).Scan(&invoice_owner)
-	if err != nil {
-		if err == pgx.ErrNoRows {
+	if _, err := uuid.Parse(invoiceId); err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusBadRequest,
+			Message:    "Invalid invoice ID format",
+		}
+	}
+
+	cacheKey := fmt.Sprintf("invoice:%s", invoiceId)
+	if cached, err := is.getFromCache(ctx, cacheKey); err == nil {
+		if invoice, ok := cached.(*InvoiceResponse); ok {
 			return &utils.ApiResponse{
-				StatusCode: http.StatusNotFound,
-				Message:    "Invoice data not found",
+				StatusCode: http.StatusOK,
+				Message:    "Invoice retrieved successfully",
+				Data:       invoice,
 			}
 		}
-		log.Error("failed to to get user invoice", "error", err, "user_id", userId, "invoice_id", invoiceId)
-		return &utils.ApiResponse{
-			StatusCode: http.StatusInternalServerError,
-			Message:    "Failed to get invoice",
-		}
-	}
-	if userId != invoice_owner && role != string(user.RoleAdmin) {
-		return &utils.ApiResponse{
-			StatusCode: http.StatusForbidden,
-			Message:    "Invoice data not found",
-		}
 	}
 
-	const query = `
-		SELECT
-			id,
-			invoice_number,
-			invoice_url,
-			title,
-			payer_email,
-			payer_name,
-			sub_total,
-			service_fee,
-			total,
-			currency,
-			status,
-			due_date,
-			paid_at,
-			created_at,
-			updated_at,
-			address_country
-		FROM invoice WHERE id = $1 AND created_by_id = $2
+	const query string = `
+		WITH invoice_data AS (
+			SELECT
+				i.id,
+				i.invoice_number,
+				i.invoice_url,
+				i.title,
+				i.payer_email,
+				i.payer_name,
+				i.sub_total,
+				i.service_fee,
+				i.total,
+				i.currency,
+				i.status,
+				i.due_date,
+				i.paid_at,
+				i.created_at,
+				i.updated_at,
+				i.address_country,
+				i.created_by_id,
+				COALESCE(
+					json_agg(
+						json_build_object(
+							'item_id', ii.id,
+							'invoice_type', ii.item_type,
+							'description', ii.description,
+							'quantity', ii.quantity,
+							'unit_price', ii.unit_price,
+							'discount', ii.discount,
+							'amount', ii.amount,
+							'created_at', ii.created_at
+						) ORDER BY ii.created_at
+					) FILTER (WHERE ii.id IS NOT NULL), 
+					'[]'::json
+				) as items
+			FROM invoice i
+			LEFT JOIN invoice_items ii ON i.id = ii.invoice_id
+			WHERE i.id = $1
+			GROUP BY i.id
+		)
+		SELECT * FROM invoice_data
 	`
-	var invoice InvoiceResponse
-	var payerName sql.NullString
-	var title sql.NullString
-	var paidAt sql.NullTime
-	var Country sql.NullString
 
-	err = is.postgres.QueryRow(ctx, query, invoiceId, userId).Scan(
-		&invoice.ID,
-		&invoice.InvoiceNumber,
-		&invoice.InvoiceURL,
-		&title,
-		&invoice.PayerEmail,
-		&payerName,
-		&invoice.SubTotal,
-		&invoice.ServiceFee,
-		&invoice.Total,
-		&invoice.Currency,
-		&invoice.Status,
-		&invoice.DueDate,
-		&paidAt,
-		&invoice.CreatedAt,
-		&invoice.UpdatedAt,
-		&Country,
+	var result struct {
+		ID             string          `db:"id"`
+		InvoiceNumber  string          `db:"invoice_number"`
+		InvoiceURL     string          `db:"invoice_url"`
+		Title          sql.NullString  `db:"title"`
+		PayerEmail     string          `db:"payer_email"`
+		PayerName      sql.NullString  `db:"payer_name"`
+		SubTotal       float64         `db:"sub_total"`
+		ServiceFee     float64         `db:"service_fee"`
+		Total          float64         `db:"total"`
+		Currency       string          `db:"currency"`
+		Status         string          `db:"status"`
+		DueDate        time.Time       `db:"due_date"`
+		PaidAt         sql.NullTime    `db:"paid_at"`
+		CreatedAt      time.Time       `db:"created_at"`
+		UpdatedAt      time.Time       `db:"updated_at"`
+		AddressCountry sql.NullString  `db:"address_country"`
+		CreatedByID    string          `db:"created_by_id"`
+		Items          json.RawMessage `db:"items"`
+	}
+
+	err := is.postgres.QueryRow(ctx, query, invoiceId).Scan(
+		&result.ID,
+		&result.InvoiceNumber,
+		&result.InvoiceURL,
+		&result.Title,
+		&result.PayerEmail,
+		&result.PayerName,
+		&result.SubTotal,
+		&result.ServiceFee,
+		&result.Total,
+		&result.Currency,
+		&result.Status,
+		&result.DueDate,
+		&result.PaidAt,
+		&result.CreatedAt,
+		&result.UpdatedAt,
+		&result.AddressCountry,
+		&result.CreatedByID,
+		&result.Items,
 	)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return &utils.ApiResponse{
 				StatusCode: http.StatusNotFound,
-				Message:    "Invoice data not found",
+				Message:    "Invoice not found",
 			}
 		}
-		log.Error("failed to to get user invoice", "error", err, "user_id", userId, "invoice_id", invoiceId)
+		log.Error("failed to fetch invoice", "error", err, "invoice_id", invoiceId)
 		return &utils.ApiResponse{
 			StatusCode: http.StatusInternalServerError,
-			Message:    "Failed to get invoice",
+			Message:    "Failed to retrieve invoice",
 		}
 	}
 
+	if result.CreatedByID != userId && role != string(user.RoleAdmin) {
+		log.Warn("unauthorized invoice access attempt",
+			"invoice_id", invoiceId,
+			"owner_id", result.CreatedByID,
+			"requester_id", userId,
+		)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusForbidden,
+			Message:    "You don't have permission to view this invoice",
+		}
+	}
+
+	var items []InvoiceItems
+	if err := json.Unmarshal(result.Items, &items); err != nil {
+		log.Error("failed to parse invoice items", "error", err)
+		items = []InvoiceItems{}
+	}
+
+	invoice := InvoiceResponse{
+		ID:            result.ID,
+		InvoiceNumber: result.InvoiceNumber,
+		InvoiceURL:    result.InvoiceURL,
+		Title:         result.Title.String,
+		PayerEmail:    result.PayerEmail,
+		PayerName:     result.PayerName.String,
+		SubTotal:      result.SubTotal,
+		ServiceFee:    result.ServiceFee,
+		Total:         result.Total,
+		Currency:      result.Currency,
+		Status:        result.Status,
+		DueDate:       result.DueDate,
+		CreatedAt:     result.CreatedAt,
+		UpdatedAt:     result.UpdatedAt,
+		Country:       result.AddressCountry.String,
+		Items:         items,
+	}
+
+	if result.PaidAt.Valid {
+		invoice.PaidAt = &result.PaidAt.Time
+	}
+
+	go is.cacheInvoice(context.Background(), cacheKey, &invoice)
+
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
-		Message:    "successful",
+		Message:    "Invoice retrieved successfully",
 		Data:       invoice,
 	}
 }
 
-func (is *InvoiceService) GetInvoiceByUrl(ctx context.Context, invoiceUrl, userId, role string) *utils.ApiResponse {
+func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invoiceId, userId, role string) *utils.ApiResponse {
 	log := is.log
+	if invoiceId == "" && invoiceUrl == "" {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusBadRequest,
+			Message:    "You must provide either invoice ID or URL",
+		}
+	}
 
-	const checkQ = `
-		SELECT created_by_id
-		FROM invoice
-		WHERE invoice_url = $1
-	`
-	var invoice_owner string
-	err := is.postgres.QueryRow(ctx, checkQ, invoiceUrl).Scan(&invoice_owner)
-	if err != nil {
-		if err == pgx.ErrNoRows {
+	cacheKey := fmt.Sprintf("invoice_search:%s:%s", invoiceId, invoiceUrl)
+	if cached, err := is.getFromCache(ctx, cacheKey); err == nil {
+		if invoice, ok := cached.(*InvoiceResponse); ok {
 			return &utils.ApiResponse{
-				StatusCode: http.StatusNotFound,
-				Message:    "Invoice data not found",
+				StatusCode: http.StatusOK,
+				Message:    "Invoice retrieved successfully",
+				Data:       invoice,
 			}
 		}
-		log.Error("failed to to get user invoice", "error", err, "user_id", userId, "invoice_url", invoiceUrl)
-		return &utils.ApiResponse{
-			StatusCode: http.StatusInternalServerError,
-			Message:    "Failed to get invoice",
-		}
-	}
-	if userId != invoice_owner && role != string(user.RoleAdmin) {
-		return &utils.ApiResponse{
-			StatusCode: http.StatusForbidden,
-			Message:    "Invoice data not found",
-		}
 	}
 
-	const query = `
-		SELECT
-			id,
-			invoice_number,
-			invoice_url,
-			title,
-			payer_email,
-			payer_name,
-			sub_total,
-			service_fee,
-			total,
-			currency,
-			status,
-			due_date,
-			paid_at,
-			created_at,
-			updated_at,
-			address_country
-		FROM invoice WHERE invoice_url = $1 AND created_by_id = $2
+	const query string = `
+		WITH invoice_data AS (
+			SELECT
+				i.id, i.invoice_number, i.invoice_url, i.title,
+				i.payer_email, i.payer_name, i.sub_total, i.service_fee, i.total,
+				i.currency, i.status, i.due_date, i.paid_at,
+				i.created_at, i.updated_at, i.address_country, i.created_by_id,
+				json_agg(
+					json_build_object(
+						'invoice_type', ii.item_type,
+						'description', ii.description,
+						'quantity', ii.quantity,
+						'unit_price', ii.unit_price,
+						'discount', ii.discount,
+						'amount', ii.amount
+					) ORDER BY ii.created_at
+				) FILTER (WHERE ii.id IS NOT NULL) as items
+			FROM invoice i
+			LEFT JOIN invoice_items ii ON i.id = ii.invoice_id
+			WHERE 
+				(($1::UUID IS NOT NULL AND i.id = $1) OR 
+				 ($2::TEXT IS NOT NULL AND i.invoice_url = $2))
+			GROUP BY i.id
+		)
+		SELECT * FROM invoice_data
 	`
-	var invoice InvoiceResponse
-	var payerName sql.NullString
-	var title sql.NullString
-	var paidAt sql.NullTime
-	var Country sql.NullString
+	var invoiceIdParam interface{}
+	var invoiceUrlParam interface{}
 
-	err = is.postgres.QueryRow(ctx, query, invoiceUrl, userId).Scan(
+	if invoiceId != "" {
+		if _, err := uuid.Parse(invoiceId); err != nil {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusBadRequest,
+				Message:    "Invalid invoice ID format",
+			}
+		}
+		invoiceIdParam = invoiceId
+	}
+	if invoiceUrl != "" {
+		invoiceUrlParam = invoiceUrl
+	}
+
+	var invoice struct {
+		ID             string          `db:"id"`
+		InvoiceNumber  string          `db:"invoice_number"`
+		InvoiceURL     string          `db:"invoice_url"`
+		Title          sql.NullString  `db:"title"`
+		PayerEmail     string          `db:"payer_email"`
+		PayerName      sql.NullString  `db:"payer_name"`
+		SubTotal       float64         `db:"sub_total"`
+		ServiceFee     float64         `db:"service_fee"`
+		Total          float64         `db:"total"`
+		Currency       string          `db:"currency"`
+		Status         string          `db:"status"`
+		DueDate        time.Time       `db:"due_date"`
+		PaidAt         sql.NullTime    `db:"paid_at"`
+		CreatedAt      time.Time       `db:"created_at"`
+		UpdatedAt      time.Time       `db:"updated_at"`
+		AddressCountry sql.NullString  `db:"address_country"`
+		CreatedBy      string          `db:"created_by_id"`
+		Items          json.RawMessage `db:"items"`
+	}
+
+	err := is.postgres.QueryRow(ctx, query, invoiceIdParam, invoiceUrlParam).Scan(
 		&invoice.ID,
 		&invoice.InvoiceNumber,
 		&invoice.InvoiceURL,
-		&title,
+		&invoice.Title,
 		&invoice.PayerEmail,
-		&payerName,
+		&invoice.PayerName,
 		&invoice.SubTotal,
 		&invoice.ServiceFee,
 		&invoice.Total,
 		&invoice.Currency,
 		&invoice.Status,
 		&invoice.DueDate,
-		&paidAt,
+		&invoice.PaidAt,
 		&invoice.CreatedAt,
 		&invoice.UpdatedAt,
-		&Country,
+		&invoice.AddressCountry,
+		&invoice.CreatedBy,
+		&invoice.Items,
 	)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return &utils.ApiResponse{
 				StatusCode: http.StatusNotFound,
-				Message:    "Invoice data not found",
+				Message:    "Invoice not found",
 			}
 		}
-		log.Error("failed to to get user invoice", "error", err, "user_id", userId, "invoice_url", invoiceUrl)
+		log.Error("failed to fetch invoice", "error", err, "invoice_id", invoiceId, "invoice_url", invoiceUrl)
 		return &utils.ApiResponse{
 			StatusCode: http.StatusInternalServerError,
-			Message:    "Failed to get invoice",
+			Message:    "Failed to retrieve invoice",
 		}
+	}
+
+	// if !is.canAccessInvoice(invoice.CreatedBy, userId, role) {
+	// 	return &utils.ApiResponse{
+	// 		StatusCode: http.StatusForbidden,
+	// 		Message:    "You don't have permission to view this invoice",
+	// 	}
+	// }
+
+	var items []InvoiceItems
+	if invoice.Items != nil {
+		if err := json.Unmarshal(invoice.Items, &items); err != nil {
+			log.Error("failed to parse invoice items", "error", err)
+			items = []InvoiceItems{}
+		}
+	}
+
+	response := InvoiceResponse{
+		ID:            invoice.ID,
+		InvoiceNumber: invoice.InvoiceNumber,
+		InvoiceURL:    invoice.InvoiceURL,
+		Title:         invoice.Title.String,
+		PayerEmail:    invoice.PayerEmail,
+		PayerName:     invoice.PayerName.String,
+		SubTotal:      invoice.SubTotal,
+		ServiceFee:    invoice.ServiceFee,
+		Total:         invoice.Total,
+		Currency:      invoice.Currency,
+		Status:        invoice.Status,
+		DueDate:       invoice.DueDate,
+		CreatedAt:     invoice.CreatedAt,
+		UpdatedAt:     invoice.UpdatedAt,
+		Country:       invoice.AddressCountry.String,
+		CreatedBy:     &invoice.CreatedBy,
+		Items:         items,
+	}
+
+	if invoice.PaidAt.Valid {
+		response.PaidAt = &invoice.PaidAt.Time
+	}
+
+	go is.cacheInvoice(context.Background(), cacheKey, &response)
+
+	if userId != invoice.CreatedBy && role != string(user.RoleAdmin) {
+		go is.trackInvoiceView(context.Background(), invoice.ID)
 	}
 
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
-		Message:    "successful",
-		Data:       invoice,
+		Message:    "Invoice retrieved successfully",
+		Data:       response,
 	}
+}
+
+func (is *InvoiceService) canAccessInvoice(ownerID, userID, role string) bool {
+	return ownerID == userID || role == string(user.RoleAdmin)
+}
+
+func (is *InvoiceService) getFromCache(ctx context.Context, key string) (interface{}, error) {
+	data, err := is.redis.Get(ctx, key).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	var invoice InvoiceResponse
+	if err := json.Unmarshal([]byte(data), &invoice); err != nil {
+		return nil, err
+	}
+
+	return &invoice, nil
+}
+
+func (is *InvoiceService) cacheInvoice(ctx context.Context, key string, invoice *InvoiceResponse) {
+	data, err := json.Marshal(invoice)
+	if err != nil {
+		is.log.Error("failed to marshal invoice for cache", "error", err)
+		return
+	}
+
+	if err := is.redis.Set(ctx, key, data, 10*time.Minute).Err(); err != nil {
+		is.log.Error("failed to cache invoice", "error", err)
+	}
+}
+
+func (is *InvoiceService) trackInvoiceView(ctx context.Context, invoiceID string) {
+	const updateQuery string = `
+		UPDATE invoice 
+		SET status = 'viewed', updated_at = NOW() 
+		WHERE id = $1 AND status = 'sent'
+	`
+	is.postgres.Exec(ctx, updateQuery, invoiceID)
 }

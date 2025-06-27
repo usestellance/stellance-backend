@@ -39,7 +39,7 @@ func RegisterInvoiceFiltersValidation(v *validator.Validate) {
 	})
 
 	v.RegisterValidation("order_by", func(fl validator.FieldLevel) bool {
-			order := strings.ToLower(fl.Field().String())
+		order := strings.ToLower(fl.Field().String())
 		return order == "asc" || order == "desc"
 	})
 }
@@ -132,16 +132,16 @@ func (handler *InvoiceHandler) GetManyInvoiceHandler(w http.ResponseWriter, r *h
 		if p, err := strconv.Atoi(page); err == nil {
 			dto.Page = p
 		}
-	}else {
+	} else {
 		dto.Page = 1
 	}
 
-	pageCount := r.URL.Query().Get("page_size")
+	pageCount := r.URL.Query().Get("page_count")
 	if pageCount != "" {
 		if ps, err := strconv.Atoi(pageCount); err == nil {
 			dto.Count = ps
 		}
-	}else{
+	} else {
 		dto.Count = 10
 	}
 
@@ -162,7 +162,7 @@ func (handler *InvoiceHandler) GetManyInvoiceHandler(w http.ResponseWriter, r *h
 
 }
 
-func (h *InvoiceHandler) GetInvoiceByID(w http.ResponseWriter, r *http.Request) {
+func (h *InvoiceHandler) GetInvoiceByIDHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	reqUserId, ok := utils.GetUserIDFromContext(ctx)
 	if !ok {
@@ -175,6 +175,23 @@ func (h *InvoiceHandler) GetInvoiceByID(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Unauthorized: missing role", http.StatusUnauthorized)
 		return
 	}
+	invoiceID := r.PathValue("id")
+	response := h.service.GetInvoiceById(ctx, invoiceID, reqUserId, role)	
+	utils.WriteToJson(w, response.StatusCode, response)
+}
+
+func (h *InvoiceHandler) GetInvoiceSearchHandler(w http.ResponseWriter, r *http.Request) {
+	//TODO: make this route a bit secured by checking if the viewer email syncs with the payer email or some secured phrase
+	ctx := r.Context()
+	reqUserId, ok := utils.GetUserIDFromContext(ctx)
+	if !ok {
+		h.service.log.Warn("unregistered access to invoice")
+	}
+
+	role, ok := utils.GetRoleFromContext(ctx)
+	if !ok {
+		h.service.log.Warn("unregistered access to invoice")
+	}
 
 	invoiceID := r.URL.Query().Get("id")
 	invoiceUrl := r.URL.Query().Get("url")
@@ -183,14 +200,7 @@ func (h *InvoiceHandler) GetInvoiceByID(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "You can only provide either 'id' or 'url', not both or none", http.StatusBadRequest)
 		return
 	}
-
-	if invoiceID != "" {
-		response := h.service.GetInvoiceById(ctx, invoiceID, reqUserId, role)
-		utils.WriteToJson(w, response.StatusCode, response)
-		return
-	}
-
-	response := h.service.GetInvoiceByUrl(ctx, invoiceUrl, reqUserId, role)
+	response := h.service.GetInvoiceSearch(ctx, invoiceUrl, invoiceID, reqUserId, role)
 	utils.WriteToJson(w, response.StatusCode, response)
 
 }
