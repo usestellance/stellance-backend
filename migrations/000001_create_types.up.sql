@@ -19,3 +19,8 @@ CREATE TYPE transaction_status AS ENUM (
     'aborted',
     'refunded'
 );
+CREATE TYPE transaction_type AS ENUM (
+    'withdrawal',
+    'funding',
+    'payment'
+);
