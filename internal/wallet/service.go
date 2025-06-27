@@ -1,1 +1,431 @@
 package wallet
+
+import (
+	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"os"
+	"time"
+
+	"github.com/The-True-Hooha/stellance-backend.git/internal/transactions"
+	"github.com/The-True-Hooha/stellance-backend.git/pkg/config"
+	jwt_ "github.com/The-True-Hooha/stellance-backend.git/pkg/jwt"
+	"github.com/The-True-Hooha/stellance-backend.git/pkg/utils"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
+	"github.com/stellar/go/clients/horizonclient"
+	"github.com/stellar/go/keypair"
+	"github.com/stellar/go/network"
+)
+
+type WalletService struct {
+	log           *slog.Logger
+	postgres      *pgxpool.Pool
+	redis         *redis.Client
+	jwt           *jwt_.JwtTokenServiceConfig
+	stage         string
+	networkPass   string
+	secureKey     []byte
+	networkURL    string
+	horizonClient *horizonclient.Client
+}
+
+func NewWalletService() *WalletService {
+	var url string
+	var networkPassPhrase string
+	if os.Getenv("TESTNET_NETWORK_URL") == "dev" {
+		url = os.Getenv("TESTNET_NETWORK_URL")
+		networkPassPhrase = network.TestNetworkPassphrase
+	} else {
+		url = os.Getenv("MAINNET_NETWORK_URL")
+		networkPassPhrase = network.PublicNetworkPassphrase
+	}
+	return &WalletService{
+		log:           config.GetAppContainer().Log,
+		postgres:      config.GetAppContainer().Postgres,
+		redis:         config.GetAppContainer().Redis,
+		jwt:           jwt_.JwtTokenService(),
+		stage:         utils.GetStellarStage(),
+		secureKey:     []byte(os.Getenv("ENCRYPTION_KEY_BASE64")),
+		networkURL:    url,
+		networkPass:   networkPassPhrase,
+		horizonClient: &horizonclient.Client{HorizonURL: url},
+	}
+}
+
+func (ws *WalletService) encryptPrivateKey(seed string) (string, error) {
+	block, err := aes.NewCipher(ws.secureKey)
+	if err != nil {
+		return "", err
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", nil
+	}
+
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return "", err
+	}
+	cipherText := gcm.Seal(nonce, nonce, []byte(seed), nil)
+	return base64.StdEncoding.EncodeToString(cipherText), nil
+}
+
+func (ws *WalletService) decryptPrivateKey(encryptedData string) (string, error) {
+	cipherText, err := base64.StdEncoding.DecodeString(encryptedData)
+	if err != nil {
+		return "", err
+	}
+	block, err := aes.NewCipher(ws.secureKey)
+	if err != nil {
+		return "", err
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+	nonceSize := gcm.NonceSize()
+	if len(cipherText) < nonceSize {
+		return "", fmt.Errorf("cipher text is too short")
+	}
+
+	nonce, ciphertext := cipherText[:nonceSize], cipherText[nonceSize:]
+	plainData, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return "", err
+	}
+	return string(plainData), nil
+}
+
+func (ws *WalletService) CreateWallet(ctx context.Context, userId string) *utils.ApiResponse {
+	log := ws.log
+
+	rateLimitKey := fmt.Sprintf("wallet:create:rate:%s", userId)
+	count, err := ws.redis.Incr(ctx, rateLimitKey).Result()
+	if err == nil && count == 1 {
+		ws.redis.Expire(ctx, rateLimitKey, 24*time.Hour)
+	}
+	if count > 3 {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusForbidden,
+			Message:    "You have reached your wallet creation limit, try back again",
+		}
+	}
+
+	tx, err := ws.postgres.Begin(ctx)
+	if err != nil {
+		log.Error("failed to start postgres transaction")
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Sever is currently unavailable, please contact support",
+		}
+	}
+	defer tx.Rollback(ctx)
+
+	var existingWalletCount int
+	const checkWalletQ string = `
+		SELECT COUNT(*)
+		FROM wallets
+		WHERE user_id = $1
+	`
+	err = tx.QueryRow(ctx, checkWalletQ, userId).Scan(&existingWalletCount)
+	if err != nil {
+		log.Error("failed to query existing wallet count")
+		existingWalletCount = 0
+	}
+
+	pair, err := keypair.Random()
+	if err != nil {
+		log.Error("failed to generate key pair")
+		return &utils.ApiResponse{
+			Message:    "Sever currently unavailable",
+			StatusCode: http.StatusInternalServerError,
+		}
+	}
+	encryptSeed, err := ws.encryptPrivateKey(pair.Seed())
+	if err != nil {
+		log.Error("failed to encrypt private key")
+		return &utils.ApiResponse{
+			Message:    "Server currently unavailable",
+			StatusCode: http.StatusInternalServerError,
+		}
+	}
+
+	if existingWalletCount == 5 {
+		return &utils.ApiResponse{
+			Message:    "Kindly contact support to create more wallet",
+			StatusCode: http.StatusForbidden,
+		}
+	}
+
+	var isPrimary bool
+	if existingWalletCount == 0 {
+		isPrimary = true
+	}
+
+	var wallet WalletResponseDto
+
+	const createWalletQ string = `
+		INSERT INTO wallets
+		(user_id, address, private_key, tag, chain, is_primary, is_active)
+		VALUES
+		($1, $2, $3, $4, $5, $6, $7, $8)
+		RETURNING
+		id, user_id, address, tag, chain, is_primary, is_active, created_at
+
+	`
+	walletTag := fmt.Sprintf("wallet_%s", string(rune(existingWalletCount+1)))
+	err = tx.QueryRow(ctx, createWalletQ, userId, pair.Address(), encryptSeed, walletTag, "usdc", isPrimary, true).Scan(
+		&wallet.ID,
+		&wallet.UserID,
+		&wallet.WalletAddress,
+		&wallet.Tag,
+		&wallet.Chain,
+		&wallet.IsPrimary,
+		&wallet.IsActive,
+		&wallet.CreatedAt,
+	)
+
+	if err != nil {
+		log.Error("failed to create new wallet, postgres error", "error", err)
+		return &utils.ApiResponse{
+			Message:    "Failed to create wallet",
+			StatusCode: http.StatusInternalServerError,
+		}
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		log.Error("failed to commit new wallet creation details", "error", err)
+		return &utils.ApiResponse{
+			Message:    "failed to create new wallet, kindly contact support",
+			StatusCode: http.StatusInternalServerError,
+		}
+	}
+
+	ws.cacheWalletInfo(ctx, &wallet)
+
+	log.Info("wallet created successfully",
+		"user_id", userId,
+		"wallet_id", wallet.ID,
+		"address", wallet.WalletAddress,
+	)
+
+	if ws.stage == "dev" {
+		go ws.fundTestnetAccount(ctx, pair.Address(), wallet.ID, userId)
+	}
+
+	balance, err := ws.getAccountBalance(pair.Seed())
+	if err != nil {
+		log.Error("failed to get account balance")
+	}
+
+	return &utils.ApiResponse{
+		StatusCode: http.StatusCreated,
+		Message:    "wallet created successfully",
+		Data: WalletResponseDto{
+			ID:            wallet.ID,
+			UserID:        userId,
+			WalletAddress: wallet.WalletAddress,
+			PrivateKey:    pair.Seed(),
+			Tag:           wallet.Tag,
+			Chain:         wallet.Chain,
+			IsPrimary:     wallet.IsPrimary,
+			IsActive:      wallet.IsActive,
+			CreatedAt:     wallet.CreatedAt,
+			Balance: StellarWalletBalance{
+				USDC: balance.USDC,
+				XLM:  balance.XLM,
+			},
+		},
+	}
+}
+
+func (ws *WalletService) GetUserWallet(ctx context.Context, userId, walletId string) *utils.ApiResponse {
+	cachedKey := ws.GetWalletCacheKey(walletId)
+	cached, err := ws.redis.Get(ctx, cachedKey).Result()
+	if err == nil {
+		var wallet any
+		if err := json.Unmarshal([]byte(cached), &wallet); err == nil {
+			return &utils.ApiResponse{
+				Message: "successful",
+				Data:    &wallet,
+			}
+		}
+	}
+	const query string = `
+		SELECT
+			id, user_id, address, tag, chain,
+			balance, is_primary, is_active, created_at, is_active
+			FROM wallets
+			WHERE id = $1 AND user_id = $2
+	`
+
+	var wallet WalletResponseDto
+	err = ws.postgres.QueryRow(ctx, query, walletId, userId).Scan(
+		&wallet.ID,
+		&wallet.UserID,
+		&wallet.WalletAddress,
+		&wallet.Tag,
+		&wallet.Chain,
+		&wallet.Balance,
+		&wallet.IsPrimary,
+		&wallet.IsActive,
+		&wallet.CreatedAt,
+	)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return &utils.ApiResponse{
+				Message:    "wallet details not found",
+				StatusCode: http.StatusNotFound,
+			}
+		}
+		return &utils.ApiResponse{
+			Message:    "Sever unavailable, failed to fetch wallet",
+			StatusCode: http.StatusInternalServerError,
+		}
+	}
+
+	balance, err := ws.getAccountBalance(wallet.WalletAddress)
+	if err != nil {
+		ws.log.Error("failed to get account balance")
+	}
+
+	ws.updateWalletBalance(ctx, walletId, balance.USDC, balance.XLM)
+
+	return &utils.ApiResponse{
+		StatusCode: http.StatusOK,
+		Message:    "successful",
+		Data: WalletResponseDto{
+			ID:            wallet.ID,
+			UserID:        userId,
+			WalletAddress: wallet.WalletAddress,
+			Tag:           wallet.Tag,
+			Chain:         wallet.Chain,
+			IsPrimary:     wallet.IsPrimary,
+			IsActive:      wallet.IsActive,
+			CreatedAt:     wallet.CreatedAt,
+			Balance: StellarWalletBalance{
+				USDC: balance.USDC,
+				XLM:  balance.XLM,
+			},
+		},
+	}
+}
+
+func (ws *WalletService) fundTestnetAccount(ctx context.Context, address, walletID, userId string) {
+	resp, err := ws.horizonClient.Fund(address)
+	if err != nil {
+		ws.log.Error("failed to fund testnet account", "error", err, "address", address)
+		return
+	}
+	ws.log.Info("testnet account funded", "address", address, "tx_hash", resp.Hash)
+	now := time.Now()
+	fee := float64(resp.FeeCharged)
+	txService := transactions.NewTransactionService()
+	transactionData := transactions.TransactionDto{
+		WalletID:          &walletID,
+		TransactionHash:   resp.Hash,
+		Amount:            10000,
+		Token:             "xlm",
+		TransactionStatus: "confirmed",
+		ConfirmedAt:       &now,
+		TransactionType:   "funding",
+		NetworkFee:        &fee,
+	}
+
+	_, err = txService.CreateNewTransaction(ctx, userId, transactionData)
+	if err != nil {
+		ws.log.Error("failed to record transaction record on wallet test funding")
+	}
+}
+
+func (ws *WalletService) getAccountBalance(address string) (*StellarWalletBalance, error) {
+	var usdcBalance float64
+	var xlmBalance float64
+	account, err := ws.horizonClient.AccountDetail(horizonclient.AccountRequest{
+		AccountID: address,
+	})
+	if err != nil {
+		ws.log.Error("failed to get wallet balance", "error", err)
+		return nil, err
+	}
+
+	for _, balance := range account.Balances {
+		switch {
+		case balance.Asset.Type == "native":
+			fmt.Scanf(balance.Balance, "%f", &xlmBalance)
+		case balance.Asset.Code == "USDC":
+			fmt.Scanf(balance.Balance, "%f", &usdcBalance)
+		}
+	}
+
+	return &StellarWalletBalance{
+		USDC: usdcBalance,
+		XLM:  xlmBalance,
+	}, nil
+}
+
+func (ws *WalletService) updateWalletBalance(ctx context.Context, walletID string, usdc_balance, xlm_balance float64) {
+	const query string = `UPDATE wallets SET usdc_balance = $2, xlm_balance = $3, updated_at = NOW() WHERE id = $1`
+	_, err := ws.postgres.Exec(ctx, query, walletID, usdc_balance, xlm_balance)
+	if err != nil {
+		ws.log.Error("failed to update wallet balance", "error", err, "wallet_id", walletID)
+	}
+	ws.log.Info("successfully updated wallet balance on wallet Id ===> " + walletID)
+}
+
+func (ws *WalletService) cacheWalletInfo(ctx context.Context, wallet *WalletResponseDto) {
+	data, err := json.Marshal(wallet)
+	if err != nil {
+		return
+	}
+
+	cacheKey := ws.GetWalletCacheKey(wallet.ID)
+	ws.redis.Set(ctx, cacheKey, data, 5*time.Minute)
+}
+
+func (ws *WalletService) GetWalletCacheKey(walletId string) string {
+	return fmt.Sprintf("wallet:%s", walletId)
+}
+
+func (ws *WalletService) ExportWalletKeys(ctx context.Context, walletID, userID, password string) *utils.ApiResponse {
+
+	var encryptedSeed string
+	var walletAddress string
+	const query string = `SELECT private_key, address, FROM wallets WHERE id = $1 AND user_id = $2`
+	err := ws.postgres.QueryRow(ctx, query, walletID, userID).Scan(&encryptedSeed, &walletAddress)
+	if err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusNotFound,
+			Message:    "Wallet details not found",
+		}
+	}
+
+	seed, err := ws.decryptPrivateKey(encryptedSeed)
+	if err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "failed to retrieve wallet details",
+		}
+	}
+
+	return &utils.ApiResponse{
+		StatusCode: http.StatusOK,
+		Message:    "successful",
+		Data: map[string]interface{}{
+			"private_key":    seed,
+			"wallet_address": walletAddress,
+		},
+	}
+}
