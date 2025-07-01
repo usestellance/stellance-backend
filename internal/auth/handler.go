@@ -127,3 +127,24 @@ func (h *AuthHandler) RequestPasswordReset(w http.ResponseWriter, r *http.Reques
 	data := h.service.RequestPasswordReset(r.Context(), email)
 	utils.WriteToJson(w, data.StatusCode, data)
 }
+
+func (h *AuthHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
+	var dto ResetPasswordDto
+	if err := json.NewDecoder(r.Body).Decode(&dto); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.validator.Struct(dto); err != nil {
+		utils.HandleValidationError(w, err)
+		return
+	}
+
+	if valid, errMsg := utils.CheckPasswordRequirements(dto.Password); !valid {
+		http.Error(w, errMsg, http.StatusBadRequest)
+		return
+	}
+
+	data := h.service.ResetPassword(r.Context(), dto)
+	utils.WriteToJson(w, data.StatusCode, data)
+}

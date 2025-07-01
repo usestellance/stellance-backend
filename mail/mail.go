@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"html/template"
 	"log/slog"
-	"math/rand"
 	"os"
 	"time"
 
@@ -82,7 +81,7 @@ func (m *Mailer) SendVerificationEmail(email, url string) error {
 	m.log.Debug(fmt.Sprintf("email sent successfully to %s", email))
 	return nil
 }
-func (m *Mailer) SendResetEmail(email, url string) error {
+func (m *Mailer) SendResetEmail(email, url, otp string) error {
 	subject := "Reset Password Request"
 	t, err := template.ParseFS(templateFs, "templates/reset_email.html")
 	if err != nil {
@@ -91,7 +90,7 @@ func (m *Mailer) SendResetEmail(email, url string) error {
 	var body bytes.Buffer
 	if err := t.Execute(&body, map[string]interface{}{
 		"URL": url,
-		"OTP": m.GenerateOTP(),
+		"OTP": otp,
 	}); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)
 	}
@@ -110,13 +109,4 @@ func (m *Mailer) SendResetEmail(email, url string) error {
 	}
 	m.log.Debug(fmt.Sprintf("email sent successfully to %s", email))
 	return nil
-}
-
-func (m *Mailer) GenerateOTP() string {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	otp := ""
-	for i := 0; i < 6; i++ {
-		otp += fmt.Sprintf("%d", r.Intn(10))
-	}
-	return otp
 }

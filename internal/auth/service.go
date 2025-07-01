@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"strings"
@@ -414,10 +415,31 @@ func (as *AuthServiceConfig) RequestPasswordReset(ctx context.Context, email str
 			Message:    fmt.Sprintf("there's no account with this email '%s', kindly contact support if you think this is unusual", email),
 		}
 	}
+	otp := as.GenerateOTP()
+	data := map[string]interface{}{
+		"email": email,
+		"otp":   otp,
+	}
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Sever is currently unavailable at the moment, kindly contact support",
+		}
+	}
+	err = as.redis.Set(ctx, fmt.Sprintf("email_otp_%s", email), jsonData, emailCacheTime).Err()
+	if err != nil {
+		as.log.Error("failed to add email token to redis", "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Sever is currently unavailable at the moment, kindly contact support",
+		}
+	}
+
 	go func() {
 		ee := url.QueryEscape(email)
 		email_url := fmt.Sprintf("https://usestellance.com/auth/reset-password?email=%s", ee)
-		err := as.mail.SendResetEmail(email, email_url)
+		err := as.mail.SendResetEmail(email, email_url, otp)
 		if err != nil {
 			as.log.Warn("error sending reset email to user", "error", err)
 		}
@@ -428,6 +450,89 @@ func (as *AuthServiceConfig) RequestPasswordReset(ctx context.Context, email str
 	}
 }
 
-func (as *AuthServiceConfig) ResetPassword(ctx context.Context, dto AuthRequestDto) *utils.ApiResponse {
-	return &utils.ApiResponse{}
+func (m *AuthServiceConfig) GenerateOTP() string {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	otp := ""
+	for i := 0; i < 6; i++ {
+		otp += fmt.Sprintf("%d", r.Intn(10))
+	}
+	return otp
+}
+
+func (as *AuthServiceConfig) ResetPassword(ctx context.Context, dto ResetPasswordDto) *utils.ApiResponse {
+	data, err := as.redis.Get(ctx, fmt.Sprintf("email_otp_%s", strings.ToLower(dto.Email))).Result()
+	if err != nil {
+		return as.RequestPasswordReset(ctx, dto.Email)
+	}
+	var cached struct {
+		Email string `json:"email"`
+		OTP   string `json:"otp"`
+	}
+
+	if err := json.Unmarshal([]byte(data), &cached); err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Sever is currently unavailable at the moment, kindly contact support",
+		}
+	}
+
+	if cached.OTP != dto.Otp {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusForbidden,
+			Message:    "OTP data in missing or incorrect",
+		}
+	}
+
+	if dto.Password != dto.ConfirmPassword {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusBadRequest,
+			Message:    "Your password and confirm password does not match",
+		}
+	}
+
+	hash, err := utils.HashString(dto.Password)
+	if err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "service unavailable, kindly contact support",
+			Error:      err.Error(),
+		}
+	}
+	tx, err := as.postgres.Begin(ctx)
+	if err != nil {
+		as.log.Error("failed to begin transaction", "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to process request",
+		}
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	const query = `UPDATE users SET password = $1 WHERE email = $2`
+
+	_, err = tx.Exec(ctx, query, hash, cached.Email)
+	if err != nil {
+		as.log.Error("failed to update user password", "error", err, "email", cached.Email)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to update user password",
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		as.log.Error("failed to commit transaction", "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to finalize update",
+		}
+	}
+
+	as.log.Info("user password updated successfully", "email", cached.Email)
+
+	return &utils.ApiResponse{
+		StatusCode: http.StatusOK,
+		Message:    "Password updated successfully",
+	}
 }
