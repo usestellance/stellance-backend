@@ -1282,6 +1282,15 @@ func (is *InvoiceService) SendInvoice(ctx context.Context, userId, invoiceId, em
 		actualEmail = payer_email
 	}
 
+	const s string = `UPDATE invoice SET status = 'sent' WHERE id = $1 AND updated_at = NOW()`
+	_, err = tx.Exec(ctx, s, invoiceId)
+	if err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to send invoice",
+		}
+	}
+
 	go func() {
 		u := url.QueryEscape(invoice_url)
 		url := fmt.Sprintf("https://usestellance.com/auth/reset-password?email=%s", u)
@@ -1293,5 +1302,71 @@ func (is *InvoiceService) SendInvoice(ctx context.Context, userId, invoiceId, em
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
 		Message:    "Invoice successfully sent",
+	}
+}
+
+func (is *InvoiceService) ReviewInvoice(ctx context.Context, invoiceId string, approve bool) *utils.ApiResponse {
+	var query string
+	if approve {
+		query = `
+			UPDATE invoice 
+			SET approved = true, 
+				approved_date = NOW(),
+				status = 'viewed',
+				updated_at = NOW()
+			WHERE id = $1 
+				AND approved = false 
+				AND rejected IS NOT TRUE`
+	} else {
+		query = `
+			UPDATE invoice 
+			SET rejected = true, 
+				rejected_date = NOW(),
+				status = 'viewed',
+				updated_at = NOW()
+			WHERE id = $1 
+				AND approved = false 
+				AND rejected IS NOT TRUE`
+	}
+
+	result, err := is.postgres.Exec(ctx, query, invoiceId)
+	if err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to review invoice",
+		}
+	}
+
+	if result.RowsAffected() == 0 {
+		var exists, isApproved, isRejected bool
+		err = is.postgres.QueryRow(ctx, `
+			SELECT 
+				EXISTS(SELECT 1 FROM invoice WHERE id = $1),
+				COALESCE((SELECT approved FROM invoice WHERE id = $1), false),
+				COALESCE((SELECT rejected FROM invoice WHERE id = $1), false)
+		`, invoiceId).Scan(&exists, &isApproved, &isRejected)
+
+		if err != nil || !exists {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusNotFound,
+				Message:    "Invoice not found",
+			}
+		}
+		if isApproved || isRejected {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusBadRequest,
+				Message:    "Invoice has already been reviewed",
+			}
+		}
+	}
+
+	action := "approved"
+	if !approve {
+		action = "rejected"
+	}
+
+	return &utils.ApiResponse{
+		StatusCode: http.StatusOK,
+		Message:    fmt.Sprintf("Invoice %s successfully", action),
 	}
 }
