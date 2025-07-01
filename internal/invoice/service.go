@@ -94,7 +94,7 @@ func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvo
 		businessNameStr = businessName.String
 	}
 
-	invoiceNumber, err := is.GenerateAndFormatInvoiceNumber(ctx, userId, businessNameStr)
+	invoiceNumber, err := is.GenerateInvoiceNumber(ctx, userId)
 	if err != nil {
 		is.log.Error("failed to generate invoice number", "error", err)
 		return &utils.ApiResponse{
@@ -286,6 +286,32 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 		}
 	}
 
+	tx, err := is.postgres.Begin(ctx)
+	if err != nil {
+		is.log.Error("failed to begin transaction", "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to process request. Please try again.",
+		}
+	}
+	defer tx.Rollback(ctx)
+
+	var bName sql.NullString
+	var sender_country string
+	var first_name string
+	var last_name string
+	var email string
+
+	const qq string = `SELECT business_name, country, email,
+		first_name, last_name FROM users WHERE id = $1
+		AND is_active = true
+		AND email_verified = true
+		AND first_name IS NOT NULL 
+		AND first_name <> '' 
+		AND last_name IS NOT NULL 
+		AND last_name <> ''
+	`
+
 	query, args := is.buildInvoiceQuery(dto, user_id)
 	countQuery := `
 		SELECT COUNT(*)
@@ -293,6 +319,21 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 		WHERE i.created_by_id = $1
 		%s
 	`
+	err = tx.QueryRow(ctx, qq, user_id).Scan(&bName, &sender_country, &email, &first_name, &last_name)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusForbidden,
+				Message:    "Please contact support, your profile is not yet complete",
+			}
+		}
+		is.log.Error("failed to fetch user", "error", err, "user_id", user_id)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to process request. Please try again.",
+		}
+	}
+
 	var whereClause string
 	countArgs := []interface{}{user_id}
 	argCount := 1
@@ -303,7 +344,7 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 	}
 
 	var totalItems int
-	err := is.postgres.QueryRow(ctx, fmt.Sprintf(countQuery, whereClause), countArgs...).Scan(&totalItems)
+	err = tx.QueryRow(ctx, fmt.Sprintf(countQuery, whereClause), countArgs...).Scan(&totalItems)
 	if err != nil {
 		is.log.Error("failed to get invoice count", "error", err)
 		return &utils.ApiResponse{
@@ -311,7 +352,7 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 			Message:    "Failed to fetch invoices",
 		}
 	}
-	rows, err := is.postgres.Query(ctx, query, args...)
+	rows, err := tx.Query(ctx, query, args...)
 	if err != nil {
 		is.log.Error("failed to fetch invoices", "error", err)
 		return &utils.ApiResponse{
@@ -368,6 +409,14 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 			invoice.Country = country.String
 		}
 
+		sender := InvoiceSenderDetails{
+			UserId:       user_id,
+			Name:         first_name + " " + last_name,
+			Email:        email,
+			Location:     sender_country,
+			BusinessName: &bName.String,
+		}
+		invoice.CreatedBy = sender
 		invoices = append(invoices, invoice)
 		invoiceIDs = append(invoiceIDs, invoice.ID)
 	}
@@ -532,6 +581,36 @@ func (is *InvoiceService) GetInvoiceById(ctx context.Context, invoiceId, userId,
 			}
 		}
 	}
+	var bName sql.NullString
+	var sender_country string
+	var first_name string
+	var last_name string
+	var email string
+
+	const qq string = `SELECT business_name, country, email,
+		first_name, last_name FROM users WHERE id = $1
+		AND is_active = true
+		AND email_verified = true
+		AND first_name IS NOT NULL 
+		AND first_name <> '' 
+		AND last_name IS NOT NULL 
+		AND last_name <> ''
+	`
+	err := is.postgres.QueryRow(ctx, qq, userId).Scan(&bName, &sender_country, &email, &first_name, &last_name)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusForbidden,
+				Message:    "Please contact support, your profile is not yet complete",
+			}
+		}
+		is.log.Error("failed to fetch user", "error", err, "user_id", userId)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to process request. Please try again.",
+		}
+	}
 
 	const query string = `
 		WITH invoice_data AS (
@@ -597,7 +676,7 @@ func (is *InvoiceService) GetInvoiceById(ctx context.Context, invoiceId, userId,
 		Items          json.RawMessage `db:"items"`
 	}
 
-	err := is.postgres.QueryRow(ctx, query, invoiceId).Scan(
+	err = is.postgres.QueryRow(ctx, query, invoiceId).Scan(
 		&result.ID,
 		&result.InvoiceNumber,
 		&result.InvoiceURL,
@@ -650,6 +729,14 @@ func (is *InvoiceService) GetInvoiceById(ctx context.Context, invoiceId, userId,
 		items = []InvoiceItems{}
 	}
 
+	sender := InvoiceSenderDetails{
+		UserId:       userId,
+		Name:         first_name + " " + last_name,
+		Email:        email,
+		Location:     sender_country,
+		BusinessName: &bName.String,
+	}
+
 	invoice := InvoiceResponse{
 		ID:            result.ID,
 		InvoiceNumber: result.InvoiceNumber,
@@ -667,6 +754,7 @@ func (is *InvoiceService) GetInvoiceById(ctx context.Context, invoiceId, userId,
 		UpdatedAt:     result.UpdatedAt,
 		Country:       result.AddressCountry.String,
 		Items:         items,
+		CreatedBy:     sender,
 	}
 
 	if result.PaidAt.Valid {
