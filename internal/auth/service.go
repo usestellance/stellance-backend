@@ -396,3 +396,38 @@ func (c *AuthServiceConfig) ResendEmail(ctx context.Context, email string) *util
 		Message:    "Email has been sent",
 	}
 }
+
+func (as *AuthServiceConfig) RequestPasswordReset(ctx context.Context, email string) *utils.ApiResponse {
+	email = strings.ToLower(email)
+	existingUser, err := user.NewUserService().FindUserByEmail(ctx, email)
+	if err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "service unavailable, kindly contact support",
+			Error:      err.Error(),
+		}
+	}
+
+	if existingUser == nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusBadRequest,
+			Message:    fmt.Sprintf("there's no account with this email '%s', kindly contact support if you think this is unusual", email),
+		}
+	}
+	go func() {
+		ee := url.QueryEscape(email)
+		email_url := fmt.Sprintf("https://usestellance.com/auth/reset-password?email=%s", ee)
+		err := as.mail.SendResetEmail(email, email_url)
+		if err != nil {
+			as.log.Warn("error sending reset email to user", "error", err)
+		}
+	}()
+	return &utils.ApiResponse{
+		StatusCode: http.StatusOK,
+		Message:    "Reset Email has successfully been sent",
+	}
+}
+
+func (as *AuthServiceConfig) ResetPassword(ctx context.Context, dto AuthRequestDto) *utils.ApiResponse {
+	return &utils.ApiResponse{}
+}

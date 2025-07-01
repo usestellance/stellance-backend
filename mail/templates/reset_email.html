@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reset Password</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Rubik:ital,wght@0,300..900;1,300..900&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+
+  <body
+    style="
+      overflow-x: hidden;
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #ffffff;
+      box-sizing: border-box;
+    "
+  >
+    <div
+      style="
+        max-width: 800px;
+        margin: 0 auto;
+        background: #ffffff;
+        padding: 40px 12px 24px;
+      "
+    >
+      <div style="width: 100%; margin: 0 auto">
+        <div style="width: 100%; position: relative">
+          <img
+            src="https://res.cloudinary.com/kodenigga/image/upload/v1750184214/stellance-email-resources/banners/lock_erg0ir.png"
+            alt="banner"
+            style="width: 100%; height: 70%; object-fit: contain"
+          />
+          <div style="position: absolute; top: 80px; left: 40px; color: #fff">
+            <img
+              src="https://res.cloudinary.com/kodenigga/image/upload/v1750181850/stellance-email-resources/banners/stellance_dglweo.png"
+              alt="stellance logo"
+              style="width: 120px; height: auto; object-fit: contain"
+            />
+            <p style="font-size: 28px; font-weight: 400; margin-bottom: 0px">
+              Password Reset
+            </p>
+          </div>
+        </div>
+
+        <div
+          style="
+            font-size: 16px;
+            line-height: 28px;
+            color: #1e1e1ee3;
+            width: 95%;
+            margin-top: 40px;
+            margin-bottom: 40px;
+          "
+        >
+          <p>
+            We received a request to reset your password. If you didn&apos;t
+            make this request, no action is needed, your account is safe and
+            your password hasn&apos;t changed.
+          </p>
+          <p>
+            If you did request a reset, please use the one time passcode below
+            to complete the process with the link below:
+          </p>
+
+          <p style="font-style: italic; font-size: 14px;">This OTP is valid for a limited time and can only be used once.</p>
+          <p style="margin: 16px auto; font-size: 28px; font-weight: bold; text-align: center; letter-spacing: 4px; color: #2c3e50;">
+            {{.OTP}}
+          </p>          
+        </div>
+
+        <div>
+          <a
+            href="{{.URL}}"
+            style="
+              display: block;
+              width: fit-content;
+              text-decoration: none;
+              background: #18234f;
+              color: white;
+              padding: 14px 40px;
+              font-weight: 600;
+              font-size: 14px;
+              border-radius: 24px;
+              margin: 0px auto;
+            "
+          >
+            Reset Password
+          </a>
+
+        </div>
+
+        <div
+          style="
+            font-size: 16px;
+            line-height: 28px;
+            color: #1e1e1ee3;
+            width: 95%;
+            margin-top: 40px;
+            padding-bottom: 40px;
+          "
+        >
+          <div>
+            <p style="margin-bottom: 0px">Best regards,</p>
+            <p style="margin-top: 0px">The Stellance Team.</p>
+          </div>
+        </div>
+      </div>
+
+      <div
+        style="
+          font-size: 14px;
+          text-align: center;
+          color: #787878;
+          margin-top: 36px;
+          margin-bottom: 40px;
+          max-width: 380px;
+          margin: auto;
+        "
+      >
+        <p>
+          You are receiving this email because you created an account with us,
+          please do not reply to this email. Have questions? Send an email to
+          <a href="mailto:help@stellance.co">help@stellance.co</a>
+        </p>
+
+        <div style="
+          font-size: 14px;
+          text-align: center;
+          color: #787878;
+          margin-top: 36px;
+          margin-bottom: 40px;
+          max-width: 380px;
+          margin: auto;
+        ">
+        <p>
+            This is an automated email, please forward queries to
+            <a href="mailto:support@usestellance.com">support@usestellance.com</a>
+        </p>
+        <div>
+            <a href="https://x.com/StellanceHQ" style="
+              overflow: hidden;
+              display: inline-block;
+              margin: 18px 10px;
+              padding: 5px;
+              height: 28px;
+              width: 28px;
+            ">
+                <img src="https://res.cloudinary.com/kodenigga/image/upload/v1750183127/stellance-email-resources/socials/devicon_twitter_nt7qdn.png"
+                    alt="X (Twitter)" />
+            </a>
+        </div>
+
+        <p>Powered by Stellance</p>
+    </div>
+  </body>
+</html>

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"log/slog"
+	"math/rand"
 	"os"
 	"time"
 
@@ -16,8 +17,8 @@ import (
 
 var (
 	verification_Email_Sender = "noreply@usestellance.com"
-	//go:embed templates/email_verification.html
-	templateFs                embed.FS
+	//go:embed templates/*.html
+	templateFs embed.FS
 )
 
 type Mailer struct {
@@ -80,4 +81,42 @@ func (m *Mailer) SendVerificationEmail(email, url string) error {
 	}
 	m.log.Debug(fmt.Sprintf("email sent successfully to %s", email))
 	return nil
+}
+func (m *Mailer) SendResetEmail(email, url string) error {
+	subject := "Reset Password Request"
+	t, err := template.ParseFS(templateFs, "templates/reset_email.html")
+	if err != nil {
+		return fmt.Errorf("failed to read reset email template: %w", err)
+	}
+	var body bytes.Buffer
+	if err := t.Execute(&body, map[string]interface{}{
+		"URL": url,
+		"OTP": m.GenerateOTP(),
+	}); err != nil {
+		return fmt.Errorf("failed to execute template: %w", err)
+	}
+	params := &resend.SendEmailRequest{
+		From:    verification_Email_Sender,
+		To:      []string{email},
+		Html:    body.String(),
+		Subject: subject,
+		ReplyTo: "support@usestellance.com",
+	}
+
+	_, err = m.client.Emails.Send(params)
+	if err != nil {
+		m.log.Error("error sending verification email", "email_error", err)
+		return err
+	}
+	m.log.Debug(fmt.Sprintf("email sent successfully to %s", email))
+	return nil
+}
+
+func (m *Mailer) GenerateOTP() string {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	otp := ""
+	for i := 0; i < 6; i++ {
+		otp += fmt.Sprintf("%d", r.Intn(10))
+	}
+	return otp
 }

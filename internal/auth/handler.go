@@ -117,3 +117,13 @@ func (h *AuthHandler) ResendEmailVerification(w http.ResponseWriter, r *http.Req
 	data := h.service.ResendEmail(r.Context(), email)
 	utils.WriteToJson(w, data.StatusCode, data)
 }
+
+func (h *AuthHandler) RequestPasswordReset(w http.ResponseWriter, r *http.Request) {
+	email := r.URL.Query().Get("email")
+	if email == "" {
+		http.Error(w, "invalid request! auth email not found", http.StatusBadRequest)
+		return
+	}
+	data := h.service.RequestPasswordReset(r.Context(), email)
+	utils.WriteToJson(w, data.StatusCode, data)
+}
