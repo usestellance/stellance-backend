@@ -43,25 +43,25 @@ type InvoiceItems struct {
 }
 
 type InvoiceResponse struct {
-	ID                 string         `json:"id"`
-	InvoiceNumber      string         `json:"invoice_number"`
-	InvoiceURL         string         `json:"invoice_url"`
-	Title              string         `json:"title,omitempty"`
-	PayerEmail         string         `json:"payer_email"`
-	PayerName          string         `json:"payer_name,omitempty"`
-	PayerWalletAddress string         `json:"payer_wallet_address,omitempty"`
-	Country            string         `json:"country,omitempty"`
-	SubTotal           float64        `json:"sub_total"`
-	ServiceFee         float64        `json:"service_fee"`
-	Total              float64        `json:"total"`
-	Currency           string         `json:"currency"`
-	Status             string         `json:"status"`
-	DueDate            time.Time      `json:"due_date"`
-	CreatedAt          time.Time      `json:"created_at"`
-	UpdatedAt          time.Time      `json:"updated_at,omitempty"`
-	PaidAt             *time.Time     `json:"paid_at,omitempty"`
-	CreatedBy          *string        `json:"created_by,omitempty"`
-	Items              []InvoiceItems `json:"items"`
+	ID                 string               `json:"id"`
+	InvoiceNumber      string               `json:"invoice_number"`
+	InvoiceURL         string               `json:"invoice_url"`
+	Title              string               `json:"title,omitempty"`
+	PayerEmail         string               `json:"payer_email"`
+	PayerName          string               `json:"payer_name,omitempty"`
+	PayerWalletAddress string               `json:"payer_wallet_address,omitempty"`
+	Country            string               `json:"country,omitempty"`
+	SubTotal           float64              `json:"sub_total"`
+	ServiceFee         float64              `json:"service_fee"`
+	Total              float64              `json:"total"`
+	Currency           string               `json:"currency"`
+	Status             string               `json:"status"`
+	DueDate            time.Time            `json:"due_date"`
+	CreatedAt          time.Time            `json:"created_at"`
+	UpdatedAt          time.Time            `json:"updated_at,omitempty"`
+	PaidAt             *time.Time           `json:"paid_at,omitempty"`
+	Items              []InvoiceItems       `json:"items"`
+	CreatedBy          InvoiceSenderDetails `json:"createdBy"`
 }
 
 type InvoiceListResponseDto struct {
@@ -82,4 +82,12 @@ type InvoiceFiltersDto struct {
 	Page    int               `json:"page" validate:"required,min=1"`
 	Count   int               `json:"count" validate:"required,min=1,max=15"`
 	OrderBy utils.OrderByType `json:"order_by" validate:"required,order_by"`
+}
+
+type InvoiceSenderDetails struct {
+	UserId       string  `json:"user_id"`
+	Name         string  `json:"name"`
+	Email        string  `json:"email"`
+	Location     string  `json:"location"`
+	BusinessName *string `json:"business_name,omitempty"`
 }

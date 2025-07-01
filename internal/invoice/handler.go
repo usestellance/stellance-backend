@@ -176,7 +176,7 @@ func (h *InvoiceHandler) GetInvoiceByIDHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 	invoiceID := r.PathValue("id")
-	response := h.service.GetInvoiceById(ctx, invoiceID, reqUserId, role)	
+	response := h.service.GetInvoiceById(ctx, invoiceID, reqUserId, role)
 	utils.WriteToJson(w, response.StatusCode, response)
 }
 

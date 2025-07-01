@@ -197,7 +197,7 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 		existingUser.Password = ""
 		return &utils.ApiResponse{
 			StatusCode: http.StatusOK,
-			Message:    "Login successful! A new email has been sent to your email address please verify your email",
+			Message:    "Login successful",
 			Data: &AuthResponseDto{
 				User:            *existingUser,
 				AccessToken:     accessToken,
