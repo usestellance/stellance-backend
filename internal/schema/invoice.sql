@@ -11,9 +11,13 @@ CREATE TABLE IF NOT EXISTS invoice (
     invoice_url TEXT NOT NULL UNIQUE,
     created_by_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     payer_id UUID REFERENCES users(id),
-    payer_email TEXT,
+    approved BOOLEAN DEFAULT FALSE,
+    approved_date TIMESTAMPZ,
+    rejected BOOLEAN,
+    rejected_date TIMESTAMPTZ payer_email TEXT,
     payer_name TEXT,
-    payer_wallet_address VARCHAR(128), -- to be updated later when the transaction has been confirmed to get payer wallet address
+    payer_wallet_address VARCHAR(128),
+    -- to be updated later when the transaction has been confirmed to get payer wallet address
     sub_total NUMERIC(20, 6) NOT NULL CHECK (sub_total >= 0),
     service_fee NUMERIC(20, 6) DEFAULT 0 CHECK (service_fee >= 0),
     total NUMERIC(20, 6) NOT NULL,

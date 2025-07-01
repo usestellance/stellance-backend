@@ -1,0 +1,10 @@
+ALTER TYPE invoice_status
+ADD VALUE IF NOT EXISTS 'pending';
+ALTER TABLE invoice
+ADD COLUMN approved BOOLEAN DEFAULT FALSE;
+ALTER TABLE invoice
+ADD COLUMN approved_date TIMESTAMPTZ;
+ALTER TABLE invoice
+ADD COLUMN rejected BOOLEAN;
+ALTER TABLE invoice
+ADD COLUMN rejected_date TIMESTAMP;
