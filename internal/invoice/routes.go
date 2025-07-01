@@ -17,5 +17,8 @@ func RegisterInvoiceRoutes(apiV1 *httpx.RouteGroup, router *http.ServeMux, invoi
 	invoiceGroup.HandleFunc("POST /", authMiddleware.Authenticate(http.HandlerFunc(invoiceHandler.CreateNewInvoiceHandler)).ServeHTTP)
 	invoiceGroup.HandleFunc("GET /", authMiddleware.Authenticate(http.HandlerFunc(invoiceHandler.GetManyInvoiceHandler)).ServeHTTP)
 	invoiceGroup.HandleFunc("GET /{id}", authMiddleware.Authenticate(http.HandlerFunc(invoiceHandler.GetInvoiceByIDHandler)).ServeHTTP)
+	invoiceGroup.HandleFunc("DELETE /{id}", authMiddleware.Authenticate(http.HandlerFunc(invoiceHandler.DeleteInvoiceHandler)).ServeHTTP)
+	invoiceGroup.HandleFunc("POST /{id}", authMiddleware.Authenticate(http.HandlerFunc(invoiceHandler.EditInvoiceHandler)).ServeHTTP)
+	invoiceGroup.HandleFunc("GET /send/{id}", authMiddleware.Authenticate(http.HandlerFunc(invoiceHandler.SendInvoice)).ServeHTTP)
 
 }

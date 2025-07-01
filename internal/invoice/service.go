@@ -8,10 +8,12 @@ import (
 	"log/slog"
 	"math"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/The-True-Hooha/stellance-backend.git/internal/user"
+	"github.com/The-True-Hooha/stellance-backend.git/mail"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/config"
 	jwt_ "github.com/The-True-Hooha/stellance-backend.git/pkg/jwt"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/utils"
@@ -30,6 +32,7 @@ type InvoiceService struct {
 	postgres *pgxpool.Pool
 	redis    *redis.Client
 	jwt      *jwt_.JwtTokenServiceConfig
+	mail     *mail.Mailer
 }
 
 func NewInvoiceService() *InvoiceService {
@@ -38,6 +41,7 @@ func NewInvoiceService() *InvoiceService {
 		postgres: config.GetAppContainer().Postgres,
 		redis:    config.GetAppContainer().Redis,
 		jwt:      jwt_.JwtTokenService(),
+		mail:     mail.NewMailer(),
 	}
 }
 
@@ -889,19 +893,50 @@ func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invo
 		}
 	}
 
-	// if !is.canAccessInvoice(invoice.CreatedBy, userId, role) {
-	// 	return &utils.ApiResponse{
-	// 		StatusCode: http.StatusForbidden,
-	// 		Message:    "You don't have permission to view this invoice",
-	// 	}
-	// }
-
 	var items []InvoiceItems
 	if invoice.Items != nil {
 		if err := json.Unmarshal(invoice.Items, &items); err != nil {
 			log.Error("failed to parse invoice items", "error", err)
 			items = []InvoiceItems{}
 		}
+	}
+
+	var bName sql.NullString
+	var sender_country string
+	var first_name string
+	var last_name string
+	var email string
+
+	const qq string = `SELECT business_name, country, email,
+		first_name, last_name FROM users WHERE id = $1
+		AND is_active = true
+		AND email_verified = true
+		AND first_name IS NOT NULL 
+		AND first_name <> '' 
+		AND last_name IS NOT NULL 
+		AND last_name <> ''
+	`
+	err = is.postgres.QueryRow(ctx, qq, userId).Scan(&bName, &sender_country, &email, &first_name, &last_name)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusForbidden,
+				Message:    "Please contact support, your profile is not yet complete",
+			}
+		}
+		is.log.Error("failed to fetch user", "error", err, "user_id", userId)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to process request. Please try again.",
+		}
+	}
+
+	sender := InvoiceSenderDetails{
+		UserId:       userId,
+		Name:         first_name + " " + last_name,
+		Email:        email,
+		Location:     sender_country,
+		BusinessName: &bName.String,
 	}
 
 	response := InvoiceResponse{
@@ -920,8 +955,8 @@ func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invo
 		CreatedAt:     invoice.CreatedAt,
 		UpdatedAt:     invoice.UpdatedAt,
 		Country:       invoice.AddressCountry.String,
-		// CreatedBy:     &invoice.CreatedBy, // TODO: check something here
-		Items: items,
+		CreatedBy:     sender,
+		Items:         items,
 	}
 
 	if invoice.PaidAt.Valid {
@@ -978,4 +1013,285 @@ func (is *InvoiceService) trackInvoiceView(ctx context.Context, invoiceID string
 		WHERE id = $1 AND status = 'sent'
 	`
 	is.postgres.Exec(ctx, updateQuery, invoiceID)
+}
+
+func (is *InvoiceService) DeleteInvoice(ctx context.Context, userId, invoiceId string) *utils.ApiResponse {
+	const deleteQuery = `
+		WITH deleted_invoice AS (
+			DELETE FROM invoice 
+			WHERE id = $1 
+			AND created_by_id = $2 
+			AND paid_at IS NULL
+			RETURNING id
+		)
+		DELETE FROM invoice_items 
+		WHERE invoice_id IN (SELECT id FROM deleted_invoice)
+		RETURNING invoice_id`
+
+	var deletedId string
+	err := is.postgres.QueryRow(ctx, deleteQuery, invoiceId, userId).Scan(&deletedId)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			var exists bool
+			var isPaid bool
+			var isOwner bool
+			checkErr := is.postgres.QueryRow(ctx, `
+				SELECT 
+					EXISTS(SELECT 1 FROM invoice WHERE id = $1),
+					EXISTS(SELECT 1 FROM invoice WHERE id = $1 AND paid_at IS NOT NULL),
+					EXISTS(SELECT 1 FROM invoice WHERE id = $1 AND created_by_id = $2)
+			`, invoiceId, userId).Scan(&exists, &isPaid, &isOwner)
+
+			if checkErr != nil || !exists {
+				return &utils.ApiResponse{
+					StatusCode: http.StatusNotFound,
+					Message:    "Invoice not found",
+				}
+			}
+			if isPaid {
+				return &utils.ApiResponse{
+					StatusCode: http.StatusBadRequest,
+					Message:    "Cannot delete paid invoice",
+				}
+			}
+			if !isOwner {
+				return &utils.ApiResponse{
+					StatusCode: http.StatusForbidden,
+					Message:    "Unauthorized to delete this invoice",
+				}
+			}
+		}
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to delete invoice",
+		}
+	}
+
+	return &utils.ApiResponse{
+		Message:    "Successful",
+		StatusCode: http.StatusOK,
+	}
+}
+
+func (is *InvoiceService) EditInvoice(ctx context.Context, userId, invoiceId string, dto CreateInvoiceDTO) *utils.ApiResponse {
+	tx, err := is.postgres.Begin(ctx)
+	if err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Server is currently unavailable, kindly contact support",
+		}
+	}
+	defer tx.Rollback(ctx)
+
+	const oq string = `SELECT status, created_by_id FROM invoice WHERE id = $1`
+	var status string
+	var createdById string
+	err = tx.QueryRow(ctx, oq,
+		invoiceId).Scan(&status, &createdById)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusNotFound,
+				Message:    "Invoice not found",
+			}
+		}
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to fetch invoice",
+		}
+	}
+
+	if createdById != userId {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusForbidden,
+			Message:    "Unauthorized to edit this invoice",
+		}
+	}
+
+	if status != "draft" {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusBadRequest,
+			Message:    "Can only edit draft invoices",
+		}
+	}
+
+	subtotal, serviceFee, total, err := is.validateAndCalculateInvoice(dto)
+	if err != nil {
+		is.log.Error("error trying to calculate invoice numbers", "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    err.Error(),
+		}
+	}
+
+	const uis string = `UPDATE invoice SET 
+			title = $1,
+			payer_name = $2,
+			payer_email = $3,
+			address_country = $4,
+			service_fee = $5,
+			sub_total = $6,
+			total = $7,
+			due_date = $8,
+			updated_at = NOW()
+		WHERE id = $9`
+	_, err = tx.Exec(ctx, uis,
+		dto.Title, dto.RecipientName, dto.Email, dto.Country,
+		serviceFee, subtotal, total, dto.DueDate, invoiceId)
+
+	if err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to update invoice",
+		}
+	}
+
+	existingItemIds := make(map[string]bool)
+	const ei string = `SELECT id FROM invoice_items WHERE invoice_id = $1`
+	rows, err := tx.Query(ctx, ei, invoiceId)
+	if err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to fetch existing items",
+		}
+	}
+	for rows.Next() {
+		var id string
+		rows.Scan(&id)
+		existingItemIds[id] = true
+	}
+	rows.Close()
+
+	itemsToKeep := make(map[string]bool)
+	for _, item := range dto.InvoiceItems {
+		if item.ItemId != "" {
+			itemsToKeep[item.ItemId] = true
+		}
+	}
+
+	for id := range existingItemIds {
+		if !itemsToKeep[id] {
+			const di string = `DELETE FROM invoice_items WHERE id = $1`
+			_, err = tx.Exec(ctx, di, id)
+			if err != nil {
+				return &utils.ApiResponse{
+					StatusCode: http.StatusInternalServerError,
+					Message:    "Failed to delete removed items",
+				}
+			}
+		}
+	}
+
+	for _, item := range dto.InvoiceItems {
+		if item.ItemId != "" && existingItemIds[item.ItemId] {
+			const ui string = `
+				UPDATE invoice_items SET
+					invoice_type = $1,
+					description = $2,
+					quantity = $3,
+					unit_price = $4,
+					discount = $5,
+					amount = $6,
+					updated_at = NOW()
+				WHERE id = $7 AND invoice_id = $8
+			`
+			_, err = tx.Exec(ctx, ui,
+				item.InvoiceType, item.Description, item.Quantity,
+				item.UnitPrice, item.Discount, item.Amount,
+				item.ItemId, invoiceId)
+		} else {
+			const ud string = `INSERT INTO invoice_items 
+					(invoice_id, invoice_type, description, 
+					quantity, unit_price, discount, amount)
+					VALUES ($1, $2, $3, $4, $5, $6, $7)`
+			_, err = tx.Exec(ctx, ud,
+				invoiceId, item.InvoiceType, item.Description, item.Quantity,
+				item.UnitPrice, item.Discount, item.Amount)
+		}
+
+		if err != nil {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusInternalServerError,
+				Message:    "Failed to update invoice items",
+			}
+		}
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to save changes",
+		}
+	}
+
+	return &utils.ApiResponse{
+		StatusCode: http.StatusOK,
+		Message:    "Invoice updated successfully",
+	}
+}
+
+func (is *InvoiceService) SendInvoice(ctx context.Context, userId, invoiceId, email string) *utils.ApiResponse {
+	tx, err := is.postgres.Begin(ctx)
+	if err != nil {
+		is.log.Error("failed to begin transaction", "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to process request. Please try again.",
+		}
+	}
+	defer tx.Rollback(ctx)
+
+	var (
+		invoice_url string
+		payer_name  string
+		payer_email string
+		first_name  string
+		last_name   string
+	)
+
+	const gi string = `
+    SELECT 
+        i.invoice_url, 
+        i.payer_name, 
+        i.payer_email,
+        u.first_name,
+        u.last_name
+    FROM invoice i
+    LEFT JOIN users u ON i.created_by_id = u.id
+    WHERE i.id = $1 AND i.created_by_id = $2`
+	err = tx.QueryRow(ctx, gi, invoiceId, userId).Scan(
+		&invoice_url, &payer_name, &payer_email, &first_name, &last_name)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusForbidden,
+				Message:    "Invoice does not exist",
+			}
+		}
+		is.log.Error("failed to fetch invoice", "error", err, "user_id", userId)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to process request. Please try again.",
+		}
+	}
+	name := fmt.Sprintf("%s %s", first_name, last_name)
+	actualEmail := email
+	if actualEmail == "" {
+		actualEmail = payer_email
+	}
+
+	go func() {
+		u := url.QueryEscape(invoice_url)
+		url := fmt.Sprintf("https://usestellance.com/auth/reset-password?email=%s", u)
+		err := is.mail.SendInvoiceUrlMail(actualEmail, payer_name, name, url)
+		if err != nil {
+			is.log.Warn("error sending invoice email", "error", err)
+		}
+	}()
+	return &utils.ApiResponse{
+		StatusCode: http.StatusOK,
+		Message:    "Invoice successfully sent",
+	}
 }

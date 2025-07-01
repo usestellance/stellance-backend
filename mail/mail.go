@@ -110,3 +110,34 @@ func (m *Mailer) SendResetEmail(email, url, otp string) error {
 	m.log.Debug(fmt.Sprintf("email sent successfully to %s", email))
 	return nil
 }
+
+func (m *Mailer) SendInvoiceUrlMail(email, payer_name, sender, url string) error {
+	subject := "Reset Password Request"
+	t, err := template.ParseFS(templateFs, "templates/send_invoice.html")
+	if err != nil {
+		return fmt.Errorf("failed to read reset email template: %w", err)
+	}
+	var body bytes.Buffer
+	if err := t.Execute(&body, map[string]interface{}{
+		"URL": url,
+		"PAYER_NAME": payer_name,
+		"SENDER": sender,
+	}); err != nil {
+		return fmt.Errorf("failed to execute template: %w", err)
+	}
+	params := &resend.SendEmailRequest{
+		From:    verification_Email_Sender,
+		To:      []string{email},
+		Html:    body.String(),
+		Subject: subject,
+		ReplyTo: "support@usestellance.com",
+	}
+
+	_, err = m.client.Emails.Send(params)
+	if err != nil {
+		m.log.Error("error sending verification email", "email_error", err)
+		return err
+	}
+	m.log.Debug(fmt.Sprintf("email sent successfully to %s", email))
+	return nil
+}

@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS invoice (
     approved BOOLEAN DEFAULT FALSE,
     approved_date TIMESTAMPZ,
     rejected BOOLEAN,
-    rejected_date TIMESTAMPTZ payer_email TEXT,
+    rejected_date TIMESTAMPTZ,
+    payer_email TEXT,
     payer_name TEXT,
     payer_wallet_address VARCHAR(128),
     -- to be updated later when the transaction has been confirmed to get payer wallet address

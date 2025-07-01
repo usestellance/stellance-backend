@@ -204,3 +204,70 @@ func (h *InvoiceHandler) GetInvoiceSearchHandler(w http.ResponseWriter, r *http.
 	utils.WriteToJson(w, response.StatusCode, response)
 
 }
+
+func (h *InvoiceHandler) DeleteInvoiceHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	reqUserId, ok := utils.GetUserIDFromContext(ctx)
+	if !ok {
+		h.service.log.Warn("unregistered access to invoice")
+	}
+	invoiceID := r.PathValue("id")
+
+	response := h.service.DeleteInvoice(ctx, reqUserId, invoiceID)
+	utils.WriteToJson(w, response.StatusCode, response)
+
+}
+
+func (h *InvoiceHandler) EditInvoiceHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	reqUserId, ok := utils.GetUserIDFromContext(ctx)
+	if !ok {
+		h.service.log.Warn("unregistered access to invoice")
+	}
+	invoiceID := r.PathValue("id")
+	var dto CreateInvoiceDTO
+	if err := json.NewDecoder(r.Body).Decode(&dto); err != nil {
+		h.service.log.Error("failed to decode request", "error", err)
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.validator.Struct(dto); err != nil {
+		utils.HandleValidationError(w, err)
+		return
+	}
+
+	if len(dto.InvoiceItems) == 0 {
+		http.Error(w, "At least one invoice item is required", http.StatusBadRequest)
+		return
+	}
+
+	dueDate, err := time.Parse("2006-01-02", dto.DueDate)
+	if err != nil {
+		http.Error(w, "Invalid due date format. Use YYYY-MM-DD", http.StatusBadRequest)
+		return
+	}
+
+	if dueDate.Before(time.Now().Truncate(24 * time.Hour)) {
+		http.Error(w, "Due date cannot be in the past", http.StatusBadRequest)
+		return
+	}
+	response := h.service.EditInvoice(ctx, reqUserId, invoiceID, dto)
+	utils.WriteToJson(w, response.StatusCode, response)
+
+}
+
+func (h *InvoiceHandler) SendInvoice(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	reqUserId, ok := utils.GetUserIDFromContext(ctx)
+	if !ok {
+		h.service.log.Warn("unregistered access to invoice")
+	}
+	invoiceID := r.PathValue("id")
+	var email string
+	if r.URL.Query().Get("email") != "" {
+		email = r.URL.Query().Get("email")
+	}
+	response := h.service.SendInvoice(ctx, reqUserId, invoiceID, email)
+	utils.WriteToJson(w, response.StatusCode, response)
+}
