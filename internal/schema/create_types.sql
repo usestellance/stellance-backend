@@ -7,7 +7,8 @@ CREATE TYPE invoice_status AS ENUM (
     'paid',
     'overdue',
     'cancelled',
-    'refunded'
+    'refunded',
+    "pending"
 );
 CREATE TYPE currency_type AS ENUM ('usdc', 'xlm');
 CREATE TYPE wallet_chain AS ENUM ('stellar');

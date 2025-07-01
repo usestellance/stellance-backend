@@ -19,6 +19,7 @@ const (
 	InvoiceStatusOverdue   InvoiceStatus = "overdue"
 	InvoiceStatusCancelled InvoiceStatus = "cancelled"
 	InvoiceStatusRefunded  InvoiceStatus = "refunded"
+	InvoiceStatusPending   InvoiceStatus = "pending"
 )
 
 type CreateInvoiceDTO struct {

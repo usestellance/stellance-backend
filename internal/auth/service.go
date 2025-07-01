@@ -2,10 +2,12 @@ package auth
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"strings"
@@ -194,12 +196,34 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 				Error:      err.Error(),
 			}
 		}
+
+		var address sql.NullString
+		var balance sql.NullFloat64
+
+		const q string = `SELECT address, balance FROM wallets WHERE user_id = $1, AND is_primary = true`
+		err = config.postgres.QueryRow(ctx, q, existingUser.ID).Scan(&address, &balance)
+		if err != nil {
+			if err == pgx.ErrNoRows {
+				config.log.Info("no wallet details found for user")
+			}
+		}
 		existingUser.Password = ""
 		return &utils.ApiResponse{
 			StatusCode: http.StatusOK,
 			Message:    "Login successful",
-			Data: &AuthResponseDto{
-				User:            *existingUser,
+			Data: &AuthLoginResponseDto{
+				User: &user.User{
+					Id:           existingUser.ID,
+					Name:         *existingUser.FirstName + " " + *existingUser.LastName,
+					Email:        existingUser.Email,
+					BusinessName: existingUser.BusinessName,
+					PhoneNumber:  existingUser.PhoneNumber,
+					Country:      existingUser.Country,
+					Wallet: &user.UserWallet{
+						Address: address.String,
+						Balance: balance.Float64,
+					},
+				},
 				AccessToken:     accessToken,
 				ExpiresIn:       time.Now().Add(1 * time.Hour).Unix(),
 				EmailVerified:   existingUser.EmailVerified,
@@ -371,5 +395,144 @@ func (c *AuthServiceConfig) ResendEmail(ctx context.Context, email string) *util
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
 		Message:    "Email has been sent",
+	}
+}
+
+func (as *AuthServiceConfig) RequestPasswordReset(ctx context.Context, email string) *utils.ApiResponse {
+	email = strings.ToLower(email)
+	existingUser, err := user.NewUserService().FindUserByEmail(ctx, email)
+	if err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "service unavailable, kindly contact support",
+			Error:      err.Error(),
+		}
+	}
+
+	if existingUser == nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusBadRequest,
+			Message:    fmt.Sprintf("there's no account with this email '%s', kindly contact support if you think this is unusual", email),
+		}
+	}
+	otp := as.GenerateOTP()
+	data := map[string]interface{}{
+		"email": email,
+		"otp":   otp,
+	}
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Sever is currently unavailable at the moment, kindly contact support",
+		}
+	}
+	err = as.redis.Set(ctx, fmt.Sprintf("email_otp_%s", email), jsonData, emailCacheTime).Err()
+	if err != nil {
+		as.log.Error("failed to add email token to redis", "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Sever is currently unavailable at the moment, kindly contact support",
+		}
+	}
+
+	go func() {
+		ee := url.QueryEscape(email)
+		email_url := fmt.Sprintf("https://usestellance.com/auth/reset-password?email=%s", ee)
+		err := as.mail.SendResetEmail(email, email_url, otp)
+		if err != nil {
+			as.log.Warn("error sending reset email to user", "error", err)
+		}
+	}()
+	return &utils.ApiResponse{
+		StatusCode: http.StatusOK,
+		Message:    "Reset Email has successfully been sent",
+	}
+}
+
+func (m *AuthServiceConfig) GenerateOTP() string {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	otp := ""
+	for i := 0; i < 6; i++ {
+		otp += fmt.Sprintf("%d", r.Intn(10))
+	}
+	return otp
+}
+
+func (as *AuthServiceConfig) ResetPassword(ctx context.Context, dto ResetPasswordDto) *utils.ApiResponse {
+	data, err := as.redis.Get(ctx, fmt.Sprintf("email_otp_%s", strings.ToLower(dto.Email))).Result()
+	if err != nil {
+		return as.RequestPasswordReset(ctx, dto.Email)
+	}
+	var cached struct {
+		Email string `json:"email"`
+		OTP   string `json:"otp"`
+	}
+
+	if err := json.Unmarshal([]byte(data), &cached); err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Sever is currently unavailable at the moment, kindly contact support",
+		}
+	}
+
+	if cached.OTP != dto.Otp {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusForbidden,
+			Message:    "OTP data in missing or incorrect",
+		}
+	}
+
+	if dto.Password != dto.ConfirmPassword {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusBadRequest,
+			Message:    "Your password and confirm password does not match",
+		}
+	}
+
+	hash, err := utils.HashString(dto.Password)
+	if err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "service unavailable, kindly contact support",
+			Error:      err.Error(),
+		}
+	}
+	tx, err := as.postgres.Begin(ctx)
+	if err != nil {
+		as.log.Error("failed to begin transaction", "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to process request",
+		}
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	const query = `UPDATE users SET password = $1 WHERE email = $2`
+
+	_, err = tx.Exec(ctx, query, hash, cached.Email)
+	if err != nil {
+		as.log.Error("failed to update user password", "error", err, "email", cached.Email)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to update user password",
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		as.log.Error("failed to commit transaction", "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to finalize update",
+		}
+	}
+
+	as.log.Info("user password updated successfully", "email", cached.Email)
+
+	return &utils.ApiResponse{
+		StatusCode: http.StatusOK,
+		Message:    "Password updated successfully",
 	}
 }
