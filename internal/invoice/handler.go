@@ -271,3 +271,18 @@ func (h *InvoiceHandler) SendInvoice(w http.ResponseWriter, r *http.Request) {
 	response := h.service.SendInvoice(ctx, reqUserId, invoiceID, email)
 	utils.WriteToJson(w, response.StatusCode, response)
 }
+
+func (h *InvoiceHandler) ReviewInvoiceHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	approveStr := r.URL.Query().Get("approve")
+	invoiceID := r.URL.Query().Get("id")
+
+	approve, err := strconv.ParseBool(approveStr)
+	if err != nil {
+		http.Error(w, "Invalid approve value", http.StatusBadRequest)
+		return
+	}
+
+	response := h.service.ReviewInvoice(ctx, invoiceID, approve)
+	utils.WriteToJson(w, response.StatusCode, response)
+}
