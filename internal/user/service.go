@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -36,10 +37,12 @@ func NewUserService() *UserService {
 func (s *UserService) FindUserByEmail(ctx context.Context, email string) (*UserProfileDto, error) {
 	email = strings.ToLower(email)
 	const query string = `
-		SELECT id, email, password, permission, email_verified, first_name, last_name
+		SELECT id, email, password, permission, email_verified, first_name, last_name, country, business_name, phone_number
 		FROM users
 		WHERE email = $1
 	`
+	var business_name sql.NullString
+	var phone_number sql.NullString
 	var user UserProfileDto
 	err := s.postgres.QueryRow(ctx, query, email).Scan(
 		&user.ID,
@@ -49,7 +52,17 @@ func (s *UserService) FindUserByEmail(ctx context.Context, email string) (*UserP
 		&user.EmailVerified,
 		&user.FirstName,
 		&user.LastName,
+		&user.Country,
+		&business_name,
+		&phone_number,
 	)
+	if business_name.Valid {
+		user.BusinessName = &business_name.String
+	}
+	if phone_number.Valid {
+		user.PhoneNumber = &phone_number.String
+	}
+
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil

@@ -16,3 +16,12 @@ type AuthResponseDto struct {
 	EmailVerified      bool                `json:"email_verified"`
 	ProfileComplete    bool                `json:"profile_complete"`
 }
+type AuthLoginResponseDto struct {
+	User               *user.User `json:"user,omitempty"`
+	AccessToken        string    `json:"access_token,omitempty"`
+	RefreshToken       string    `json:"refresh_token,omitempty"`
+	ExpiresIn          int64     `json:"expires_in,omitempty"`
+	RefreshTokenExpiry int64     `json:"refresh_token_expiry,omitempty"`
+	EmailVerified      bool      `json:"email_verified"`
+	ProfileComplete    bool      `json:"profile_complete"`
+}

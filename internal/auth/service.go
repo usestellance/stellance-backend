@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -194,12 +195,34 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 				Error:      err.Error(),
 			}
 		}
+
+		var address sql.NullString
+		var balance sql.NullFloat64
+
+		const q string = `SELECT address, balance FROM wallets WHERE user_id = $1, AND is_primary = true`
+		err = config.postgres.QueryRow(ctx, q, existingUser.ID).Scan(&address, &balance)
+		if err != nil {
+			if err == pgx.ErrNoRows {
+				config.log.Info("no wallet details found for user")
+			}
+		}
 		existingUser.Password = ""
 		return &utils.ApiResponse{
 			StatusCode: http.StatusOK,
 			Message:    "Login successful",
-			Data: &AuthResponseDto{
-				User:            *existingUser,
+			Data: &AuthLoginResponseDto{
+				User: &user.User{
+					Id:           existingUser.ID,
+					Name:         *existingUser.FirstName + " " + *existingUser.LastName,
+					Email:        existingUser.Email,
+					BusinessName: existingUser.BusinessName,
+					PhoneNumber:  existingUser.PhoneNumber,
+					Country:      existingUser.Country,
+					Wallet: &user.UserWallet{
+						Address: address.String,
+						Balance: balance.Float64,
+					},
+				},
 				AccessToken:     accessToken,
 				ExpiresIn:       time.Now().Add(1 * time.Hour).Unix(),
 				EmailVerified:   existingUser.EmailVerified,
