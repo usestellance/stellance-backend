@@ -91,4 +91,5 @@ type InvoiceSenderDetails struct {
 	Email        string  `json:"email"`
 	Location     string  `json:"location"`
 	BusinessName *string `json:"business_name,omitempty"`
+	PhoneNumber  *string `json:"phone_number,omitempty"`
 }

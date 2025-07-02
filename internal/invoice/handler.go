@@ -181,16 +181,15 @@ func (h *InvoiceHandler) GetInvoiceByIDHandler(w http.ResponseWriter, r *http.Re
 }
 
 func (h *InvoiceHandler) GetInvoiceSearchHandler(w http.ResponseWriter, r *http.Request) {
-	//TODO: make this route a bit secured by checking if the viewer email syncs with the payer email or some secured phrase
 	ctx := r.Context()
 	reqUserId, ok := utils.GetUserIDFromContext(ctx)
 	if !ok {
-		h.service.log.Warn("unregistered access to invoice")
+		h.service.log.Warn("public access to invoice")
 	}
 
 	role, ok := utils.GetRoleFromContext(ctx)
 	if !ok {
-		h.service.log.Warn("unregistered access to invoice")
+		h.service.log.Warn("public access to invoice")
 	}
 
 	invoiceID := r.URL.Query().Get("id")
@@ -277,12 +276,22 @@ func (h *InvoiceHandler) ReviewInvoiceHandler(w http.ResponseWriter, r *http.Req
 	approveStr := r.URL.Query().Get("approve")
 	invoiceID := r.URL.Query().Get("id")
 
+	reqUserId, ok := utils.GetUserIDFromContext(ctx)
+	if !ok {
+		h.service.log.Warn("public access to invoice")
+	}
+
+	role, ok := utils.GetRoleFromContext(ctx)
+	if !ok {
+		h.service.log.Warn("public access to invoice")
+	}
+
 	approve, err := strconv.ParseBool(approveStr)
 	if err != nil {
 		http.Error(w, "Invalid approve value", http.StatusBadRequest)
 		return
 	}
 
-	response := h.service.ReviewInvoice(ctx, invoiceID, approve)
+	response := h.service.ReviewInvoice(ctx, invoiceID, approve, role, reqUserId)
 	utils.WriteToJson(w, response.StatusCode, response)
 }

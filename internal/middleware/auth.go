@@ -56,3 +56,41 @@ func (authM *AuthMiddleware) Authenticate(h http.Handler) http.Handler {
 		h.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
+
+func (authM *AuthMiddleware) IsPublicAccess(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log := logger.Logger()
+
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			log.Debug("authorization header not provided")
+			h.ServeHTTP(w, r)
+			return
+		}
+
+		parts := strings.Split(authHeader, " ")
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			log.Debug("invalid authorization header format")
+			h.ServeHTTP(w, r)
+			return
+		}
+
+		token := parts[1]
+
+		claims, err := jwt_.JwtTokenService().ValidateAccessToken(token)
+		if err != nil {
+			log.Debug("token validation failed", "error", err)
+			h.ServeHTTP(w, r)
+			return
+		}
+		ctx := context.WithValue(r.Context(), UserIDKey, claims.UserId)
+		ctx = context.WithValue(ctx, UserEmailKey, claims.Email)
+		ctx = context.WithValue(ctx, RoleKey, claims.Role)
+
+		log = log.With("user_id", claims.UserId)
+		ctx = WriteLoggerToContext(ctx, log)
+
+		h.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+

@@ -214,7 +214,8 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 			Data: &AuthLoginResponseDto{
 				User: &user.User{
 					Id:           existingUser.ID,
-					Name:         *existingUser.FirstName + " " + *existingUser.LastName,
+					FirstName:    existingUser.FirstName,
+					LastName:     existingUser.LastName,
 					Email:        existingUser.Email,
 					BusinessName: existingUser.BusinessName,
 					PhoneNumber:  existingUser.PhoneNumber,

@@ -17,7 +17,7 @@ type UserProfileDto struct {
 	LastName        *string    `json:"last_name,omitempty"`
 	BusinessName    *string    `json:"business_name,omitempty"`
 	PhoneNumber     *string    `json:"phone_number,omitempty"`
-	Country         string    `json:"country,omitempty"`
+	Country         string     `json:"country,omitempty"`
 	IsActive        bool       `json:"is_active"`
 	EmailVerified   bool       `json:"email_verified,omitempty"`
 	EmailVerifiedAt *time.Time `json:"email_verified_at,omitempty"`
@@ -43,12 +43,13 @@ type UpdateProfileDto struct {
 }
 
 type User struct {
-	Id           string     `json:"id"`
-	Name         string     `json:"name"`
-	Email        string     `json:"email"`
-	BusinessName *string    `json:"business_name,omitempty"`
-	PhoneNumber  *string    `json:"phone_number,omitempty"`
-	Country      string     `json:"country"`
+	Id           string      `json:"id"`
+	FirstName    *string     `json:"first_name,omitempty"`
+	LastName     *string     `json:"last_name,omitempty"`
+	Email        string      `json:"email"`
+	BusinessName *string     `json:"business_name,omitempty"`
+	PhoneNumber  *string     `json:"phone_number,omitempty"`
+	Country      string      `json:"country"`
 	Wallet       *UserWallet `json:"wallet,omitempty"`
 }
 

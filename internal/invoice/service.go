@@ -795,31 +795,40 @@ func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invo
 		}
 	}
 
+	var bName sql.NullString
+	var sender_country string
+	var first_name string
+	var last_name string
+	var email string
+	var phone_number sql.NullString
+
 	const query string = `
-		WITH invoice_data AS (
-			SELECT
-				i.id, i.invoice_number, i.invoice_url, i.title,
-				i.payer_email, i.payer_name, i.sub_total, i.service_fee, i.total,
-				i.currency, i.status, i.due_date, i.paid_at,
-				i.created_at, i.updated_at, i.address_country, i.created_by_id,
-				json_agg(
-					json_build_object(
-						'invoice_type', ii.item_type,
-						'description', ii.description,
-						'quantity', ii.quantity,
-						'unit_price', ii.unit_price,
-						'discount', ii.discount,
-						'amount', ii.amount
-					) ORDER BY ii.created_at
-				) FILTER (WHERE ii.id IS NOT NULL) as items
-			FROM invoice i
-			LEFT JOIN invoice_items ii ON i.id = ii.invoice_id
-			WHERE 
-				(($1::UUID IS NOT NULL AND i.id = $1) OR 
-				 ($2::TEXT IS NOT NULL AND i.invoice_url = $2))
-			GROUP BY i.id
-		)
-		SELECT * FROM invoice_data
+	WITH invoice_data AS (
+		SELECT
+			i.id, i.invoice_number, i.invoice_url, i.title,
+			i.payer_email, i.payer_name, i.sub_total, i.service_fee, i.total,
+			i.currency, i.status, i.due_date, i.paid_at,
+			i.created_at, i.updated_at, i.address_country, i.created_by_id,
+			u.first_name, u.last_name, u.country, u.email, u.business_name, u.phone_number,
+			json_agg(
+				json_build_object(
+					'invoice_type', ii.item_type,
+					'description', ii.description,
+					'quantity', ii.quantity,
+					'unit_price', ii.unit_price,
+					'discount', ii.discount,
+					'amount', ii.amount
+				) ORDER BY ii.created_at
+			) FILTER (WHERE ii.id IS NOT NULL) as items
+		FROM invoice i
+		LEFT JOIN users u ON i.created_by_id = u.id
+		LEFT JOIN invoice_items ii ON i.id = ii.invoice_id
+		WHERE 
+			(($1::UUID IS NOT NULL AND i.id = $1) OR 
+			 ($2::TEXT IS NOT NULL AND i.invoice_url = $2))
+		GROUP BY i.id, u.first_name, u.last_name, u.country, u.email, u.business_name, u.phone_number
+	)
+	SELECT * FROM invoice_data
 	`
 	var invoiceIdParam interface{}
 	var invoiceUrlParam interface{}
@@ -876,6 +885,12 @@ func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invo
 		&invoice.UpdatedAt,
 		&invoice.AddressCountry,
 		&invoice.CreatedBy,
+		&first_name,
+		&last_name,
+		&sender_country,
+		&email,
+		&bName,
+		&phone_number,
 		&invoice.Items,
 	)
 
@@ -901,42 +916,13 @@ func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invo
 		}
 	}
 
-	var bName sql.NullString
-	var sender_country string
-	var first_name string
-	var last_name string
-	var email string
-
-	const qq string = `SELECT business_name, country, email,
-		first_name, last_name FROM users WHERE id = $1
-		AND is_active = true
-		AND email_verified = true
-		AND first_name IS NOT NULL 
-		AND first_name <> '' 
-		AND last_name IS NOT NULL 
-		AND last_name <> ''
-	`
-	err = is.postgres.QueryRow(ctx, qq, userId).Scan(&bName, &sender_country, &email, &first_name, &last_name)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return &utils.ApiResponse{
-				StatusCode: http.StatusForbidden,
-				Message:    "Please contact support, your profile is not yet complete",
-			}
-		}
-		is.log.Error("failed to fetch user", "error", err, "user_id", userId)
-		return &utils.ApiResponse{
-			StatusCode: http.StatusInternalServerError,
-			Message:    "Failed to process request. Please try again.",
-		}
-	}
-
 	sender := InvoiceSenderDetails{
-		UserId:       userId,
+		UserId:       invoice.CreatedBy,
 		Name:         first_name + " " + last_name,
 		Email:        email,
 		Location:     sender_country,
 		BusinessName: &bName.String,
+		PhoneNumber:  &phone_number.String,
 	}
 
 	response := InvoiceResponse{
@@ -1305,8 +1291,35 @@ func (is *InvoiceService) SendInvoice(ctx context.Context, userId, invoiceId, em
 	}
 }
 
-func (is *InvoiceService) ReviewInvoice(ctx context.Context, invoiceId string, approve bool) *utils.ApiResponse {
-	var query string
+func (is *InvoiceService) ReviewInvoice(ctx context.Context, invoiceId string, approve bool, userId, role string) *utils.ApiResponse {
+	var (
+		id    string
+		query string
+		cId   string
+	)
+
+	const ic string = `
+			SELECT id, created_by_id FROM invoice WHERE id = $1 AND paid_at IS NULL
+		`
+	err := is.postgres.QueryRow(ctx, ic, invoiceId).Scan(&id, &cId)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusNotFound,
+				Message:    "Invoice not found, or either has already been paid for. Thus, cannot be reviewed",
+			}
+		}
+	}
+
+	if userId != "" && role != "" {
+		if userId == cId {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusForbidden,
+				Message:    "You cannot review your own invoices, kindly forward a copy to your client for approval",
+			}
+		}
+	}
+
 	if approve {
 		query = `
 			UPDATE invoice 
