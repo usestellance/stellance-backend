@@ -1279,7 +1279,7 @@ func (is *InvoiceService) SendInvoice(ctx context.Context, userId, invoiceId, em
 
 	go func() {
 		u := url.QueryEscape(invoice_url)
-		url := fmt.Sprintf("https://usestellance.com/auth/reset-password?email=%s", u)
+		url := fmt.Sprintf("https://usestellance.com/client/%s", u)
 		err := is.mail.SendInvoiceUrlMail(actualEmail, payer_name, name, url)
 		if err != nil {
 			is.log.Warn("error sending invoice email", "error", err)
