@@ -1383,3 +1383,25 @@ func (is *InvoiceService) ReviewInvoice(ctx context.Context, invoiceId string, a
 		Message:    fmt.Sprintf("Invoice %s successfully", action),
 	}
 }
+
+func (is *InvoiceService) UpdateOverdueInvoices(ctx context.Context) error {
+	const query string = `
+		UPDATE invoice 
+		SET 
+			status = 'overdue',
+			updated_at = NOW()
+		WHERE 
+			status IN ('sent', 'viewed', 'approved', 'pending')
+			AND due_date < CURRENT_DATE
+			AND paid_at IS NULL
+			AND status != 'overdue'`
+
+	result, err := is.postgres.Exec(ctx, query)
+	if err != nil {
+		is.log.Error("Failed to update overdue invoices", "error", err)
+		return err
+	}
+
+	is.log.Info("Updated overdue invoices", "count", result.RowsAffected())
+	return nil
+}
