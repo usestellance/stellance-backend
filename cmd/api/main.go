@@ -2,14 +2,17 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/The-True-Hooha/stellance-backend.git/cmd/server"
 	database "github.com/The-True-Hooha/stellance-backend.git/internal/db"
 	"github.com/The-True-Hooha/stellance-backend.git/internal/middleware"
+	"github.com/The-True-Hooha/stellance-backend.git/internal/tasks"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/config"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/logger"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/utils"
+	"github.com/hibiken/asynq"
 	"github.com/joho/godotenv"
 )
 
@@ -54,4 +57,22 @@ func main() {
 
 	server := server.SetServerConfig()
 	server.StartHttpServer(ctx)
+	addr := fmt.Sprintf("%s:%s", redis.Host, redis.Port)
+
+	scheduler := asynq.NewScheduler(asynq.RedisClientOpt{
+		Addr:     addr,
+		Password: redis.Password,
+		DB:       redis.Index,
+	}, nil)
+	task, err := tasks.NewUpdateOverdueInvoicesTask()
+	if err != nil {
+		log.Error("failed to run scheduler to update invoices tasks")
+	} else {
+		scheduler.Register("0 1 * * *", task)
+		err := scheduler.Run()
+		if err != nil {
+			log.Error("failed to start scheduler", "error", err)
+		}
+	}
+
 }
