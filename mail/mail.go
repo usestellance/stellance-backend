@@ -112,7 +112,7 @@ func (m *Mailer) SendResetEmail(email, url, otp string) error {
 }
 
 func (m *Mailer) SendInvoiceUrlMail(email, payer_name, sender, url string) error {
-	subject := "Reset Password Request"
+	subject := "Invoice Review"
 	t, err := template.ParseFS(templateFs, "templates/send_invoice.html")
 	if err != nil {
 		return fmt.Errorf("failed to read reset email template: %w", err)
