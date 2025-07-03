@@ -274,7 +274,7 @@ func (h *InvoiceHandler) SendInvoice(w http.ResponseWriter, r *http.Request) {
 func (h *InvoiceHandler) ReviewInvoiceHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	approveStr := r.URL.Query().Get("approve")
-	invoiceID := r.URL.Query().Get("id")
+	invoiceID := r.PathValue("id")
 
 	reqUserId, ok := utils.GetUserIDFromContext(ctx)
 	if !ok {
