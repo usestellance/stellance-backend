@@ -2,6 +2,7 @@ package auth
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -134,6 +135,8 @@ func (h *AuthHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
+
+	fmt.Println(dto, "checking the dto")
 
 	if err := h.validator.Struct(dto); err != nil {
 		utils.HandleValidationError(w, err)

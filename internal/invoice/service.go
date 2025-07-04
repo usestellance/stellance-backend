@@ -999,6 +999,7 @@ func (is *InvoiceService) trackInvoiceView(ctx context.Context, invoiceID string
 		WHERE id = $1 AND status = 'sent'
 	`
 	is.postgres.Exec(ctx, updateQuery, invoiceID)
+	is.DeleteFromRedisCache(ctx, invoiceID)
 }
 
 func (is *InvoiceService) DeleteInvoice(ctx context.Context, userId, invoiceId string) *utils.ApiResponse {
@@ -1053,6 +1054,7 @@ func (is *InvoiceService) DeleteInvoice(ctx context.Context, userId, invoiceId s
 			Message:    "Failed to delete invoice",
 		}
 	}
+	is.DeleteFromRedisCache(ctx, invoiceId)
 
 	return &utils.ApiResponse{
 		Message:    "Successful",
@@ -1211,6 +1213,7 @@ func (is *InvoiceService) EditInvoice(ctx context.Context, userId, invoiceId str
 			Message:    "Failed to save changes",
 		}
 	}
+	is.DeleteFromRedisCache(ctx, invoiceId)
 
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
@@ -1377,6 +1380,7 @@ func (is *InvoiceService) ReviewInvoice(ctx context.Context, invoiceId string, a
 	if !approve {
 		action = "rejected"
 	}
+	is.DeleteFromRedisCache(ctx, invoiceId)
 
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
@@ -1385,7 +1389,7 @@ func (is *InvoiceService) ReviewInvoice(ctx context.Context, invoiceId string, a
 }
 
 func (is *InvoiceService) UpdateOverdueInvoices(ctx context.Context) error {
-	const query string = `
+	const query = `
 		UPDATE invoice 
 		SET 
 			status = 'overdue',
@@ -1394,14 +1398,41 @@ func (is *InvoiceService) UpdateOverdueInvoices(ctx context.Context) error {
 			status IN ('sent', 'viewed', 'approved', 'pending')
 			AND due_date < CURRENT_DATE
 			AND paid_at IS NULL
-			AND status != 'overdue'`
+		RETURNING id`
 
-	result, err := is.postgres.Exec(ctx, query)
+	rows, err := is.postgres.Query(ctx, query)
 	if err != nil {
 		is.log.Error("Failed to update overdue invoices", "error", err)
 		return err
 	}
+	defer rows.Close()
 
-	is.log.Info("Updated overdue invoices", "count", result.RowsAffected())
+	var updatedIDs []string
+
+	for rows.Next() {
+		var invoiceID string
+		if err := rows.Scan(&invoiceID); err != nil {
+			is.log.Error("Failed to scan invoice ID", "error", err)
+			continue
+		}
+		updatedIDs = append(updatedIDs, invoiceID)
+		is.DeleteFromRedisCache(ctx, invoiceID)
+	}
+
+	if err := rows.Err(); err != nil {
+		is.log.Error("Row iteration error", "error", err)
+		return err
+	}
+
+	is.log.Info("Updated overdue invoices", "count", len(updatedIDs))
+	return nil
+}
+
+func (is *InvoiceService) DeleteFromRedisCache(ctx context.Context, invoiceId string) error {
+	err := is.redis.Del(ctx, fmt.Sprintf("invoice:%s", invoiceId)).Err()
+	if err != nil {
+		is.log.Info("Failed to delete Redis key", "error", err)
+		return err
+	}
 	return nil
 }

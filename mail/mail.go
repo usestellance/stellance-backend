@@ -115,7 +115,7 @@ func (m *Mailer) SendInvoiceUrlMail(email, payer_name, sender, url string) error
 	subject := "Invoice Review"
 	t, err := template.ParseFS(templateFs, "templates/send_invoice.html")
 	if err != nil {
-		return fmt.Errorf("failed to read reset email template: %w", err)
+		return fmt.Errorf("failed to read invoice email template: %w", err)
 	}
 	var body bytes.Buffer
 	if err := t.Execute(&body, map[string]interface{}{
@@ -135,7 +135,7 @@ func (m *Mailer) SendInvoiceUrlMail(email, payer_name, sender, url string) error
 
 	_, err = m.client.Emails.Send(params)
 	if err != nil {
-		m.log.Error("error sending verification email", "email_error", err)
+		m.log.Error("error sending invoice email", "email_error", err)
 		return err
 	}
 	m.log.Debug(fmt.Sprintf("email sent successfully to %s", email))
