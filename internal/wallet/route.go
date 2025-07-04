@@ -16,5 +16,5 @@ func RegisterWalletRoutes(apiV1 *httpx.RouteGroup, router *http.ServeMux, wallet
 
 	walletGroup.HandleFunc("POST /", authMiddleware.Authenticate(http.HandlerFunc(walletHandler.CreateWalletHandler)).ServeHTTP)
 	walletGroup.HandleFunc("GET /{id}", authMiddleware.Authenticate(http.HandlerFunc(walletHandler.GetWalletHandler)).ServeHTTP)
-	walletGroup.HandleFunc("GET /", authMiddleware.Authenticate(http.HandlerFunc(walletHandler.ExportWalletHandler)).ServeHTTP)
+	walletGroup.HandleFunc("GET /export/{id}", authMiddleware.Authenticate(http.HandlerFunc(walletHandler.ExportWalletHandler)).ServeHTTP)
 }

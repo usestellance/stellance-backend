@@ -9,7 +9,7 @@ type WalletResponseDto struct {
 	PrivateKey    string               `json:"private_key,omitempty"`
 	Tag           string               `json:"tag,omitempty"`
 	Chain         string               `json:"chain,omitempty"`
-	Balance       StellarWalletBalance `json:"balance,omitempty"`
+	Balance       *StellarWalletBalance `json:"balance,omitempty"`
 	IsPrimary     bool                 `json:"is_primary,omitempty"`
 	IsActive      bool                 `json:"is_active,omitempty"`
 	CreatedAt     *time.Time           `json:"created_at,omitempty"`

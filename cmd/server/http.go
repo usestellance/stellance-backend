@@ -18,6 +18,7 @@ import (
 	"github.com/The-True-Hooha/stellance-backend.git/internal/invoice"
 	"github.com/The-True-Hooha/stellance-backend.git/internal/middleware"
 	"github.com/The-True-Hooha/stellance-backend.git/internal/user"
+	"github.com/The-True-Hooha/stellance-backend.git/internal/wallet"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/config"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/config/cors_config"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/httpx"
@@ -88,6 +89,9 @@ func (server *Server) AddHttpRoutes() {
 
 	invoiceService := invoice.NewInvoiceService()
 	invoice.RegisterInvoiceRoutes(apiV1, server.router, invoiceService)
+
+	walletService := wallet.NewWalletService()
+	wallet.RegisterWalletRoutes(apiV1, server.router, walletService)
 }
 
 func (server *Server) StartHttpServer(ctx context.Context) {
