@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -410,8 +411,8 @@ func (ws *WalletService) getAccountBalance(address string) (*StellarWalletBalanc
 	}
 
 	return &StellarWalletBalance{
-		USDC: usdcBalance,
-		XLM:  xlmBalance,
+		USDC: math.Round(usdcBalance*100) / 100,
+		XLM:  math.Round(xlmBalance*100) / 100,
 	}, nil
 }
 
@@ -446,33 +447,54 @@ func (ws *WalletService) GetWalletCacheKey(walletId string) string {
 }
 
 func (ws *WalletService) ExportWalletKeys(ctx context.Context, walletID, userID string, role user.UserRole) *utils.ApiResponse {
-
 	var encryptedSeed string
 	var walletAddress string
-	var userId string
-	const query string = `SELECT private_key, address, user_id, FROM wallets WHERE id = $1 AND user_id = $2`
-	err := ws.postgres.QueryRow(ctx, query, walletID, userID).Scan(&encryptedSeed, &walletAddress, &userId)
-	if err != nil {
-		return &utils.ApiResponse{
-			StatusCode: http.StatusNotFound,
-			Message:    "Wallet details not found",
-		}
+	var dbUserID string
+	var walletId string
+	
+	query := `SELECT id, private_key, address, user_id FROM wallets WHERE id = $1`
+	args := []interface{}{walletID}
+	
+	if role != user.RoleAdmin {
+		query += ` AND user_id = $2`
+		args = append(args, userID)
 	}
-
-	if userID != userId && role != user.RoleAdmin {
+	
+	err := ws.postgres.QueryRow(ctx, query, args...).Scan(
+		&walletId,
+		&encryptedSeed, 
+		&walletAddress, 
+		&dbUserID,
+	)
+	
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusNotFound,
+				Message:    "Wallet not found or access denied",
+			}
+		}
+		ws.log.Error("Failed to fetch wallet", "error", err)
 		return &utils.ApiResponse{
-			StatusCode: http.StatusUnauthorized,
-			Message:    "oops, please contact support",
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to retrieve wallet details",
 		}
 	}
 
 	seed, err := ws.decryptPrivateKey(encryptedSeed)
 	if err != nil {
+		ws.log.Error("Failed to decrypt private key", "error", err)
 		return &utils.ApiResponse{
 			StatusCode: http.StatusInternalServerError,
-			Message:    "failed to retrieve wallet details",
+			Message:    "Failed to process wallet keys",
 		}
 	}
+	ws.log.Info("Wallet keys exported", 
+		"walletId", walletID,
+		"exportedBy", userID,
+		"role", role,
+		"walletOwner", dbUserID,
+	)
 
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
