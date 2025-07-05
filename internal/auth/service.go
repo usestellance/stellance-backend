@@ -61,7 +61,6 @@ func (c *AuthServiceConfig) ClearRedis(ctx context.Context) *utils.ApiResponse {
 
 func (config *AuthServiceConfig) CreateNewUser(ctx context.Context, dto AuthRequestDto, role user.UserRole) *utils.ApiResponse {
 	db := config.postgres
-	redis := config.redis
 	log := config.log
 
 	email := strings.ToLower(dto.Email)
@@ -115,7 +114,6 @@ func (config *AuthServiceConfig) CreateNewUser(ctx context.Context, dto AuthRequ
 			Error:      err.Error(),
 		}
 	}
-
 	if err = tx.Commit(ctx); err != nil {
 		log.Error("failed to commit and save new user record", "error", err)
 		return &utils.ApiResponse{
@@ -124,12 +122,6 @@ func (config *AuthServiceConfig) CreateNewUser(ctx context.Context, dto AuthRequ
 			Error:      err.Error(),
 		}
 	}
-	userCache, _ := json.Marshal(user)
-	err = redis.Set(ctx, user.ID, userCache, userCacheTime).Err()
-	if err != nil {
-		log.Error("failed to add new user record to cache", "error", err)
-	}
-
 	accessToken, err := config.jwt.GenerateNewAccessToken(user.ID, user.Email, string(role))
 	if err != nil {
 		log.Error(fmt.Sprintf("error generating access token for user with Id =>> %s", user.ID), "error", err)
@@ -219,7 +211,7 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 					Email:        existingUser.Email,
 					BusinessName: existingUser.BusinessName,
 					PhoneNumber:  existingUser.PhoneNumber,
-					Country:      existingUser.Country,
+					Country:      &existingUser.Country,
 					Wallet: &user.UserWallet{
 						Address: address.String,
 						Balance: balance.Float64,
@@ -272,7 +264,7 @@ func (config *AuthServiceConfig) ValidateEmail(ctx context.Context, token, email
 	}
 
 	const checkQuery string = `
-		SELECT id, email_verified, role
+		SELECT id, email_verified, permission
 		FROM users 
 		WHERE email = $1
 		FOR UPDATE

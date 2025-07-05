@@ -49,7 +49,7 @@ type User struct {
 	Email        string      `json:"email"`
 	BusinessName *string     `json:"business_name,omitempty"`
 	PhoneNumber  *string     `json:"phone_number,omitempty"`
-	Country      string      `json:"country"`
+	Country      *string     `json:"country,omitempty"`
 	Wallet       *UserWallet `json:"wallet,omitempty"`
 }
 
