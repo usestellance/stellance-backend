@@ -265,21 +265,23 @@ func (config *AuthServiceConfig) ValidateEmail(ctx context.Context, token, email
 	}
 	defer tx.Rollback(ctx)
 
-	var user struct {
+	var user_ struct {
 		ID            string
 		EmailVerified bool
+		role          string
 	}
 
 	const checkQuery string = `
-		SELECT id, email_verified 
+		SELECT id, email_verified, role
 		FROM users 
 		WHERE email = $1
 		FOR UPDATE
 	`
 
 	err = tx.QueryRow(ctx, checkQuery, email).Scan(
-		&user.ID,
-		&user.EmailVerified,
+		&user_.ID,
+		&user_.EmailVerified,
+		&user_.role,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -295,7 +297,7 @@ func (config *AuthServiceConfig) ValidateEmail(ctx context.Context, token, email
 		}
 	}
 
-	if user.EmailVerified {
+	if user_.EmailVerified {
 		return &utils.ApiResponse{
 			StatusCode: http.StatusOK,
 			Message:    "Your email is already verified. You can log in to your account.",
@@ -308,9 +310,9 @@ func (config *AuthServiceConfig) ValidateEmail(ctx context.Context, token, email
 		    email_verified_at = NOW()
 		WHERE id = $1
 	`
-	_, err = tx.Exec(ctx, updateQuery, user.ID)
+	_, err = tx.Exec(ctx, updateQuery, user_.ID)
 	if err != nil {
-		config.log.Info("failed to update verification", "error", err, "user_id", user.ID)
+		config.log.Info("failed to update verification", "error", err, "user_id", user_.ID)
 		return &utils.ApiResponse{
 			StatusCode: http.StatusInternalServerError,
 			Message:    "Failed to verify email. Please contact support.",
@@ -327,12 +329,32 @@ func (config *AuthServiceConfig) ValidateEmail(ctx context.Context, token, email
 
 	config.log.Info("email verified successfully",
 		"email", email,
-		"user_id", user.ID,
+		"user_id", user_.ID,
 	)
+
+	accessToken, err := config.jwt.GenerateNewAccessToken(user_.ID, email, user_.role)
+	if err != nil {
+		config.log.Error(fmt.Sprintf("error generating access token for user with Id =>> %s", user_.ID), "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "service unavailable, kindly contact support",
+			Error:      err.Error(),
+		}
+	}
 
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
 		Message:    fmt.Sprintf("Welcome %s! Your email has been verified successfully.", email),
+		Data: &AuthLoginResponseDto{
+			User: &user.User{
+				Id:    user_.ID,
+				Email: email,
+			},
+			AccessToken:     accessToken,
+			ExpiresIn:       time.Now().Add(1 * time.Hour).Unix(),
+			EmailVerified:   true,
+			ProfileComplete: false,
+		},
 	}
 }
 
