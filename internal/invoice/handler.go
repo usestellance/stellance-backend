@@ -208,7 +208,8 @@ func (h *InvoiceHandler) DeleteInvoiceHandler(w http.ResponseWriter, r *http.Req
 	ctx := r.Context()
 	reqUserId, ok := utils.GetUserIDFromContext(ctx)
 	if !ok {
-		h.service.log.Warn("unregistered access to invoice")
+		http.Error(w, "invalid request! not allowed", http.StatusUnauthorized)
+		return
 	}
 	invoiceID := r.PathValue("id")
 
@@ -221,7 +222,8 @@ func (h *InvoiceHandler) EditInvoiceHandler(w http.ResponseWriter, r *http.Reque
 	ctx := r.Context()
 	reqUserId, ok := utils.GetUserIDFromContext(ctx)
 	if !ok {
-		h.service.log.Warn("unregistered access to invoice")
+		http.Error(w, "invalid request! not allowed", http.StatusUnauthorized)
+		return
 	}
 	invoiceID := r.PathValue("id")
 	var dto CreateInvoiceDTO
@@ -260,7 +262,8 @@ func (h *InvoiceHandler) SendInvoice(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	reqUserId, ok := utils.GetUserIDFromContext(ctx)
 	if !ok {
-		h.service.log.Warn("unregistered access to invoice")
+		http.Error(w, "invalid request! not allowed", http.StatusUnauthorized)
+		return
 	}
 	invoiceID := r.PathValue("id")
 	var email string
