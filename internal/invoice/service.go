@@ -1222,75 +1222,103 @@ func (is *InvoiceService) EditInvoice(ctx context.Context, userId, invoiceId str
 }
 
 func (is *InvoiceService) SendInvoice(ctx context.Context, userId, invoiceId, email string) *utils.ApiResponse {
-	tx, err := is.postgres.Begin(ctx)
-	if err != nil {
-		is.log.Error("failed to begin transaction", "error", err)
-		return &utils.ApiResponse{
-			StatusCode: http.StatusInternalServerError,
-			Message:    "Failed to process request. Please try again.",
-		}
-	}
-	defer tx.Rollback(ctx)
-
 	var (
 		invoice_url string
 		payer_name  string
 		payer_email string
 		first_name  string
 		last_name   string
+		status      string
 	)
 
-	const gi string = `
-    SELECT 
-        i.invoice_url, 
-        i.payer_name, 
-        i.payer_email,
-        u.first_name,
-        u.last_name
-    FROM invoice i
-    LEFT JOIN users u ON i.created_by_id = u.id
-    WHERE i.id = $1 AND i.created_by_id = $2`
-	err = tx.QueryRow(ctx, gi, invoiceId, userId).Scan(
-		&invoice_url, &payer_name, &payer_email, &first_name, &last_name)
+	const query string = `
+		WITH invoice_update AS (
+			UPDATE invoice 
+			SET status = 'sent', updated_at = NOW()
+			WHERE id = $1 
+				AND created_by_id = $2 
+				AND status IN ('draft', 'viewed')
+			RETURNING invoice_url, payer_name, payer_email, status
+		)
+		SELECT 
+			iu.invoice_url,
+			iu.payer_name,
+			iu.payer_email,
+			u.first_name,
+			u.last_name,
+			iu.status
+		FROM invoice_update iu
+		LEFT JOIN users u ON u.id = $2`
+
+	err := is.postgres.QueryRow(ctx, query, invoiceId, userId).Scan(
+		&invoice_url, &payer_name, &payer_email, &first_name, &last_name, &status)
+
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			var exists bool
+			var isOwner bool
+			checkErr := is.postgres.QueryRow(ctx, `
+				SELECT 
+					EXISTS(SELECT 1 FROM invoice WHERE id = $1),
+					EXISTS(SELECT 1 FROM invoice WHERE id = $1 AND created_by_id = $2)
+			`, invoiceId, userId).Scan(&exists, &isOwner)
+
+			if checkErr != nil || !exists {
+				return &utils.ApiResponse{
+					StatusCode: http.StatusNotFound,
+					Message:    "Invoice not found",
+				}
+			}
+			if !isOwner {
+				return &utils.ApiResponse{
+					StatusCode: http.StatusForbidden,
+					Message:    "Access denied",
+				}
+			}
 			return &utils.ApiResponse{
-				StatusCode: http.StatusForbidden,
-				Message:    "Invoice does not exist",
+				StatusCode: http.StatusBadRequest,
+				Message:    "Invoice already sent or paid",
 			}
 		}
-		is.log.Error("failed to fetch invoice", "error", err, "user_id", userId)
+
+		is.log.Error("failed to send invoice", "error", err, "user_id", userId)
 		return &utils.ApiResponse{
 			StatusCode: http.StatusInternalServerError,
-			Message:    "Failed to process request. Please try again.",
+			Message:    "Failed to process request",
 		}
 	}
-	name := fmt.Sprintf("%s %s", first_name, last_name)
-	actualEmail := email
-	if actualEmail == "" {
-		actualEmail = payer_email
+	recipientEmail := email
+	if recipientEmail == "" {
+		recipientEmail = payer_email
 	}
 
-	const s string = `UPDATE invoice SET status = 'sent' WHERE id = $1 AND updated_at = NOW()`
-	_, err = tx.Exec(ctx, s, invoiceId)
-	if err != nil {
+	if recipientEmail == "" {
 		return &utils.ApiResponse{
-			StatusCode: http.StatusInternalServerError,
-			Message:    "Failed to send invoice",
+			StatusCode: http.StatusBadRequest,
+			Message:    "No recipient email provided",
 		}
 	}
 
 	go func() {
-		u := url.QueryEscape(invoice_url)
-		url := fmt.Sprintf("https://usestellance.com/client/%s", u)
-		err := is.mail.SendInvoiceUrlMail(actualEmail, payer_name, name, url)
-		if err != nil {
-			is.log.Warn("error sending invoice email", "error", err)
+		senderName := strings.TrimSpace(fmt.Sprintf("%s %s", first_name, last_name))
+		invoiceURL := fmt.Sprintf("https://usestellance.com/invoice/%s", url.QueryEscape(invoice_url))
+
+		if err := is.mail.SendInvoiceUrlMail(recipientEmail, payer_name, senderName, invoiceURL); err != nil {
+			is.log.Error("failed to send invoice email",
+				"error", err,
+				"invoice_id", invoiceId,
+				"recipient", recipientEmail)
+		} else {
+			is.log.Info("invoice email sent successfully",
+				"invoice_id", invoiceId,
+				"recipient", recipientEmail)
 		}
 	}()
+
+	is.DeleteFromRedisCache(ctx, invoiceId)
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
-		Message:    "Invoice successfully sent",
+		Message:    "Invoice sent successfully",
 	}
 }
 
