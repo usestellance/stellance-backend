@@ -1,6 +1,10 @@
 package transactions
 
-import "time"
+import (
+	"time"
+
+	"github.com/gofrs/uuid"
+)
 
 type TransactionType string
 
@@ -21,4 +25,33 @@ type TransactionDto struct {
 	ConfirmedAt       *time.Time      `json:"confirmed_at,omitempty"`
 	TransactionType   TransactionType `json:"transaction_type"`
 	CreatedAt         *time.Time      `json:"created_at"`
+}
+
+type GetTransactionDto struct {
+	ID              uuid.UUID  `json:"id"`
+	InvoiceID       *uuid.UUID `json:"invoice_id,omitempty"`
+	WalletID        *uuid.UUID `json:"wallet_id,omitempty"`
+	TransactionHash string     `json:"transaction_hash"`
+	Amount          float64    `json:"amount"`
+	Currency        string     `json:"currency"`
+	Status          string     `json:"status"`
+	NetworkFee      *float64   `json:"network_fee,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
+	ConfirmedAt     *time.Time `json:"confirmed_at,omitempty"`
+	TokenType       string     `json:"token_type"`
+	TransactionType string     `json:"transaction_type"`
+}
+
+type PaginatedTransactions struct {
+	Data       []GetTransactionDto `json:"data"`
+	Page       int                 `json:"page"`
+	Limit      int                 `json:"limit"`
+	TotalCount int                 `json:"total_count"`
+}
+
+
+type TransactionFiltersDto struct {
+	UserId  string            `json:"user_id,omitempty"`
+	Page    int               `json:"page" validate:"required,min=1"`
+	Count   int               `json:"count" validate:"required,min=1,max=15"`
 }
