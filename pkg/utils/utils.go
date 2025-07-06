@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -106,7 +107,6 @@ func HandleValidationError(w http.ResponseWriter, err error) {
 	_ = json.NewEncoder(w).Encode(res)
 }
 
-
 func parseValidationErrorMessage(e validator.FieldError) string {
 	switch e.Tag() {
 	case "required":
@@ -123,7 +123,6 @@ func parseValidationErrorMessage(e validator.FieldError) string {
 		return fmt.Sprintf("%s is invalid", e.Field())
 	}
 }
-
 
 func WriteToJson(w http.ResponseWriter, code int, data any) {
 	w.Header().Set("Content-Type", "application/json")
@@ -277,7 +276,6 @@ func GenerateShortURL(data string, log *slog.Logger) (string, error) {
 	return shortID, nil
 }
 
-
 func GenerateSecureToken(length int) (string, error) {
 	b := make([]byte, length)
 	_, err := rand.Read(b)
@@ -292,4 +290,18 @@ func GetStellarStage() string {
 		return "testnet"
 	}
 	return "mainnet"
+}
+
+func NullStringPtr(ns sql.NullString) *string {
+	if ns.Valid {
+		return &ns.String
+	}
+	return nil
+}
+
+func NullFloatPtr(nf sql.NullFloat64) *float64 {
+	if nf.Valid {
+		return &nf.Float64
+	}
+	return nil
 }

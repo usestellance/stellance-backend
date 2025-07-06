@@ -54,6 +54,11 @@ type User struct {
 }
 
 type UserWallet struct {
-	Address string  `json:"address,omitempty"`
-	Balance float64 `json:"balance,omitempty"`
+	Address *string        `json:"address,omitempty"`
+	Balance *WalletBalance `json:"balance,omitempty"`
+}
+
+type WalletBalance struct {
+	USDC_Balance *float64 `json:"usdc_balance,omitempty"`
+	XLM_Balance  *float64 `json:"xlm_balance,omitempty"`
 }

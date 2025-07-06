@@ -190,16 +190,35 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 		}
 
 		var address sql.NullString
-		var balance sql.NullFloat64
+		var usdc_balance sql.NullFloat64
+		var xlm_balance sql.NullFloat64
 
-		const q string = `SELECT address, balance FROM wallets WHERE user_id = $1, AND is_primary = true`
-		err = config.postgres.QueryRow(ctx, q, existingUser.ID).Scan(&address, &balance)
+		const q string = `
+			SELECT address, usdc_balance, xlm_balance 
+			FROM wallets 
+			WHERE user_id = $1 AND is_primary = true AND is_active = true
+		`
+		err = config.postgres.QueryRow(ctx, q, existingUser.ID).Scan(&address, &usdc_balance, &xlm_balance)
 		if err != nil {
 			if err == pgx.ErrNoRows {
 				config.log.Info("no wallet details found for user")
 			}
 		}
 		existingUser.Password = ""
+		wallet := &user.UserWallet{
+			Balance: &user.WalletBalance{},
+		}
+
+		if address.Valid {
+			wallet.Address = &address.String
+		}
+		if usdc_balance.Valid {
+			wallet.Balance.USDC_Balance = &usdc_balance.Float64
+		}
+		if xlm_balance.Valid {
+			wallet.Balance.XLM_Balance = &xlm_balance.Float64
+		}
+
 		return &utils.ApiResponse{
 			StatusCode: http.StatusOK,
 			Message:    "Login successful",
@@ -212,10 +231,7 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 					BusinessName: existingUser.BusinessName,
 					PhoneNumber:  existingUser.PhoneNumber,
 					Country:      &existingUser.Country,
-					Wallet: &user.UserWallet{
-						Address: address.String,
-						Balance: balance.Float64,
-					},
+					Wallet:       wallet,
 				},
 				AccessToken:     accessToken,
 				ExpiresIn:       time.Now().Add(1 * time.Hour).Unix(),

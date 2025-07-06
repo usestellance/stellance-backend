@@ -17,6 +17,7 @@ import (
 	"github.com/The-True-Hooha/stellance-backend.git/internal/auth"
 	"github.com/The-True-Hooha/stellance-backend.git/internal/invoice"
 	"github.com/The-True-Hooha/stellance-backend.git/internal/middleware"
+	"github.com/The-True-Hooha/stellance-backend.git/internal/transactions"
 	"github.com/The-True-Hooha/stellance-backend.git/internal/user"
 	"github.com/The-True-Hooha/stellance-backend.git/internal/wallet"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/config"
@@ -92,6 +93,8 @@ func (server *Server) AddHttpRoutes() {
 
 	walletService := wallet.NewWalletService()
 	wallet.RegisterWalletRoutes(apiV1, server.router, walletService)
+	transactionService := transactions.NewTransactionService()
+	transactions.RegisterTransactionRoutes(apiV1, server.router, transactionService)
 }
 
 func (server *Server) StartHttpServer(ctx context.Context) {

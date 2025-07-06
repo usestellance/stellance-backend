@@ -243,13 +243,21 @@ func (s *UserService) CompleteUserProfile(ctx context.Context, email string, dto
 func (s *UserService) GetProfileByID(ctx context.Context, userID string, requestingUserID string) *utils.ApiResponse {
 	log := s.log
 
+	var (
+		address     sql.NullString
+		usdcBalance sql.NullFloat64
+		xlmBalance  sql.NullFloat64
+	)
+
 	const query = `
 		SELECT 
-			id, email, first_name, last_name, business_name, 
-			phone_number, country, email_verified, is_active, 
-			created_at, updated_at
-		FROM users 
-		WHERE id = $1 AND is_active = true
+		u.id, u.email, u.first_name, u.last_name, u.business_name,
+		u.phone_number, u.country, u.email_verified, u.is_active,
+		u.created_at, u.updated_at,
+		w.address, w.usdc_balance, w.xlm_balance
+		FROM users u
+		LEFT JOIN wallets w ON w.user_id = u.id AND w.is_primary = true AND w.is_active = true
+		WHERE u.id = $1 AND u.is_active = true
 	`
 
 	var profile UserProfileDto
@@ -265,6 +273,9 @@ func (s *UserService) GetProfileByID(ctx context.Context, userID string, request
 		&profile.IsActive,
 		&profile.CreatedAt,
 		&profile.UpdatedAt,
+		&address,
+		&usdcBalance,
+		&xlmBalance,
 	)
 
 	if err != nil {
@@ -283,6 +294,20 @@ func (s *UserService) GetProfileByID(ctx context.Context, userID string, request
 
 	profileComplete := profile.FirstName != nil && profile.LastName != nil
 
+	wallet := &UserWallet{
+		Balance: &WalletBalance{},
+	}
+
+	if address.Valid || usdcBalance.Valid || xlmBalance.Valid {
+		wallet = &UserWallet{
+			Address: utils.NullStringPtr(address),
+			Balance: &WalletBalance{
+				USDC_Balance: utils.NullFloatPtr(usdcBalance),
+				XLM_Balance:  utils.NullFloatPtr(xlmBalance),
+			},
+		}
+	}
+
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
 		Message:    "Profile fetched successfully",
@@ -290,6 +315,7 @@ func (s *UserService) GetProfileByID(ctx context.Context, userID string, request
 			"profile":          profile,
 			"profile_complete": profileComplete,
 			"email_verified":   !profile.EmailVerified,
+			"wallet":           wallet,
 		},
 	}
 }

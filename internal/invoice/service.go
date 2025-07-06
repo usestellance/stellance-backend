@@ -1301,7 +1301,7 @@ func (is *InvoiceService) SendInvoice(ctx context.Context, userId, invoiceId, em
 
 	go func() {
 		senderName := strings.TrimSpace(fmt.Sprintf("%s %s", first_name, last_name))
-		invoiceURL := fmt.Sprintf("https://usestellance.com/invoice/%s", url.QueryEscape(invoice_url))
+		invoiceURL := fmt.Sprintf("https://usestellance.com/client/%s", url.QueryEscape(invoice_url))
 
 		if err := is.mail.SendInvoiceUrlMail(recipientEmail, payer_name, senderName, invoiceURL); err != nil {
 			is.log.Error("failed to send invoice email",
