@@ -2,7 +2,6 @@ package invoice
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -92,7 +91,6 @@ func (handler *InvoiceHandler) GetManyInvoiceHandler(w http.ResponseWriter, r *h
 	ctx := r.Context()
 
 	reqUserId, ok := utils.GetUserIDFromContext(ctx)
-	fmt.Println(reqUserId, "the request user id")
 	if !ok {
 		http.Error(w, "invalid request! not allowed", http.StatusUnauthorized)
 		return
