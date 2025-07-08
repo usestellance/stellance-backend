@@ -54,6 +54,7 @@ type User struct {
 }
 
 type UserWallet struct {
+	Id      *string        `json:"id,omitempty"`
 	Address *string        `json:"address,omitempty"`
 	Balance *WalletBalance `json:"balance,omitempty"`
 }

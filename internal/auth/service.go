@@ -192,13 +192,14 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 		var address sql.NullString
 		var usdc_balance sql.NullFloat64
 		var xlm_balance sql.NullFloat64
+		var walletId sql.NullString
 
 		const q string = `
-			SELECT address, usdc_balance, xlm_balance 
+			SELECT id, address, usdc_balance, xlm_balance 
 			FROM wallets 
 			WHERE user_id = $1 AND is_primary = true AND is_active = true
 		`
-		err = config.postgres.QueryRow(ctx, q, existingUser.ID).Scan(&address, &usdc_balance, &xlm_balance)
+		err = config.postgres.QueryRow(ctx, q, existingUser.ID).Scan(&walletId, &address, &usdc_balance, &xlm_balance)
 		if err != nil {
 			if err == pgx.ErrNoRows {
 				config.log.Info("no wallet details found for user")
@@ -217,6 +218,10 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 		}
 		if xlm_balance.Valid {
 			wallet.Balance.XLM_Balance = &xlm_balance.Float64
+		}
+
+		if walletId.Valid {
+			wallet.Id = &walletId.String
 		}
 
 		return &utils.ApiResponse{
