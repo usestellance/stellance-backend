@@ -214,10 +214,10 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 			wallet.Address = &address.String
 		}
 		if usdc_balance.Valid {
-			wallet.Balance.USDC_Balance = &usdc_balance.Float64
+			wallet.Balance.USDC = &usdc_balance.Float64
 		}
 		if xlm_balance.Valid {
-			wallet.Balance.XLM_Balance = &xlm_balance.Float64
+			wallet.Balance.XLM = &xlm_balance.Float64
 		}
 
 		if walletId.Valid {

@@ -302,8 +302,8 @@ func (s *UserService) GetProfileByID(ctx context.Context, userID string, request
 		wallet = &UserWallet{
 			Address: utils.NullStringPtr(address),
 			Balance: &WalletBalance{
-				USDC_Balance: utils.NullFloatPtr(usdcBalance),
-				XLM_Balance:  utils.NullFloatPtr(xlmBalance),
+				USDC: utils.NullFloatPtr(usdcBalance),
+				XLM:  utils.NullFloatPtr(xlmBalance),
 			},
 		}
 	}
@@ -449,9 +449,46 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID string, dto Upda
 
 	log.Info("user profile updated successfully", "user_id", userID)
 
+	var address sql.NullString
+	var usdc_balance sql.NullFloat64
+	var xlm_balance sql.NullFloat64
+	var walletId sql.NullString
+	const q string = `
+			SELECT id, address, usdc_balance, xlm_balance 
+			FROM wallets 
+			WHERE user_id = $1 AND is_primary = true AND is_active = true
+		`
+	err = s.postgres.QueryRow(ctx, q, userID).Scan(&walletId, &address, &usdc_balance, &xlm_balance)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			s.log.Info("no wallet details found for user")
+		}
+	}
+
+	wallet := &UserWallet{
+		Balance: &WalletBalance{},
+	}
+
+	if address.Valid {
+		wallet.Address = &address.String
+	}
+	if usdc_balance.Valid {
+		wallet.Balance.USDC = &usdc_balance.Float64
+	}
+	if xlm_balance.Valid {
+		wallet.Balance.XLM = &xlm_balance.Float64
+	}
+
+	if walletId.Valid {
+		wallet.Id = &walletId.String
+	}
+
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
 		Message:    "Profile updated successfully",
-		Data:       updatedProfile,
+		Data: map[string]interface{}{
+			"user":   updatedProfile,
+			"wallet": wallet,
+		},
 	}
 }

@@ -60,6 +60,6 @@ type UserWallet struct {
 }
 
 type WalletBalance struct {
-	USDC_Balance *float64 `json:"usdc_balance,omitempty"`
-	XLM_Balance  *float64 `json:"xlm_balance,omitempty"`
+	USDC *float64 `json:"usdc,omitempty"`
+	XLM  *float64 `json:"xlm,omitempty"`
 }
