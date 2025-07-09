@@ -10,20 +10,21 @@ const (
 )
 
 type UserProfileDto struct {
-	ID              string     `json:"id"`
-	Email           string     `json:"email,omitempty"`
-	Password        string     `json:"password,omitempty"`
-	FirstName       *string    `json:"first_name,omitempty"`
-	LastName        *string    `json:"last_name,omitempty"`
-	BusinessName    *string    `json:"business_name,omitempty"`
-	PhoneNumber     *string    `json:"phone_number,omitempty"`
-	Country         string     `json:"country,omitempty"`
-	IsActive        bool       `json:"is_active"`
-	EmailVerified   bool       `json:"email_verified,omitempty"`
-	EmailVerifiedAt *time.Time `json:"email_verified_at,omitempty"`
-	CreatedAt       *time.Time `json:"created_at,omitempty"`
-	UpdatedAt       *time.Time `json:"updated_at,omitempty"`
-	Role            UserRole   `json:"role,omitempty"`
+	ID              string      `json:"id"`
+	Email           string      `json:"email,omitempty"`
+	Password        string      `json:"password,omitempty"`
+	FirstName       *string     `json:"first_name,omitempty"`
+	LastName        *string     `json:"last_name,omitempty"`
+	BusinessName    *string     `json:"business_name,omitempty"`
+	PhoneNumber     *string     `json:"phone_number,omitempty"`
+	Country         string      `json:"country,omitempty"`
+	IsActive        bool        `json:"is_active"`
+	EmailVerified   bool        `json:"email_verified,omitempty"`
+	EmailVerifiedAt *time.Time  `json:"email_verified_at,omitempty"`
+	CreatedAt       *time.Time  `json:"created_at,omitempty"`
+	UpdatedAt       *time.Time  `json:"updated_at,omitempty"`
+	Role            UserRole    `json:"role,omitempty"`
+	Wallet          *UserWallet `json:"wallet,omitempty"`
 }
 
 type CompleteProfileRequestDto struct {

@@ -483,12 +483,11 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID string, dto Upda
 		wallet.Id = &walletId.String
 	}
 
+	updatedProfile.Wallet = wallet
+
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
 		Message:    "Profile updated successfully",
-		Data: map[string]interface{}{
-			"user":   updatedProfile,
-			"wallet": wallet,
-		},
+		Data:       updatedProfile,
 	}
 }
