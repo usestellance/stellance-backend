@@ -131,12 +131,6 @@ func (ws *WalletService) CreateWallet(ctx context.Context, userId string) *utils
 	if err == nil && count == 1 {
 		ws.redis.Expire(ctx, rateLimitKey, 24*time.Hour)
 	}
-	// if count > 3 {
-	// 	return &utils.ApiResponse{
-	// 		StatusCode: http.StatusForbidden,
-	// 		Message:    "You have reached your wallet creation limit, try back again",
-	// 	}
-	// }
 
 	tx, err := ws.postgres.Begin(ctx)
 	if err != nil {
@@ -158,6 +152,13 @@ func (ws *WalletService) CreateWallet(ctx context.Context, userId string) *utils
 	if err != nil {
 		log.Error("failed to query existing wallet count")
 		existingWalletCount = 0
+	}
+
+	if existingWalletCount >= 1 {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusForbidden,
+			Message:    "You have reached your wallet creation limit, try back again",
+		}
 	}
 
 	pair, err := keypair.Random()
@@ -451,22 +452,22 @@ func (ws *WalletService) ExportWalletKeys(ctx context.Context, walletID, userID 
 	var walletAddress string
 	var dbUserID string
 	var walletId string
-	
+
 	query := `SELECT id, private_key, address, user_id FROM wallets WHERE id = $1`
 	args := []interface{}{walletID}
-	
+
 	if role != user.RoleAdmin {
 		query += ` AND user_id = $2`
 		args = append(args, userID)
 	}
-	
+
 	err := ws.postgres.QueryRow(ctx, query, args...).Scan(
 		&walletId,
-		&encryptedSeed, 
-		&walletAddress, 
+		&encryptedSeed,
+		&walletAddress,
 		&dbUserID,
 	)
-	
+
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return &utils.ApiResponse{
@@ -489,7 +490,7 @@ func (ws *WalletService) ExportWalletKeys(ctx context.Context, walletID, userID 
 			Message:    "Failed to process wallet keys",
 		}
 	}
-	ws.log.Info("Wallet keys exported", 
+	ws.log.Info("Wallet keys exported",
 		"walletId", walletID,
 		"exportedBy", userID,
 		"role", role,
