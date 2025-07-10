@@ -240,7 +240,7 @@ func (s *UserService) CompleteUserProfile(ctx context.Context, email string, dto
 	}
 }
 
-func (s *UserService) GetProfileByID(ctx context.Context, userID string, requestingUserID string) *utils.ApiResponse {
+func (s *UserService) GetProfileByID(ctx context.Context, userID string) *utils.ApiResponse {
 	log := s.log
 
 	var (

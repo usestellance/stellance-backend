@@ -58,7 +58,7 @@ func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Forbidden: not allowed to access this profile", http.StatusForbidden)
 		return
 	}
-	response := h.service.GetProfileByID(ctx, userID, requestingUserID)
+	response := h.service.GetProfileByID(ctx, userID)
 	utils.WriteToJson(w, response.StatusCode, response)
 }
 
@@ -86,5 +86,22 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response := h.service.UpdateProfile(ctx, userID, dto)
+	utils.WriteToJson(w, response.StatusCode, response)
+}
+
+func(h *UserHandler)GetMe(w http.ResponseWriter, r *http.Request){
+	ctx := r.Context()
+	requestingUserID, ok := utils.GetUserIDFromContext(ctx)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	_, ok = utils.GetRoleFromContext(ctx)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	response := h.service.GetProfileByID(ctx, requestingUserID)
 	utils.WriteToJson(w, response.StatusCode, response)
 }
