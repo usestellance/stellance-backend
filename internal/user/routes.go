@@ -14,6 +14,6 @@ func RegisterUserRoutes(apiV1 *httpx.RouteGroup, router *http.ServeMux, userServ
 
 	profileGroup.HandleFunc("POST /", authMiddleware.Authenticate(http.HandlerFunc(profileHandler.CompleteProfileHandler)).ServeHTTP)
 	profileGroup.HandleFunc("GET /{id}", authMiddleware.Authenticate(http.HandlerFunc(profileHandler.GetProfile)).ServeHTTP)
-	profileGroup.HandleFunc("GET /", authMiddleware.Authenticate(http.HandlerFunc(profileHandler.GetMe)).ServeHTTP)
+	profileGroup.HandleFunc("GET /me", authMiddleware.Authenticate(http.HandlerFunc(profileHandler.GetMe)).ServeHTTP)
 	profileGroup.HandleFunc("PUT /", authMiddleware.Authenticate(http.HandlerFunc(profileHandler.UpdateProfile)).ServeHTTP)
 }
