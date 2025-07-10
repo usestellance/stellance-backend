@@ -244,9 +244,13 @@ func (s *UserService) GetProfileByID(ctx context.Context, userID string) *utils.
 	log := s.log
 
 	var (
-		address     sql.NullString
-		usdcBalance sql.NullFloat64
-		xlmBalance  sql.NullFloat64
+		address      sql.NullString
+		usdcBalance  sql.NullFloat64
+		xlmBalance   sql.NullFloat64
+		firstName    sql.NullString
+		lastName     sql.NullString
+		businessName sql.NullString
+		phoneNumber  sql.NullString
 	)
 
 	const query = `
@@ -264,10 +268,10 @@ func (s *UserService) GetProfileByID(ctx context.Context, userID string) *utils.
 	err := s.postgres.QueryRow(ctx, query, userID).Scan(
 		&profile.ID,
 		&profile.Email,
-		&profile.FirstName,
-		&profile.LastName,
-		&profile.BusinessName,
-		&profile.PhoneNumber,
+		&firstName,
+		&lastName,
+		&businessName,
+		&phoneNumber,
 		&profile.Country,
 		&profile.EmailVerified,
 		&profile.IsActive,
@@ -277,6 +281,22 @@ func (s *UserService) GetProfileByID(ctx context.Context, userID string) *utils.
 		&usdcBalance,
 		&xlmBalance,
 	)
+
+	if firstName.Valid {
+		profile.FirstName = &firstName.String
+	}
+
+	if lastName.Valid {
+		profile.LastName = &lastName.String
+	}
+
+	if businessName.Valid {
+		profile.BusinessName = &businessName.String
+	}
+
+	if phoneNumber.Valid {
+		profile.PhoneNumber = &phoneNumber.String
+	}
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
