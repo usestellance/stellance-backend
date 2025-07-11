@@ -14,13 +14,13 @@ import (
 
 var (
 	DefaultLimit = RateLimitConfig{
-		Capacity:     30,
-		RefillRate:   30,
+		Capacity:     70,
+		RefillRate:   50,
 		RefillPeriod: 20 * time.Minute,
 	}
 
 	StrictLimit = RateLimitConfig{
-		Capacity:     50,
+		Capacity:     100,
 		RefillRate:   50,
 		RefillPeriod: 20 * time.Minute,
 	}
