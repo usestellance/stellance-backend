@@ -338,7 +338,6 @@ func (s *UserService) GetProfileByID(ctx context.Context, userID string) *utils.
 		Data: map[string]interface{}{
 			"profile":          profile,
 			"profile_complete": profileComplete,
-			"email_verified":   !profile.EmailVerified,
 			"wallet":           wallet,
 		},
 	}
