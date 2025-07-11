@@ -99,6 +99,7 @@ func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvo
 	}
 
 	invoiceNumber, err := is.GenerateInvoiceNumber(ctx, userId)
+	fmt.Println("the invoice number key", invoiceNumber)
 	if err != nil {
 		is.log.Error("failed to generate invoice number", "error", err)
 		return &utils.ApiResponse{
