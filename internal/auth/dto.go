@@ -17,10 +17,11 @@ type AuthResponseDto struct {
 	ProfileComplete    bool                `json:"profile_complete"`
 }
 type AuthLoginResponseDto struct {
-	AccessToken        string     `json:"access_token,omitempty"`
-	ExpiresIn          int64      `json:"expires_in,omitempty"`
-	EmailVerified      bool       `json:"email_verified"`
-	ProfileComplete    bool       `json:"profile_complete"`
+	AccessToken     string    `json:"access_token,omitempty"`
+	ExpiresIn       int64     `json:"expires_in,omitempty"`
+	EmailVerified   bool      `json:"email_verified"`
+	ProfileComplete bool      `json:"profile_complete"`
+	User            user.User `json:"user"`
 }
 
 type ResetPasswordDto struct {
