@@ -223,12 +223,26 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 			wallet.Id = &walletId.String
 		}
 
+		profileComplete := existingUser.FirstName != nil && existingUser.LastName != nil
+
 		return &utils.ApiResponse{
 			StatusCode: http.StatusOK,
 			Message:    "Login successful",
 			Data: &AuthLoginResponseDto{
 				AccessToken:     accessToken,
 				ExpiresIn:       time.Now().Add(1 * time.Hour).Unix(),
+				EmailVerified:   existingUser.EmailVerified,
+				ProfileComplete: profileComplete,
+				User: user.User{
+					Id:           existingUser.ID,
+					FirstName:    existingUser.FirstName,
+					LastName:     existingUser.LastName,
+					Email:        existingUser.Email,
+					BusinessName: existingUser.BusinessName,
+					PhoneNumber:  existingUser.PhoneNumber,
+					Country:      existingUser.Country,
+					Wallet:       wallet,
+				},
 			},
 		}
 	}
