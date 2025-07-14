@@ -240,8 +240,6 @@ func (ws *WalletService) CreateWallet(ctx context.Context, userId string) *utils
 		}
 	}
 
-	ws.cacheWalletInfo(ctx, &wallet)
-
 	log.Info("wallet created successfully",
 		"user_id", userId,
 		"wallet_id", wallet.ID,
@@ -283,9 +281,8 @@ func (ws *WalletService) GetUserWallet(ctx context.Context, userId, walletId str
 					Message:    "Access denied",
 				}
 			}
-			balance, _ := ws.getAccountBalance(wallet.WalletAddress)
+			balance, _ := ws.getAccountBalance(ctx, wallet.WalletAddress, walletId)
 			wallet.Balance = balance
-
 			return &utils.ApiResponse{
 				StatusCode: http.StatusOK,
 				Message:    "successful",
@@ -332,7 +329,7 @@ func (ws *WalletService) GetUserWallet(ctx context.Context, userId, walletId str
 			Message:    "Failed to fetch wallet",
 		}
 	}
-	balance, err := ws.getAccountBalance(wallet.WalletAddress)
+	balance, err := ws.getAccountBalance(ctx, wallet.WalletAddress, walletId)
 	if err != nil {
 		ws.log.Error("Failed to get account balance", "error", err, "wallet", walletId)
 		balance = &StellarWalletBalance{USDC: 0, XLM: 0}
@@ -340,9 +337,6 @@ func (ws *WalletService) GetUserWallet(ctx context.Context, userId, walletId str
 
 	wallet.Balance = balance
 	ws.cacheWalletInfo(ctx, &wallet)
-	if err == nil {
-		go ws.updateWalletBalance(context.Background(), walletId, balance.USDC, balance.XLM)
-	}
 
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
@@ -385,7 +379,7 @@ func (ws *WalletService) fundTestnetAccount(ctx context.Context, address, wallet
 	}
 }
 
-func (ws *WalletService) getAccountBalance(address string) (*StellarWalletBalance, error) {
+func (ws *WalletService) getAccountBalance(ctx context.Context, address, walletId string) (*StellarWalletBalance, error) {
 	account, err := ws.horizonClient.AccountDetail(horizonclient.AccountRequest{
 		AccountID: address,
 	})
@@ -411,9 +405,13 @@ func (ws *WalletService) getAccountBalance(address string) (*StellarWalletBalanc
 		}
 	}
 
+	usdc := math.Round(usdcBalance*100) / 100
+	xlm := math.Round(xlmBalance*100) / 100
+	ws.updateWalletBalance(ctx, walletId, usdc, xlm)
+
 	return &StellarWalletBalance{
-		USDC: math.Round(usdcBalance*100) / 100,
-		XLM:  math.Round(xlmBalance*100) / 100,
+		USDC: usdc,
+		XLM:  xlm,
 	}, nil
 }
 
