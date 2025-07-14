@@ -204,9 +204,8 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 			}
 		}
 		existingUser.Password = ""
-		balance := user.WalletBalance{}
 		wallet_ := &user.UserWallet{
-			Balance:&user.WalletBalance{},
+			Balance: &user.WalletBalance{},
 		}
 
 		if address.Valid {
@@ -215,8 +214,8 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 
 		if walletId.Valid && address.Valid {
 			bal, _ := wallet.NewWalletService().GetAccountBalance(ctx, address.String, walletId.String)
-			balance.USDC = &bal.USDC
-			balance.XLM = &bal.XLM
+			wallet_.Balance.USDC = &bal.USDC
+			wallet_.Balance.XLM = &bal.XLM
 		}
 
 		if walletId.Valid {
