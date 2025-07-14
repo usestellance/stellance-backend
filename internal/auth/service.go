@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/The-True-Hooha/stellance-backend.git/internal/user"
+	"github.com/The-True-Hooha/stellance-backend.git/internal/wallet"
 	"github.com/The-True-Hooha/stellance-backend.git/mail"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/config"
 	jwt_ "github.com/The-True-Hooha/stellance-backend.git/pkg/jwt"
@@ -189,38 +190,37 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 		}
 
 		var address sql.NullString
-		var usdc_balance sql.NullFloat64
-		var xlm_balance sql.NullFloat64
 		var walletId sql.NullString
 
 		const q string = `
-			SELECT id, address, usdc_balance, xlm_balance 
+			SELECT id, address
 			FROM wallets 
 			WHERE user_id = $1 AND is_primary = true AND is_active = true
 		`
-		err = config.postgres.QueryRow(ctx, q, existingUser.ID).Scan(&walletId, &address, &usdc_balance, &xlm_balance)
+		err = config.postgres.QueryRow(ctx, q, existingUser.ID).Scan(&walletId, &address)
 		if err != nil {
 			if err == pgx.ErrNoRows {
 				config.log.Info("no wallet details found for user")
 			}
 		}
 		existingUser.Password = ""
-		wallet := &user.UserWallet{
-			Balance: &user.WalletBalance{},
+		balance := user.WalletBalance{}
+		wallet_ := &user.UserWallet{
+			Balance:&user.WalletBalance{},
 		}
 
 		if address.Valid {
-			wallet.Address = &address.String
+			wallet_.Address = &address.String
 		}
-		if usdc_balance.Valid {
-			wallet.Balance.USDC = &usdc_balance.Float64
-		}
-		if xlm_balance.Valid {
-			wallet.Balance.XLM = &xlm_balance.Float64
+
+		if walletId.Valid && address.Valid {
+			bal, _ := wallet.NewWalletService().GetAccountBalance(ctx, address.String, walletId.String)
+			balance.USDC = &bal.USDC
+			balance.XLM = &bal.XLM
 		}
 
 		if walletId.Valid {
-			wallet.Id = &walletId.String
+			wallet_.Id = &walletId.String
 		}
 
 		profileComplete := existingUser.FirstName != nil && existingUser.LastName != nil
@@ -241,7 +241,7 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 					BusinessName: existingUser.BusinessName,
 					PhoneNumber:  existingUser.PhoneNumber,
 					Country:      existingUser.Country,
-					Wallet:       wallet,
+					Wallet:       wallet_,
 				},
 			},
 		}

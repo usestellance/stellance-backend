@@ -281,7 +281,7 @@ func (ws *WalletService) GetUserWallet(ctx context.Context, userId, walletId str
 					Message:    "Access denied",
 				}
 			}
-			balance, _ := ws.getAccountBalance(ctx, wallet.WalletAddress, walletId)
+			balance, _ := ws.GetAccountBalance(ctx, wallet.WalletAddress, walletId)
 			wallet.Balance = balance
 			return &utils.ApiResponse{
 				StatusCode: http.StatusOK,
@@ -329,7 +329,7 @@ func (ws *WalletService) GetUserWallet(ctx context.Context, userId, walletId str
 			Message:    "Failed to fetch wallet",
 		}
 	}
-	balance, err := ws.getAccountBalance(ctx, wallet.WalletAddress, walletId)
+	balance, err := ws.GetAccountBalance(ctx, wallet.WalletAddress, walletId)
 	if err != nil {
 		ws.log.Error("Failed to get account balance", "error", err, "wallet", walletId)
 		balance = &StellarWalletBalance{USDC: 0, XLM: 0}
@@ -379,7 +379,7 @@ func (ws *WalletService) fundTestnetAccount(ctx context.Context, address, wallet
 	}
 }
 
-func (ws *WalletService) getAccountBalance(ctx context.Context, address, walletId string) (*StellarWalletBalance, error) {
+func (ws *WalletService) GetAccountBalance(ctx context.Context, address, walletId string) (*StellarWalletBalance, error) {
 	account, err := ws.horizonClient.AccountDetail(horizonclient.AccountRequest{
 		AccountID: address,
 	})
