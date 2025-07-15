@@ -407,7 +407,11 @@ func (ws *WalletService) GetAccountBalance(ctx context.Context, address, walletI
 
 	usdc := math.Round(usdcBalance*100) / 100
 	xlm := math.Round(xlmBalance*100) / 100
-	ws.updateWalletBalance(ctx, walletId, usdc, xlm)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+		defer cancel()
+		ws.updateWalletBalance(ctx, walletId, usdc, xlm)
+	}()
 
 	return &StellarWalletBalance{
 		USDC: usdc,

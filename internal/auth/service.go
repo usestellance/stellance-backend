@@ -153,15 +153,59 @@ func (config *AuthServiceConfig) CreateNewUser(ctx context.Context, dto AuthRequ
 
 func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) *utils.ApiResponse {
 	email := strings.ToLower(dto.Email)
+	userD := &user.User{}
+	cacheKey := fmt.Sprintf("user_login:email:%s", email)
+	cachedUser, err := config.redis.Get(ctx, cacheKey).Result()
+	if err == nil {
+		if err := json.Unmarshal([]byte(cachedUser), &userD); err == nil {
+			config.log.Debug("user found in redis cache", "email", email)
+		}
+		if userD.Wallet != nil && userD.Wallet.Address != nil && userD.Wallet.Id != nil {
+			if userD.Wallet.Balance == nil {
+				userD.Wallet.Balance = &user.WalletBalance{}
+			}
+			bal, _ := wallet.NewWalletService().GetAccountBalance(ctx, *userD.Wallet.Address, *userD.Wallet.Id)
+			userD.Wallet.Balance.USDC = &bal.USDC
+			userD.Wallet.Balance.XLM = &bal.XLM
+		}
+
+		accessToken, err := config.jwt.GenerateNewAccessToken(userD.Id, userD.Email, string("user"))
+		if err != nil {
+			config.log.Error(fmt.Sprintf("error generating access token for user with Id =>> %s", userD.Id), "error", err)
+			return &utils.ApiResponse{
+				StatusCode: http.StatusInternalServerError,
+				Message:    "service unavailable, kindly contact support",
+				Error:      err.Error(),
+			}
+		}
+		profileComplete := userD.FirstName != nil && userD.LastName != nil
+		return &utils.ApiResponse{
+			StatusCode: http.StatusOK,
+			Message:    "login successful",
+			Data: &AuthLoginResponseDto{
+				EmailVerified:   *userD.EmailVerified,
+				ProfileComplete: profileComplete,
+				ExpiresIn:       time.Now().Add(1 * time.Hour).Unix(),
+				AccessToken:     accessToken,
+				User:            *userD,
+			},
+		}
+	}
+
 	existingUser, err := user.NewUserService().FindUserByEmail(ctx, email)
 	if err != nil {
+		config.log.Error("error fetching user from database", "error", err)
 		return &utils.ApiResponse{
 			StatusCode: http.StatusInternalServerError,
 			Message:    "service unavailable, kindly contact support",
-			Error:      err.Error(),
 		}
 	}
-	if existingUser != nil {
+	if existingUser == nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusNotFound,
+			Message:    "invalid login credentials, contact support",
+		}
+	} else {
 		err = utils.CompareHash(existingUser.Password, dto.Password)
 		if err != nil {
 			return &utils.ApiResponse{
@@ -169,26 +213,6 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 				Message:    "invalid login credentials, contact support",
 			}
 		}
-
-		if !existingUser.EmailVerified {
-			err = config.GenerateAndSendEmail(ctx, email, existingUser.ID, config.log)
-			if err != nil {
-				return &utils.ApiResponse{
-					StatusCode: http.StatusInternalServerError,
-					Message:    "Server currently unavailable",
-				}
-			}
-		}
-		accessToken, err := config.jwt.GenerateNewAccessToken(existingUser.ID, existingUser.Email, string(existingUser.Role))
-		if err != nil {
-			config.log.Error(fmt.Sprintf("error generating access token for user with Id =>> %s", existingUser.ID), "error", err)
-			return &utils.ApiResponse{
-				StatusCode: http.StatusInternalServerError,
-				Message:    "service unavailable, kindly contact support",
-				Error:      err.Error(),
-			}
-		}
-
 		var address sql.NullString
 		var walletId sql.NullString
 
@@ -200,26 +224,54 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 		err = config.postgres.QueryRow(ctx, q, existingUser.ID).Scan(&walletId, &address)
 		if err != nil {
 			if err == pgx.ErrNoRows {
-				config.log.Info("no wallet details found for user")
+				config.log.Debug("no wallet details found for user", "userId", existingUser.ID)
 			}
-		}
-		existingUser.Password = ""
-		wallet_ := &user.UserWallet{
-			Balance: &user.WalletBalance{},
+			config.log.Error("failed to fetch wallet", "error", err, "userId", existingUser.ID)
 		}
 
-		if address.Valid {
-			wallet_.Address = &address.String
+		userCopy := &user.User{
+			Id:            existingUser.ID,
+			FirstName:     existingUser.FirstName,
+			LastName:      existingUser.LastName,
+			Email:         existingUser.Email,
+			BusinessName:  existingUser.BusinessName,
+			PhoneNumber:   existingUser.PhoneNumber,
+			Country:       existingUser.Country,
+			EmailVerified: &existingUser.EmailVerified,
 		}
 
 		if walletId.Valid && address.Valid {
+			userCopy.Wallet = &user.UserWallet{
+				Id:      &walletId.String,
+				Address: &address.String,
+			}
+			userCopy.Wallet.Balance = &user.WalletBalance{}
 			bal, _ := wallet.NewWalletService().GetAccountBalance(ctx, address.String, walletId.String)
-			wallet_.Balance.USDC = &bal.USDC
-			wallet_.Balance.XLM = &bal.XLM
+			userCopy.Wallet.Balance.USDC = &bal.USDC
+			userCopy.Wallet.Balance.XLM = &bal.XLM
 		}
 
-		if walletId.Valid {
-			wallet_.Id = &walletId.String
+		if userData, err := json.Marshal(userCopy); err == nil {
+			config.redis.Set(ctx, cacheKey, userData, 30*time.Second)
+		}
+		if !existingUser.EmailVerified {
+			err = config.GenerateAndSendEmail(ctx, email, existingUser.ID, config.log)
+			if err != nil {
+				return &utils.ApiResponse{
+					StatusCode: http.StatusInternalServerError,
+					Message:    "Server currently unavailable",
+				}
+			}
+		}
+
+		accessToken, err := config.jwt.GenerateNewAccessToken(existingUser.ID, existingUser.Email, string(existingUser.Role))
+		if err != nil {
+			config.log.Error(fmt.Sprintf("error generating access token for user with Id =>> %s", existingUser.ID), "error", err)
+			return &utils.ApiResponse{
+				StatusCode: http.StatusInternalServerError,
+				Message:    "service unavailable, kindly contact support",
+				Error:      err.Error(),
+			}
 		}
 
 		profileComplete := existingUser.FirstName != nil && existingUser.LastName != nil
@@ -232,22 +284,10 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 				ExpiresIn:       time.Now().Add(1 * time.Hour).Unix(),
 				EmailVerified:   existingUser.EmailVerified,
 				ProfileComplete: profileComplete,
-				User: user.User{
-					Id:           existingUser.ID,
-					FirstName:    existingUser.FirstName,
-					LastName:     existingUser.LastName,
-					Email:        existingUser.Email,
-					BusinessName: existingUser.BusinessName,
-					PhoneNumber:  existingUser.PhoneNumber,
-					Country:      existingUser.Country,
-					Wallet:       wallet_,
-				},
+				User:            *userCopy,
 			},
 		}
-	}
-	return &utils.ApiResponse{
-		StatusCode: http.StatusForbidden,
-		Message:    "invalid login credentials, contact support",
+
 	}
 }
 
