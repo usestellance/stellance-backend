@@ -995,7 +995,7 @@ func (is *InvoiceService) cacheInvoice(ctx context.Context, key string, invoice 
 		return
 	}
 
-	if err := is.redis.Set(ctx, key, data, 10*time.Minute).Err(); err != nil {
+	if err := is.redis.Set(ctx, key, data, 90*time.Second).Err(); err != nil {
 		is.log.Error("failed to cache invoice", "error", err)
 	}
 }
