@@ -63,6 +63,8 @@ type InvoiceResponse struct {
 	PaidAt             *time.Time           `json:"paid_at,omitempty"`
 	Items              []InvoiceItems       `json:"items"`
 	CreatedBy          InvoiceSenderDetails `json:"createdBy"`
+	Approved           *bool                `json:"approved"`
+	ReviewDate         *time.Time           `json:"review_date"`
 }
 
 type InvoiceListResponseDto struct {
@@ -86,10 +88,11 @@ type InvoiceFiltersDto struct {
 }
 
 type InvoiceSenderDetails struct {
-	UserId       string  `json:"user_id"`
-	Name         string  `json:"name"`
-	Email        string  `json:"email"`
-	Location     string  `json:"location"`
-	BusinessName *string `json:"business_name,omitempty"`
-	PhoneNumber  *string `json:"phone_number,omitempty"`
+	UserId         string  `json:"user_id"`
+	Name           string  `json:"name"`
+	Email          string  `json:"email"`
+	Location       string  `json:"location"`
+	BusinessName   *string `json:"business_name,omitempty"`
+	PhoneNumber    *string `json:"phone_number,omitempty"`
+	Wallet_address *string `json:"wallet_address,omitempty"`
 }

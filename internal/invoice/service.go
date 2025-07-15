@@ -218,7 +218,7 @@ func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvo
 func (s *InvoiceService) GenerateInvoiceNumber(ctx context.Context, userID string) (string, error) {
 	year := time.Now().Year()
 	shortUserID := userID[:8]
-	
+
 	_, err := s.postgres.Exec(ctx, `
 		INSERT INTO invoice_counters (user_id, year, last_number)
 		VALUES ($1, $2, 0)
@@ -227,7 +227,7 @@ func (s *InvoiceService) GenerateInvoiceNumber(ctx context.Context, userID strin
 	if err != nil {
 		return "", fmt.Errorf("failed to ensure counter exists: %w", err)
 	}
-	
+
 	var invoiceNumber int
 	err = s.postgres.QueryRow(ctx, `
 		UPDATE invoice_counters 
@@ -236,7 +236,7 @@ func (s *InvoiceService) GenerateInvoiceNumber(ctx context.Context, userID strin
 		WHERE user_id = $1 AND year = $2
 		RETURNING last_number
 	`, userID, year).Scan(&invoiceNumber)
-	
+
 	if err != nil {
 		return "", fmt.Errorf("failed to generate invoice number: %w", err)
 	}
@@ -645,6 +645,9 @@ func (is *InvoiceService) GetInvoiceById(ctx context.Context, invoiceId, userId,
 				i.updated_at,
 				i.address_country,
 				i.created_by_id,
+				i.approved,
+				i.approved_date,
+				i.rejected_date,
 				COALESCE(
 					json_agg(
 						json_build_object(
@@ -687,6 +690,10 @@ func (is *InvoiceService) GetInvoiceById(ctx context.Context, invoiceId, userId,
 		AddressCountry sql.NullString  `db:"address_country"`
 		CreatedByID    string          `db:"created_by_id"`
 		Items          json.RawMessage `db:"items"`
+		Approved       bool            `db:"approved"`
+		ApprovedDate   sql.NullTime    `db:"approved_date"`
+		RejectedDate   sql.NullTime    `db:"rejected_date"`
+		ReviewDate     sql.NullTime
 	}
 
 	err = is.postgres.QueryRow(ctx, query, invoiceId).Scan(
@@ -707,6 +714,9 @@ func (is *InvoiceService) GetInvoiceById(ctx context.Context, invoiceId, userId,
 		&result.UpdatedAt,
 		&result.AddressCountry,
 		&result.CreatedByID,
+		&result.Approved,
+		&result.ApprovedDate,
+		&result.RejectedDate,
 		&result.Items,
 	)
 
@@ -750,6 +760,12 @@ func (is *InvoiceService) GetInvoiceById(ctx context.Context, invoiceId, userId,
 		BusinessName: &bName.String,
 	}
 
+	if result.Approved && result.ApprovedDate.Valid {
+		result.ReviewDate = result.ApprovedDate
+	} else {
+		result.ReviewDate = result.RejectedDate
+	}
+
 	invoice := InvoiceResponse{
 		ID:            result.ID,
 		InvoiceNumber: result.InvoiceNumber,
@@ -768,6 +784,8 @@ func (is *InvoiceService) GetInvoiceById(ctx context.Context, invoiceId, userId,
 		Country:       result.AddressCountry.String,
 		Items:         items,
 		CreatedBy:     sender,
+		Approved:      &result.Approved,
+		ReviewDate:    &result.ReviewDate.Time,
 	}
 
 	if result.PaidAt.Valid {
@@ -817,6 +835,7 @@ func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invo
 			i.payer_email, i.payer_name, i.sub_total, i.service_fee, i.total,
 			i.currency, i.status, i.due_date, i.paid_at,
 			i.created_at, i.updated_at, i.address_country, i.created_by_id,
+			i.approved, i.approved_date, i.rejected_date,
 			u.first_name, u.last_name, u.country, u.email, u.business_name, u.phone_number,
 			json_agg(
 				json_build_object(
@@ -854,6 +873,8 @@ func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invo
 		invoiceUrlParam = invoiceUrl
 	}
 
+	var reviewDate sql.NullTime
+
 	var invoice struct {
 		ID             string          `db:"id"`
 		InvoiceNumber  string          `db:"invoice_number"`
@@ -873,6 +894,9 @@ func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invo
 		AddressCountry sql.NullString  `db:"address_country"`
 		CreatedBy      string          `db:"created_by_id"`
 		Items          json.RawMessage `db:"items"`
+		Approved       bool            `db:"approved"`
+		ApprovedDate   sql.NullTime    `db:"approved_date"`
+		RejectedDate   sql.NullTime    `db:"rejected_date"`
 	}
 
 	err := is.postgres.QueryRow(ctx, query, invoiceIdParam, invoiceUrlParam).Scan(
@@ -893,6 +917,9 @@ func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invo
 		&invoice.UpdatedAt,
 		&invoice.AddressCountry,
 		&invoice.CreatedBy,
+		&invoice.Approved,
+		&invoice.ApprovedDate,
+		&invoice.RejectedDate,
 		&first_name,
 		&last_name,
 		&sender_country,
@@ -924,13 +951,36 @@ func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invo
 		}
 	}
 
+	var walletAddress sql.NullString
+	const w = `SELECT address from wallets WHERE user_id = $1 AND is_primary = true AND is_active = true`
+	err = is.postgres.QueryRow(ctx, w, invoice.CreatedBy).Scan(&walletAddress)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			is.log.Debug("no wallet details found for user", "userId", invoice.CreatedBy)
+		}
+		is.log.Error("failed to fetch wallet", "error", err, "userId", invoice.CreatedBy)
+	}
+
 	sender := InvoiceSenderDetails{
-		UserId:       invoice.CreatedBy,
-		Name:         first_name + " " + last_name,
-		Email:        email,
-		Location:     sender_country,
-		BusinessName: &bName.String,
-		PhoneNumber:  &phone_number.String,
+		UserId:         invoice.CreatedBy,
+		Name:           first_name + " " + last_name,
+		Email:          email,
+		Location:       sender_country,
+		BusinessName:   &bName.String,
+		Wallet_address: &walletAddress.String,
+	}
+
+	if phone_number.Valid {
+		sender.PhoneNumber = &phone_number.String
+	}
+	if bName.Valid {
+		sender.BusinessName = &bName.String
+	}
+
+	if invoice.Approved && invoice.ApprovedDate.Valid {
+		reviewDate = invoice.ApprovedDate
+	} else {
+		reviewDate = invoice.RejectedDate
 	}
 
 	response := InvoiceResponse{
@@ -951,6 +1001,8 @@ func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invo
 		Country:       invoice.AddressCountry.String,
 		CreatedBy:     sender,
 		Items:         items,
+		Approved:      &invoice.Approved,
+		ReviewDate:    &reviewDate.Time,
 	}
 
 	if invoice.PaidAt.Valid {
