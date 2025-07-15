@@ -218,7 +218,7 @@ func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvo
 func (s *InvoiceService) GenerateInvoiceNumber(ctx context.Context, userID string) (string, error) {
 	year := time.Now().Year()
 	shortUserID := userID[:8]
-	
+
 	_, err := s.postgres.Exec(ctx, `
 		INSERT INTO invoice_counters (user_id, year, last_number)
 		VALUES ($1, $2, 0)
@@ -227,7 +227,7 @@ func (s *InvoiceService) GenerateInvoiceNumber(ctx context.Context, userID strin
 	if err != nil {
 		return "", fmt.Errorf("failed to ensure counter exists: %w", err)
 	}
-	
+
 	var invoiceNumber int
 	err = s.postgres.QueryRow(ctx, `
 		UPDATE invoice_counters 
@@ -236,7 +236,7 @@ func (s *InvoiceService) GenerateInvoiceNumber(ctx context.Context, userID strin
 		WHERE user_id = $1 AND year = $2
 		RETURNING last_number
 	`, userID, year).Scan(&invoiceNumber)
-	
+
 	if err != nil {
 		return "", fmt.Errorf("failed to generate invoice number: %w", err)
 	}
@@ -924,13 +924,24 @@ func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invo
 		}
 	}
 
+	var walletAddress sql.NullString
+	const w = `SELECT address from wallets WHERE user_id = $1 AND is_primary = true AND is_active = true`
+	err = is.postgres.QueryRow(ctx, w, invoice.CreatedBy).Scan(&walletAddress)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			is.log.Debug("no wallet details found for user", "userId", invoice.CreatedBy)
+		}
+		is.log.Error("failed to fetch wallet", "error", err, "userId", invoice.CreatedBy)
+	}
+
 	sender := InvoiceSenderDetails{
-		UserId:       invoice.CreatedBy,
-		Name:         first_name + " " + last_name,
-		Email:        email,
-		Location:     sender_country,
-		BusinessName: &bName.String,
-		PhoneNumber:  &phone_number.String,
+		UserId:         invoice.CreatedBy,
+		Name:           first_name + " " + last_name,
+		Email:          email,
+		Location:       sender_country,
+		BusinessName:   &bName.String,
+		PhoneNumber:    &phone_number.String,
+		Wallet_address: &walletAddress.String,
 	}
 
 	response := InvoiceResponse{

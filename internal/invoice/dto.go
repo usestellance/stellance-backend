@@ -86,10 +86,11 @@ type InvoiceFiltersDto struct {
 }
 
 type InvoiceSenderDetails struct {
-	UserId       string  `json:"user_id"`
-	Name         string  `json:"name"`
-	Email        string  `json:"email"`
-	Location     string  `json:"location"`
-	BusinessName *string `json:"business_name,omitempty"`
-	PhoneNumber  *string `json:"phone_number,omitempty"`
+	UserId         string  `json:"user_id"`
+	Name           string  `json:"name"`
+	Email          string  `json:"email"`
+	Location       string  `json:"location"`
+	BusinessName   *string `json:"business_name,omitempty"`
+	PhoneNumber    *string `json:"phone_number,omitempty"`
+	Wallet_address *string `json:"wallet_address,omitempty"`
 }
