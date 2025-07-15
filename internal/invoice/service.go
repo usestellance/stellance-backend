@@ -217,23 +217,30 @@ func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvo
 
 func (s *InvoiceService) GenerateInvoiceNumber(ctx context.Context, userID string) (string, error) {
 	year := time.Now().Year()
-	var invoiceNumber int
-
-	const query = `
+	shortUserID := userID[:8]
+	
+	_, err := s.postgres.Exec(ctx, `
 		INSERT INTO invoice_counters (user_id, year, last_number)
-		VALUES ($1, $2, 1)
-		ON CONFLICT (user_id, year)
-		DO UPDATE SET 
-			last_number = invoice_counters.last_number + 1,
-			updated_at = NOW()
+		VALUES ($1, $2, 0)
+		ON CONFLICT (user_id, year) DO NOTHING
+	`, userID, year)
+	if err != nil {
+		return "", fmt.Errorf("failed to ensure counter exists: %w", err)
+	}
+	
+	var invoiceNumber int
+	err = s.postgres.QueryRow(ctx, `
+		UPDATE invoice_counters 
+		SET last_number = last_number + 1,
+		    updated_at = NOW()
+		WHERE user_id = $1 AND year = $2
 		RETURNING last_number
-	`
-
-	err := s.postgres.QueryRow(ctx, query, userID, year).Scan(&invoiceNumber)
+	`, userID, year).Scan(&invoiceNumber)
+	
 	if err != nil {
 		return "", fmt.Errorf("failed to generate invoice number: %w", err)
 	}
-	return fmt.Sprintf("INV-%d-%04d", year, invoiceNumber), nil
+	return fmt.Sprintf("INV-%s-%04d", shortUserID, invoiceNumber), nil
 }
 
 func (is *InvoiceService) GenerateAndFormatInvoiceNumber(ctx context.Context, userId, businessName string) (string, error) {
