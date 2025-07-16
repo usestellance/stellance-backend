@@ -1011,10 +1011,6 @@ func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invo
 
 	go is.cacheInvoice(context.Background(), cacheKey, &response)
 
-	if userId != invoice.CreatedBy && role != string(user.RoleAdmin) {
-		go is.trackInvoiceView(context.Background(), invoice.ID)
-	}
-
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
 		Message:    "Invoice retrieved successfully",
