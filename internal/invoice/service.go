@@ -181,6 +181,7 @@ func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvo
 		Email:        email,
 		Location:     country,
 	}
+	f := false
 
 	invoiceResponse := InvoiceResponse{
 		ID:            invoiceId,
@@ -199,6 +200,8 @@ func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvo
 		CreatedAt:     createdAt,
 		Items:         dto.InvoiceItems,
 		CreatedBy:     sender,
+		Approved:      &f,
+		ReviewDate:    nil,
 	}
 
 	is.log.Info("invoice created successfully",
@@ -785,11 +788,16 @@ func (is *InvoiceService) GetInvoiceById(ctx context.Context, invoiceId, userId,
 		Items:         items,
 		CreatedBy:     sender,
 		Approved:      &result.Approved,
-		ReviewDate:    &result.ReviewDate.Time,
 	}
 
 	if result.PaidAt.Valid {
 		invoice.PaidAt = &result.PaidAt.Time
+	}
+
+	if result.ReviewDate.Valid {
+		invoice.ReviewDate = &result.ReviewDate.Time
+	} else {
+		invoice.ReviewDate = nil
 	}
 
 	go is.cacheInvoice(context.Background(), cacheKey, &invoice)
@@ -1002,11 +1010,16 @@ func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invo
 		CreatedBy:     sender,
 		Items:         items,
 		Approved:      &invoice.Approved,
-		ReviewDate:    &reviewDate.Time,
 	}
 
 	if invoice.PaidAt.Valid {
 		response.PaidAt = &invoice.PaidAt.Time
+	}
+
+	if reviewDate.Valid {
+		response.ReviewDate = &reviewDate.Time
+	} else {
+		response.ReviewDate = nil
 	}
 
 	go is.cacheInvoice(context.Background(), cacheKey, &response)
