@@ -382,11 +382,17 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 	invoiceIDs := []string{}
 
 	for rows.Next() {
-		var invoice InvoiceResponse
-		var payerWalletAddress sql.NullString
-		var title sql.NullString
-		var paidAt sql.NullTime
-		var country sql.NullString
+		var (
+			invoice            InvoiceResponse
+			payerWalletAddress sql.NullString
+			title              sql.NullString
+			paidAt             sql.NullTime
+			country            sql.NullString
+			approved           bool
+			approvedDate       sql.NullTime
+			rejectedDate       sql.NullTime
+			reviewDate         sql.NullTime
+		)
 
 		err := rows.Scan(
 			&invoice.ID,
@@ -406,6 +412,9 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 			&invoice.CreatedAt,
 			&invoice.UpdatedAt,
 			&country,
+			&approved,
+			&approvedDate,
+			&rejectedDate,
 		)
 		if err != nil {
 			is.log.Error("failed to scan invoice", "error", err)
@@ -425,6 +434,12 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 			invoice.Country = country.String
 		}
 
+		if approved && approvedDate.Valid {
+			reviewDate = approvedDate
+		} else {
+			reviewDate = rejectedDate
+		}
+
 		sender := InvoiceSenderDetails{
 			UserId:       user_id,
 			Name:         first_name + " " + last_name,
@@ -433,6 +448,8 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 			BusinessName: &bName.String,
 		}
 		invoice.CreatedBy = sender
+		invoice.ReviewDate = &reviewDate.Time
+		invoice.Approved = &approved
 		invoices = append(invoices, invoice)
 		invoiceIDs = append(invoiceIDs, invoice.ID)
 	}
@@ -548,7 +565,10 @@ func (is *InvoiceService) buildInvoiceQuery(filters InvoiceFiltersDto, userId st
 			i.paid_at,
 			i.created_at,
 			i.updated_at,
-			i.address_country
+			i.address_country,
+			i.approved,
+			i.approved_date,
+			i.rejected_date
 		FROM invoice i
 		WHERE i.created_by_id = $1
 	`
