@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 	"unicode"
@@ -52,9 +53,9 @@ type ValidationError struct {
 }
 
 type ErrorResponse struct {
-	Status  int               `json:"status"`
-	Message string            `json:"message"`
-	Errors  []ValidationError `json:"errors,omitempty"`
+	Status  int    `json:"status"`
+	Message string `json:"message"`
+	// Errors  []ValidationError `json:"errors,omitempty"`
 }
 
 func GetEnvAsInt() int {
@@ -71,6 +72,18 @@ func HashString(data string) (string, error) {
 	return string(hash), err
 }
 
+func humanizeFieldName(name string) string {
+	var words []rune
+	for i, r := range name {
+		if i > 0 && r >= 'A' && r <= 'Z' {
+			words = append(words, ' ')
+		}
+		words = append(words, r)
+	}
+	return string(words)
+}
+
+
 func CompareHash(hash, password string) error {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 }
@@ -79,48 +92,85 @@ func HandleValidationError(w http.ResponseWriter, err error) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusBadRequest)
 
-	res := ErrorResponse{
-		Status:  http.StatusBadRequest,
-		Message: "failed! invalid request details sent",
-		Errors:  make([]ValidationError, 0),
-	}
+	message := "failed! invalid request details sent"
+
 	switch ve := err.(type) {
 	case validator.ValidationErrors:
 		seen := make(map[string]bool)
+		var sb strings.Builder
 		for _, e := range ve {
 			field := e.Field()
 			if !seen[field] {
-				res.Errors = append(res.Errors, ValidationError{
-					Field:   field,
-					Message: parseValidationErrorMessage(e),
-				})
+				sb.WriteString(fmt.Sprintf("%s; ", parseValidationErrorMessage(e)))
 				seen[field] = true
 			}
 		}
+		message = sb.String()
+
 	default:
-		res.Errors = append(res.Errors, ValidationError{
-			Field:   "unknown",
-			Message: err.Error(),
-		})
+		message = err.Error()
+	}
+
+	res := ErrorResponse{
+		Status:  http.StatusBadRequest,
+		Message: message,
 	}
 
 	_ = json.NewEncoder(w).Encode(res)
 }
 
 func parseValidationErrorMessage(e validator.FieldError) string {
+	field := humanizeFieldName(e.Field())
+	param := e.Param()
+
 	switch e.Tag() {
 	case "required":
-		return fmt.Sprintf("%s is required", e.Field())
+		return fmt.Sprintf("%s is required", field)
+
 	case "email":
-		return fmt.Sprintf("%s must be a valid email address", e.Field())
+		return fmt.Sprintf("%s must be a valid email address", field)
+
 	case "min":
-		return fmt.Sprintf("%s must be at least %s characters long", e.Field(), e.Param())
+		return fmt.Sprintf("%s must be at least %s characters long", field, param)
+
 	case "max":
-		return fmt.Sprintf("%s must be at most %s characters long", e.Field(), e.Param())
+		return fmt.Sprintf("%s must be at most %s characters long", field, param)
+
 	case "len":
-		return fmt.Sprintf("%s must be exactly %s characters long", e.Field(), e.Param())
+		return fmt.Sprintf("%s must be exactly %s characters long", field, param)
+
+	case "eq":
+		return fmt.Sprintf("%s must be equal to %s", field, param)
+
+	case "ne":
+		return fmt.Sprintf("%s must not be equal to %s", field, param)
+
+	case "gte":
+		return fmt.Sprintf("%s must be greater than or equal to %s", field, param)
+
+	case "lte":
+		return fmt.Sprintf("%s must be less than or equal to %s", field, param)
+
+	case "oneof":
+		return fmt.Sprintf("%s must be one of [%s]", field, param)
+
+	case "url":
+		return fmt.Sprintf("%s must be a valid URL", field)
+
+	case "uuid":
+		return fmt.Sprintf("%s must be a valid UUID", field)
+
+	case "numeric":
+		return fmt.Sprintf("%s must be a numeric value", field)
+
+	case "boolean":
+		return fmt.Sprintf("%s must be a boolean", field)
+
+	case "datetime":
+		return fmt.Sprintf("%s must be a valid datetime format", field)
+
 	default:
-		return fmt.Sprintf("%s is invalid", e.Field())
+		return fmt.Sprintf("%s is invalid (%s validation failed)", field, e.Tag())
 	}
 }
 
