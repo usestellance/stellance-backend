@@ -221,7 +221,7 @@ func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvo
 
 func (s *InvoiceService) GenerateInvoiceNumber(ctx context.Context, userID string) (string, error) {
 	year := time.Now().Year()
-	shortUserID := userID[:8]
+	dateStr := time.Now().Format("20060102")
 
 	_, err := s.postgres.Exec(ctx, `
 		INSERT INTO invoice_counters (user_id, year, last_number)
@@ -244,7 +244,7 @@ func (s *InvoiceService) GenerateInvoiceNumber(ctx context.Context, userID strin
 	if err != nil {
 		return "", fmt.Errorf("failed to generate invoice number: %w", err)
 	}
-	return fmt.Sprintf("INV-%s-%04d", shortUserID, invoiceNumber), nil
+	return fmt.Sprintf("INV-%s-%04d", dateStr, invoiceNumber), nil
 }
 
 func (is *InvoiceService) GenerateAndFormatInvoiceNumber(ctx context.Context, userId, businessName string) (string, error) {
@@ -1568,4 +1568,37 @@ func (is *InvoiceService) DeleteFromRedisCache(ctx context.Context, invoiceId st
 		return err
 	}
 	return nil
+}
+
+func (is *InvoiceService) GetStats(ctx context.Context, userId string) *utils.ApiResponse {
+	const query = `
+		SELECT 
+			COUNT(*) FILTER (WHERE status = 'pending') AS pending_count,
+			COUNT(*) FILTER (WHERE status = 'paid') AS paid_count,
+			COUNT(*) FILTER (WHERE status = 'overdue') AS overdue_count,
+			COUNT(*) AS total_count
+		FROM invoice
+		WHERE created_by_id = $1;
+	`
+
+	var stats struct {
+		PendingCount int `db:"pending_count" json:"pending_count"`
+		PaidCount    int `db:"paid_count" json:"paid_count"`
+		OverdueCount int `db:"overdue_count" json:"overdue_count"`
+		TotalCount   int `db:"total_count" json:"total_count"`
+	}
+
+	err := is.postgres.QueryRow(ctx, query, userId).Scan(&stats.PendingCount, &stats.PaidCount, &stats.OverdueCount, &stats.TotalCount)
+	if err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to query status",
+		}
+	}
+
+	return &utils.ApiResponse{
+		StatusCode: http.StatusOK,
+		Message:    "successful",
+		Data:       stats,
+	}
 }

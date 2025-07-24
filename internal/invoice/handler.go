@@ -296,3 +296,14 @@ func (h *InvoiceHandler) ReviewInvoiceHandler(w http.ResponseWriter, r *http.Req
 	response := h.service.ReviewInvoice(ctx, invoiceID, approve, role, reqUserId)
 	utils.WriteToJson(w, response.StatusCode, response)
 }
+
+func(h *InvoiceHandler) GetInvoiceStatsHandler(w http.ResponseWriter, r *http.Request){
+	ctx := r.Context()
+	
+	userId, ok := utils.GetUserIDFromContext(ctx)
+	if !ok {
+		h.service.log.Warn("public access to invoice")
+	}
+	response := h.service.GetStats(ctx, userId)
+	utils.WriteToJson(w, response.StatusCode, response)
+}

@@ -161,12 +161,12 @@ func (ns *NotificationService) GetUserNotifications(ctx context.Context, userID 
 	}
 	defer rows.Close()
 
-	var result []Notifications
+	var result []Notification
 	for rows.Next() {
-		var notif Notifications
-		var viewedAtNullable *sql.NullTime
+		var notif Notification
+		var viewedAt sql.NullTime
 
-		err := rows.Scan(&notif.Id, &notif.Title, &notif.Body, &notif.Viewed, &viewedAtNullable)
+		err := rows.Scan(&notif.Id, &notif.Title, &notif.Body, &notif.Viewed, &viewedAt)
 		if err != nil {
 			return &utils.ApiResponse{
 				StatusCode: http.StatusInternalServerError,
@@ -174,18 +174,24 @@ func (ns *NotificationService) GetUserNotifications(ctx context.Context, userID 
 			}
 		}
 
-		notif.ViewedAt = &viewedAtNullable.Time
-		notif.UnreadCount = unreadCount
-		notif.ReadCount = readCount
-		notif.TotalCount = totalCount
-
+		if viewedAt.Valid {
+			t := viewedAt.Time
+			notif.ViewedAt = &t
+		} else {
+			notif.ViewedAt = nil
+		}
 		result = append(result, notif)
 	}
 
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
 		Message:    "successful",
-		Data:       result,
+		Data: Notifications{
+			Notification: result,
+			UnreadCount:  unreadCount,
+			ReadCount:    readCount,
+			TotalCount:   totalCount,
+		},
 	}
 }
 
@@ -196,7 +202,7 @@ func (ns *NotificationService) GetNotificationByID(ctx context.Context, id, user
 		WHERE id = $1 AND user_id = $2
 	`
 
-	var notif Notifications
+	var notif Notification
 	var viewedAt *sql.NullTime
 
 	err := ns.postgres.QueryRow(ctx, query, id, userId).Scan(

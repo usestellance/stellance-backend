@@ -27,6 +27,7 @@ func (h *NotificationHandler) GetNotifications(w http.ResponseWriter, r *http.Re
 	ctx := r.Context()
 
 	viewedStr := r.URL.Query().Get("viewed")
+	var viewed bool
 
 	userId, ok := utils.GetUserIDFromContext(ctx)
 	if !ok {
@@ -35,10 +36,13 @@ func (h *NotificationHandler) GetNotifications(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	viewed, err := strconv.ParseBool(viewedStr)
-	if err != nil {
-		http.Error(w, "Invalid approve value", http.StatusBadRequest)
-		return
+	if viewedStr != "" {
+		v, err := strconv.ParseBool(viewedStr)
+		if err != nil {
+			http.Error(w, "Invalid approve value", http.StatusBadRequest)
+			return
+		}
+		viewed = v
 	}
 
 	response := h.service.GetUserNotifications(ctx, userId, &viewed)

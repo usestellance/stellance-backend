@@ -157,11 +157,11 @@ func (s *TransactionService) GetTransactionsPaginated(ctx context.Context, page,
 
 	const query = `
 		SELECT id, invoice_id, wallet_id, transaction_hash, amount, currency,
-			   status, network_fee, created_at, confirmed_at, token_type, transaction_type
+	   	status, network_fee, created_at, confirmed_at, token_type, transaction_type
 		FROM transactions
+		WHERE user_id = $3
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
-        WHERE user_id = $3
 	`
 
 	rows, err := s.postgres.Query(ctx, query, limit, offset, user_id)
