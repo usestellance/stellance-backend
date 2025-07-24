@@ -83,7 +83,6 @@ func humanizeFieldName(name string) string {
 	return string(words)
 }
 
-
 func CompareHash(hash, password string) error {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 }
@@ -168,6 +167,8 @@ func parseValidationErrorMessage(e validator.FieldError) string {
 
 	case "datetime":
 		return fmt.Sprintf("%s must be a valid datetime format", field)
+	case "passwd":
+		return string("password length must be greater than 6 and contain one upper case, lower case, numeric, and a special characters")
 
 	default:
 		return fmt.Sprintf("%s is invalid (%s validation failed)", field, e.Tag())
@@ -241,7 +242,7 @@ func GetBaseURL() string {
 func ValidatePassword(fl validator.FieldLevel) bool {
 	password := fl.Field().String()
 
-	if len(password) < 8 {
+	if len(password) < 6 {
 		return false
 	}
 
@@ -269,8 +270,8 @@ func ValidatePassword(fl validator.FieldLevel) bool {
 }
 
 func CheckPasswordRequirements(password string) (bool, string) {
-	if len(password) < 8 {
-		return false, "Password must be at least 8 characters long"
+	if len(password) < 6 {
+		return false, "Password must be at least 6 characters long"
 	}
 	var (
 		hasUpper   bool
