@@ -203,14 +203,13 @@ func (ns *NotificationService) GetNotificationByID(ctx context.Context, id, user
 	`
 
 	var notif Notification
-	var viewedAt *sql.NullTime
 
 	err := ns.postgres.QueryRow(ctx, query, id, userId).Scan(
 		&notif.Id,
 		&notif.Title,
 		&notif.Body,
 		&notif.Viewed,
-		&viewedAt,
+		&notif.ViewedAt,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -224,10 +223,6 @@ func (ns *NotificationService) GetNotificationByID(ctx context.Context, id, user
 			StatusCode: http.StatusInternalServerError,
 			Message:    "Service Unreachable",
 		}
-	}
-
-	if viewedAt.Valid {
-		*notif.ViewedAt = viewedAt.Time
 	}
 
 	return &utils.ApiResponse{
