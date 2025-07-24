@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/The-True-Hooha/stellance-backend.git/internal/notifications"
 	"github.com/The-True-Hooha/stellance-backend.git/internal/transactions"
 	"github.com/The-True-Hooha/stellance-backend.git/internal/user"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/config"
@@ -249,6 +250,13 @@ func (ws *WalletService) CreateWallet(ctx context.Context, userId string) *utils
 	if ws.stage == "testnet" {
 		go func() {
 			ws.fundTestnetAccount(context.Background(), pair.Address(), wallet.ID, userId, pair)
+			data := notifications.CreateNotificationDto{
+				Title:  "New Transaction Update",
+				UserId: userId,
+				Body:   "A new wallet has been created for you, you can find your wallet in the wallet tab with your wallet address and private key. Kindly note that your private key is not visible to us, ensure to keep it safely secured on your end",
+			}
+			notifications.NewNotificationService().CreateNewNotification(context.Background(), data)
+
 		}()
 	}
 

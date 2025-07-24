@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/The-True-Hooha/stellance-backend.git/internal/notifications"
 	"github.com/The-True-Hooha/stellance-backend.git/internal/user"
 	"github.com/The-True-Hooha/stellance-backend.git/mail"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/config"
@@ -287,11 +288,11 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 		validStatuses := map[InvoiceStatus]bool{
 			InvoiceStatusDraft:     true,
 			InvoiceStatusSent:      true,
+			InvoiceStatusViewed:    true,
 			InvoiceStatusPaid:      true,
 			InvoiceStatusOverdue:   true,
 			InvoiceStatusCancelled: true,
 			InvoiceStatusRefunded:  true,
-			InvoiceStatusViewed:    true,
 			InvoiceStatusPending:   true,
 		}
 		if !validStatuses[dto.Status] {
@@ -1455,7 +1456,7 @@ func (is *InvoiceService) ReviewInvoice(ctx context.Context, invoiceId string, a
 			UPDATE invoice 
 			SET rejected = true, 
 				rejected_date = NOW(),
-				status = 'viewed',
+				status = 'cancelled',
 				updated_at = NOW()
 			WHERE id = $1 
 				AND approved = false 
@@ -1469,6 +1470,8 @@ func (is *InvoiceService) ReviewInvoice(ctx context.Context, invoiceId string, a
 			Message:    "Failed to review invoice",
 		}
 	}
+
+	// TODO: send email to notify that invoice has been approved or not
 
 	if result.RowsAffected() == 0 {
 		var exists, isApproved, isRejected bool
@@ -1494,10 +1497,23 @@ func (is *InvoiceService) ReviewInvoice(ctx context.Context, invoiceId string, a
 	}
 
 	action := "approved"
+	var body string
 	if !approve {
 		action = "rejected"
+		body = fmt.Sprintf("Your invoice with ID %s has been rejected at %s", invoiceId, time.Now().Format("02/01/2006 03:04PM"))
+	} else {
+		body = fmt.Sprintf("Your invoice with ID %s has been approved at %s", invoiceId, time.Now().Format("02/01/2006 03:04PM"))
 	}
 	is.DeleteFromRedisCache(ctx, invoiceId)
+
+	go func() {
+		data := notifications.CreateNotificationDto{
+			Title:  "Invoice Review Update",
+			UserId: cId,
+			Body:   body,
+		}
+		notifications.NewNotificationService().CreateNewNotification(context.Background(), data)
+	}()
 
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
