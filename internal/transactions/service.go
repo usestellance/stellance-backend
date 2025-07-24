@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/The-True-Hooha/stellance-backend.git/internal/notifications"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/config"
 	jwt_ "github.com/The-True-Hooha/stellance-backend.git/pkg/jwt"
 	"github.com/The-True-Hooha/stellance-backend.git/pkg/utils"
@@ -69,6 +70,16 @@ func (ts *TransactionService) CreateNewTransaction(ctx context.Context, userId s
 		log.Error("failed to commit new transaction on wallet", "error", err)
 		return false, err
 	}
+
+	go func() {
+		body := fmt.Sprintf("A new transaction has occurred in your wallet. %.2f %s has been added to your %s wallet.", dto.Amount, currency, currency)
+		data := notifications.CreateNotificationDto{
+			Title:  "New Transaction Update",
+			UserId: userId,
+			Body:   body,
+		}
+		notifications.NewNotificationService().CreateNewNotification(context.Background(), data)
+	}()
 
 	return true, nil
 }
@@ -146,11 +157,11 @@ func (s *TransactionService) GetTransactionsPaginated(ctx context.Context, page,
 
 	const query = `
 		SELECT id, invoice_id, wallet_id, transaction_hash, amount, currency,
-			   status, network_fee, created_at, confirmed_at, token_type, transaction_type
+	   	status, network_fee, created_at, confirmed_at, token_type, transaction_type
 		FROM transactions
+		WHERE user_id = $3
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
-        WHERE user_id = $3
 	`
 
 	rows, err := s.postgres.Query(ctx, query, limit, offset, user_id)
