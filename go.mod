@@ -5,8 +5,10 @@ go 1.24.1
 require (
 	github.com/fernet/fernet-go v0.0.0-20240119011108-303da6aec611
 	github.com/go-playground/validator/v10 v10.26.0
+	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/uuid v1.6.0
+	github.com/hibiken/asynq v0.25.1
 	github.com/jackc/pgx v3.6.2+incompatible
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/joho/godotenv v1.5.1
@@ -27,9 +29,7 @@ require (
 	github.com/go-errors/errors v1.5.1 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
-	github.com/gofrs/uuid v4.4.0+incompatible // indirect
 	github.com/gorilla/schema v1.4.1 // indirect
-	github.com/hibiken/asynq v0.25.1 // indirect
 	github.com/jackc/fake v0.0.0-20150926172116-812a484cc733 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
