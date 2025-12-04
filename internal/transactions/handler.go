@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/The-True-Hooha/stellance-backend.git/internal/user"
-	"github.com/The-True-Hooha/stellance-backend.git/pkg/utils"
+	"github.com/The-True-Hooha/stellance-backend/internal/user"
+	"github.com/The-True-Hooha/stellance-backend/pkg/utils"
 	"github.com/go-playground/validator/v10"
 )
 

@@ -9,8 +9,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/The-True-Hooha/stellance-backend.git/pkg/config"
-	"github.com/The-True-Hooha/stellance-backend.git/pkg/utils"
+	"github.com/The-True-Hooha/stellance-backend/pkg/config"
+	"github.com/The-True-Hooha/stellance-backend/pkg/utils"
 	"github.com/resend/resend-go/v2"
 )
 

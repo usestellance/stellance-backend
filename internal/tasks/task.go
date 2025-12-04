@@ -3,7 +3,7 @@ package tasks
 import (
 	"context"
 
-	"github.com/The-True-Hooha/stellance-backend.git/internal/invoice"
+	"github.com/The-True-Hooha/stellance-backend/internal/invoice"
 	"github.com/hibiken/asynq"
 )
 

@@ -1,6 +1,6 @@
 package auth
 
-import "github.com/The-True-Hooha/stellance-backend.git/internal/user"
+import "github.com/The-True-Hooha/stellance-backend/internal/user"
 
 type AuthRequestDto struct {
 	Email    string `json:"email" validate:"required,email"`

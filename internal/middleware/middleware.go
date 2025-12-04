@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/The-True-Hooha/stellance-backend.git/pkg/logger"
-	ratelimiter "github.com/The-True-Hooha/stellance-backend.git/pkg/ratelimits"
+	"github.com/The-True-Hooha/stellance-backend/pkg/logger"
+	ratelimiter "github.com/The-True-Hooha/stellance-backend/pkg/ratelimits"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )

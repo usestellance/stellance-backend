@@ -17,7 +17,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/The-True-Hooha/stellance-backend.git/internal/middleware"
+	"github.com/The-True-Hooha/stellance-backend/internal/middleware"
 	"github.com/fernet/fernet-go"
 	"github.com/go-playground/validator/v10"
 	gonanoid "github.com/matoous/go-nanoid/v2"

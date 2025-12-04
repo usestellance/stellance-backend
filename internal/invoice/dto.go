@@ -3,7 +3,7 @@ package invoice
 import (
 	"time"
 
-	"github.com/The-True-Hooha/stellance-backend.git/pkg/utils"
+	"github.com/The-True-Hooha/stellance-backend/pkg/utils"
 )
 
 type InvoiceType string

@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/The-True-Hooha/stellance-backend.git/pkg/config/cors_config"
-	"github.com/The-True-Hooha/stellance-backend.git/pkg/logger"
+	"github.com/The-True-Hooha/stellance-backend/pkg/config/cors_config"
+	"github.com/The-True-Hooha/stellance-backend/pkg/logger"
 )
 
 func CORSMiddleware(config cors_config.CORSConfig) func(http.Handler) http.Handler {

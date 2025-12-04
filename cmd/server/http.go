@@ -14,17 +14,17 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/The-True-Hooha/stellance-backend.git/internal/auth"
-	"github.com/The-True-Hooha/stellance-backend.git/internal/invoice"
-	"github.com/The-True-Hooha/stellance-backend.git/internal/middleware"
-	"github.com/The-True-Hooha/stellance-backend.git/internal/notifications"
-	"github.com/The-True-Hooha/stellance-backend.git/internal/transactions"
-	"github.com/The-True-Hooha/stellance-backend.git/internal/user"
-	"github.com/The-True-Hooha/stellance-backend.git/internal/wallet"
-	"github.com/The-True-Hooha/stellance-backend.git/pkg/config"
-	"github.com/The-True-Hooha/stellance-backend.git/pkg/config/cors_config"
-	"github.com/The-True-Hooha/stellance-backend.git/pkg/httpx"
-	"github.com/The-True-Hooha/stellance-backend.git/pkg/logger"
+	"github.com/The-True-Hooha/stellance-backend/internal/auth"
+	"github.com/The-True-Hooha/stellance-backend/internal/invoice"
+	"github.com/The-True-Hooha/stellance-backend/internal/middleware"
+	"github.com/The-True-Hooha/stellance-backend/internal/notifications"
+	"github.com/The-True-Hooha/stellance-backend/internal/transactions"
+	"github.com/The-True-Hooha/stellance-backend/internal/user"
+	"github.com/The-True-Hooha/stellance-backend/internal/wallet"
+	"github.com/The-True-Hooha/stellance-backend/pkg/config"
+	"github.com/The-True-Hooha/stellance-backend/pkg/config/cors_config"
+	"github.com/The-True-Hooha/stellance-backend/pkg/httpx"
+	"github.com/The-True-Hooha/stellance-backend/pkg/logger"
 )
 
 type Server struct {

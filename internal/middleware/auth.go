@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	jwt_ "github.com/The-True-Hooha/stellance-backend.git/pkg/jwt"
-	"github.com/The-True-Hooha/stellance-backend.git/pkg/logger"
+	jwt_ "github.com/The-True-Hooha/stellance-backend/pkg/jwt"
+	"github.com/The-True-Hooha/stellance-backend/pkg/logger"
 )
 
 type AuthMiddleware struct {

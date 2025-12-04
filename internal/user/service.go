@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/The-True-Hooha/stellance-backend.git/pkg/config"
-	jwt_ "github.com/The-True-Hooha/stellance-backend.git/pkg/jwt"
-	"github.com/The-True-Hooha/stellance-backend.git/pkg/utils"
+	"github.com/The-True-Hooha/stellance-backend/pkg/config"
+	jwt_ "github.com/The-True-Hooha/stellance-backend/pkg/jwt"
+	"github.com/The-True-Hooha/stellance-backend/pkg/utils"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"

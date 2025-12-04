@@ -23,7 +23,7 @@ Run `migrations` with with [go-migrate](https://github.com/golang-migrate/migrat
 
 Run with hot reload (install air first)
 
-cmd: `go install github.com/cosmtrek/air@latest`
+cmd: `go install github.com/air-verse/air@latest`
 
 cmd: `air`
 

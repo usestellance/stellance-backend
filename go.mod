@@ -1,4 +1,4 @@
-module github.com/The-True-Hooha/stellance-backend.git
+module github.com/The-True-Hooha/stellance-backend
 
 go 1.24.1
 

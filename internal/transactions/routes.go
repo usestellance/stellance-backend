@@ -3,8 +3,8 @@ package transactions
 import (
 	"net/http"
 
-	"github.com/The-True-Hooha/stellance-backend.git/internal/middleware"
-	"github.com/The-True-Hooha/stellance-backend.git/pkg/httpx"
+	"github.com/The-True-Hooha/stellance-backend/internal/middleware"
+	"github.com/The-True-Hooha/stellance-backend/pkg/httpx"
 )
 
 func RegisterTransactionRoutes(apiV1 *httpx.RouteGroup, router *http.ServeMux, transactionService *TransactionService) {

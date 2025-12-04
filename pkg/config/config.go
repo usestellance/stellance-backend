@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"sync"
 
-	database "github.com/The-True-Hooha/stellance-backend.git/internal/db"
+	database "github.com/The-True-Hooha/stellance-backend/internal/db"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )

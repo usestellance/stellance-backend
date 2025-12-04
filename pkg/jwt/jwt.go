@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/The-True-Hooha/stellance-backend.git/pkg/config"
+	"github.com/The-True-Hooha/stellance-backend/pkg/config"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"

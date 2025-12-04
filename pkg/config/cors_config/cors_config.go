@@ -4,7 +4,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/The-True-Hooha/stellance-backend.git/pkg/logger"
+	"github.com/The-True-Hooha/stellance-backend/pkg/logger"
 )
 
 type CORSConfig struct {
