@@ -1602,3 +1602,99 @@ func (is *InvoiceService) GetStats(ctx context.Context, userId string) *utils.Ap
 		Data:       stats,
 	}
 }
+
+
+func (ir *InvoiceService) GetInvoiceCountByStatusQuery(ctx context.Context, userID string, startDate, endDate time.Time) ([]InvoiceStatusRow, error) {
+    const query = `
+        SELECT 
+            status::text as status,
+            COUNT(*) as count
+        FROM invoice
+        WHERE created_by_id = $1
+            AND created_at >= $2
+            AND created_at < $3
+        GROUP BY status
+        ORDER BY status
+    `
+    
+    rows, err := ir.postgres.Query(ctx, query, userID, startDate, endDate)
+    if err != nil {
+        return nil, fmt.Errorf("failed to query invoice status counts: %w", err)
+    }
+    defer rows.Close()
+    
+    var results []InvoiceStatusRow
+    for rows.Next() {
+        var row InvoiceStatusRow
+        if err := rows.Scan(&row.Status, &row.Count); err != nil {
+            return nil, fmt.Errorf("failed to scan row: %w", err)
+        }
+        results = append(results, row)
+    }
+    
+    if err := rows.Err(); err != nil {
+        return nil, fmt.Errorf("row iteration error: %w", err)
+    }
+    
+    return results, nil
+}
+
+
+func (is *InvoiceService) GetInvoicesByStatus(ctx context.Context, userID string, query InvoiceStatusQuery) *utils.ApiResponse {
+    var targetMonth time.Month
+    var targetYear int
+    var err error
+    
+    now := time.Now()
+    
+    if query.Month == "" {
+        targetMonth = now.Month()
+        targetYear = now.Year()
+    } else {
+        targetMonth, err = utils.ParseMonthString(query.Month)
+        if err != nil {
+			is.log.Error("failed to parse month for invoice status query", "error", err, "query_value", query)
+            return &utils.ApiResponse{
+                StatusCode: http.StatusBadRequest,
+                Message:    "invalid month format. Use full name (July), abbreviation (Jul), or number (07)",
+            }
+        }
+        
+        targetYear = now.Year()
+        if targetMonth > now.Month() {
+            targetYear--
+        }
+    }
+    
+    startDate := time.Date(targetYear, targetMonth, 1, 0, 0, 0, 0, time.UTC)
+    endDate := startDate.AddDate(0, 1, 0)
+    
+    
+    statusData, err := is.GetInvoiceCountByStatusQuery(ctx, userID, startDate, endDate)
+    if err != nil {
+		is.log.Error("failed to return data from postgres", "error", err)
+        return &utils.ApiResponse{
+            StatusCode: http.StatusInternalServerError,
+            Message:    "failed to retrieve invoice status data",
+        }
+    }
+    
+    invoicesByStatus := make([]InvoiceStatusDataPoint, 0, len(statusData))
+    
+    for _, row := range statusData {
+        invoicesByStatus = append(invoicesByStatus, InvoiceStatusDataPoint{
+            Status: utils.CapitalizeStatus(row.Status),
+            Value:  row.Count,
+        })
+    }
+    
+    if len(invoicesByStatus) == 0 {
+        invoicesByStatus = []InvoiceStatusDataPoint{}
+    }
+    
+    return &utils.ApiResponse{
+        StatusCode: http.StatusOK,
+        Message:    "successful",
+        Data:       invoicesByStatus,
+    }
+}

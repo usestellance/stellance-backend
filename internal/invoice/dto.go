@@ -96,3 +96,21 @@ type InvoiceSenderDetails struct {
 	PhoneNumber    *string `json:"phone_number,omitempty"`
 	Wallet_address *string `json:"wallet_address,omitempty"`
 }
+
+type InvoiceStatusQuery struct {
+    Month string `form:"month" json:"month"`
+}
+
+type InvoiceStatusDataPoint struct {
+    Status string `json:"status"`
+    Value  int    `json:"value"`
+}
+
+type GetInvoiceByStatusResponse struct {
+    InvoicesByStatus []InvoiceStatusDataPoint `json:"invoices_by_status"`
+}
+
+type InvoiceStatusRow struct {
+    Status string
+    Count  int
+}

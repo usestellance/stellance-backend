@@ -307,3 +307,22 @@ func(h *InvoiceHandler) GetInvoiceStatsHandler(w http.ResponseWriter, r *http.Re
 	response := h.service.GetStats(ctx, userId)
 	utils.WriteToJson(w, response.StatusCode, response)
 }
+
+func (ih *InvoiceHandler) GetInvoicesByStatus(w http.ResponseWriter, r *http.Request) {
+    
+    userID, ok := utils.GetUserIDFromContext(r.Context())
+    if !ok {
+        utils.WriteToJson(w, http.StatusUnauthorized, utils.ApiResponse{
+            StatusCode: http.StatusUnauthorized,
+            Message:    "unauthorized",
+        })
+        return
+    }
+    
+    var query InvoiceStatusQuery
+    query.Month = r.URL.Query().Get("month")
+    
+    response := ih.service.GetInvoicesByStatus(r.Context(), userID, query)
+    
+    utils.WriteToJson(w, response.StatusCode, response)
+}
