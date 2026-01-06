@@ -72,3 +72,23 @@ type TransactionOverviewRow struct {
 	TotalAmount string
 	InvoiceCount int
 }
+type TransactionCashFlowQuery struct {
+    From string `form:"from" json:"from"`// Format: YYYY-MM-DD
+    To   string `form:"to" json:"to"` // Format: YYYY-MM-DD
+}
+
+type CashFlowDataPoint struct {
+    Date     string `json:"date"`
+    Amount   int64  `json:"amount"`
+    Invoices int    `json:"invoices"`
+}
+
+type GetTransactionCashFlowResponse struct {
+    CashFlow []CashFlowDataPoint `json:"cash_flow"`
+}
+
+type CashFlowRow struct {
+    Month        time.Time
+    TotalAmount  string
+    InvoiceCount int
+}

@@ -119,5 +119,23 @@ func (handler *TransactionHandler) GetManyTransactionHandler(w http.ResponseWrit
 
 	response := handler.service.GetTransactionsPaginated(ctx, dto.Page, dto.Count, dto.UserId)
 	utils.WriteToJson(w, response.StatusCode, response)
+}
 
+func (th *TransactionHandler) GetTransactionCashFlow(w http.ResponseWriter, r *http.Request) {
+    userID, ok := utils.GetUserIDFromContext(r.Context())
+    if !ok {
+        utils.WriteToJson(w, http.StatusUnauthorized, utils.ApiResponse{
+            StatusCode: http.StatusUnauthorized,
+            Message:    "unauthorized",
+        })
+        return
+    }
+    
+    var query TransactionCashFlowQuery
+    query.From = r.URL.Query().Get("from")
+    query.To = r.URL.Query().Get("to")
+    
+    response := th.service.GetTransactionCashFlow(r.Context(), userID, query)
+    
+    utils.WriteToJson(w, response.StatusCode, response)
 }

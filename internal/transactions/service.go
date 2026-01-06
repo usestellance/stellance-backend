@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/The-True-Hooha/stellance-backend/internal/notifications"
 	"github.com/The-True-Hooha/stellance-backend/pkg/config"
@@ -263,6 +264,7 @@ func (tr *TransactionService) GetTransactionOverviewByUserQuery(ctx context.Cont
 }
 
 func (ts *TransactionService) GetTransactionCardForUser(ctx context.Context, userID string) *utils.ApiResponse {
+	// TODO - save to redis
     overviewData, err := ts.GetTransactionOverviewByUserQuery(ctx, userID)
     if err != nil {
         return &utils.ApiResponse{
@@ -306,5 +308,138 @@ func (ts *TransactionService) GetTransactionCardForUser(ctx context.Context, use
         StatusCode: http.StatusOK,
         Message:    "successful",
         Data:       response,
+    }
+}
+
+func (tr *TransactionService) GetTransactionCashFlowQuery(ctx context.Context, userID string, fromDate, toDate time.Time) ([]CashFlowRow, error) {
+    const query = `
+        SELECT 
+            DATE_TRUNC('month', t.created_at) as month,
+            COALESCE(SUM(t.amount), 0) as total_amount,
+            COUNT(DISTINCT t.invoice_id) as invoice_count
+        FROM transactions t
+        WHERE t.user_id = $1
+            AND t.currency = 'usdc'
+            AND t.status = 'confirmed'
+            AND t.created_at >= $2
+            AND t.created_at < $3
+        GROUP BY DATE_TRUNC('month', t.created_at)
+        ORDER BY month ASC
+    `
+    
+    rows, err := tr.postgres.Query(ctx, query, userID, fromDate, toDate)
+    if err != nil {
+        return nil, fmt.Errorf("failed to query transaction cash flow: %w", err)
+    }
+    defer rows.Close()
+    
+    var results []CashFlowRow
+    for rows.Next() {
+        var row CashFlowRow
+        if err := rows.Scan(&row.Month, &row.TotalAmount, &row.InvoiceCount); err != nil {
+            return nil, fmt.Errorf("failed to scan row: %w", err)
+        }
+        results = append(results, row)
+    }
+    
+    if err := rows.Err(); err != nil {
+        return nil, fmt.Errorf("row iteration error: %w", err)
+    }
+    
+    return results, nil
+}
+
+func (tr *TransactionService) GetUserCreationDateQuery(ctx context.Context, userID string) (time.Time, error) {
+    var createdAt time.Time
+    query := `SELECT created_at FROM users WHERE id = $1`
+    
+    err := tr.postgres.QueryRow(ctx, query, userID).Scan(&createdAt)
+    if err != nil {
+        return time.Time{}, fmt.Errorf("failed to get user creation date: %w", err)
+    }
+    
+    return createdAt, nil
+}
+
+func (ts *TransactionService) GetTransactionCashFlow(ctx context.Context, userID string, query TransactionCashFlowQuery) *utils.ApiResponse {
+    var fromDate, toDate time.Time
+    var err error
+    
+    if query.From != "" && query.To != "" {
+        fromDate, err = time.Parse("2006-01-02", query.From)
+        if err != nil {
+            return &utils.ApiResponse{
+                StatusCode: http.StatusBadRequest,
+                Message:    "invalid 'from' date format. Use YYYY-MM-DD",
+                Error:      err.Error(),
+            }
+        }        
+        toDate, err = time.Parse("2006-01-02", query.To)
+        if err != nil {
+            return &utils.ApiResponse{
+                StatusCode: http.StatusBadRequest,
+                Message:    "invalid 'to' date format. Use YYYY-MM-DD",
+                Error:      err.Error(),
+            }
+        }
+        
+        toDate = toDate.AddDate(0, 0, 1)
+        
+        if fromDate.After(toDate) {
+            return &utils.ApiResponse{
+                StatusCode: http.StatusBadRequest,
+                Message:    "'from' date cannot be after 'to' date",
+            }
+        }
+    } else {
+        userCreatedAt, err := ts.GetUserCreationDateQuery(ctx, userID)
+        if err != nil {
+            return &utils.ApiResponse{
+                StatusCode: http.StatusInternalServerError,
+                Message:    "failed to retrieve user creation date",
+                Error:      err.Error(),
+            }
+        }
+        
+        oneYearAgo := time.Now().AddDate(-1, 0, 0)
+        if userCreatedAt.After(oneYearAgo) {
+            fromDate = userCreatedAt
+        } else {
+            fromDate = oneYearAgo
+        }
+        toDate = time.Now().AddDate(0, 0, 1)
+    }
+    
+    cashFlowData, err := ts.GetTransactionCashFlowQuery(ctx, userID, fromDate, toDate)
+    if err != nil {
+        return &utils.ApiResponse{
+            StatusCode: http.StatusInternalServerError,
+            Message:    "failed to retrieve transaction cash flow",
+            Error:      err.Error(),
+        }
+    }
+	
+    cashFlow := make([]CashFlowDataPoint, 0, len(cashFlowData))
+    
+    for _, row := range cashFlowData {
+        amountInCents, err := utils.ConvertUSDCToCents(row.TotalAmount)
+        if err != nil {
+			ts.log.Error("failed to parse USDC to cents", "error", err, "user_id", userID)
+            continue
+        }
+        
+        monthName := row.Month.Format("Jan")
+        
+        cashFlow = append(cashFlow, CashFlowDataPoint{
+            Date:     monthName,
+            Amount:   amountInCents,
+            Invoices: row.InvoiceCount,
+        })
+    }
+    
+    return &utils.ApiResponse{
+        StatusCode: http.StatusOK,
+        Message:    "successful",
+        Data:       cashFlow,
     }
 }
