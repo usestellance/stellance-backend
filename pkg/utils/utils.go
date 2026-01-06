@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math"
 	"math/big"
 	"net/http"
 	"os"
@@ -356,3 +357,15 @@ func NullFloatPtr(nf sql.NullFloat64) *float64 {
 	}
 	return nil
 }
+
+func ConvertUSDCToCents(usdcAmount string)(int64, error){
+	amount, err := strconv.ParseFloat(usdcAmount, 64)
+	if err != nil {
+		return 0,  fmt.Errorf("failed to parse USDC amount: %w", err)
+	}
+
+	cents := int64(math.Round(amount * 100))
+	return cents, nil
+}
+
+

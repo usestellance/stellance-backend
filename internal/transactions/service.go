@@ -225,3 +225,86 @@ func (s *TransactionService) GetTransactionsPaginated(ctx context.Context, page,
 		},
 	}
 }
+
+func (tr *TransactionService) GetTransactionOverviewByUserQuery(ctx context.Context, userID string) ([]TransactionOverviewRow, error) {
+    const query = `
+        SELECT 
+            COALESCE(i.status::text, 'no_invoice') as invoice_status,
+            COALESCE(SUM(t.amount), 0) as total_amount,
+            COUNT(DISTINCT t.invoice_id) as invoice_count
+        FROM transactions t
+        LEFT JOIN invoice i ON t.invoice_id = i.id
+        WHERE t.user_id = $1
+            AND t.currency = 'usdc'
+            AND t.status = 'confirmed'
+        GROUP BY i.status
+    `
+    
+    rows, err := tr.postgres.Query(ctx, query, userID)
+    if err != nil {
+        return nil, fmt.Errorf("failed to query transaction overview: %w", err)
+    }
+    defer rows.Close()
+    
+    var results []TransactionOverviewRow
+    for rows.Next() {
+        var row TransactionOverviewRow
+        if err := rows.Scan(&row.InvoiceStatus, &row.TotalAmount, &row.InvoiceCount); err != nil {
+            return nil, fmt.Errorf("failed to scan row: %w", err)
+        }
+        results = append(results, row)
+    }
+    
+    if err := rows.Err(); err != nil {
+        return nil, fmt.Errorf("row iteration error: %w", err)
+    }
+    
+    return results, nil
+}
+
+func (ts *TransactionService) GetTransactionCardForUser(ctx context.Context, userID string) *utils.ApiResponse {
+    overviewData, err := ts.GetTransactionOverviewByUserQuery(ctx, userID)
+    if err != nil {
+        return &utils.ApiResponse{
+            StatusCode: http.StatusInternalServerError,
+            Message:    "failed to retrieve transaction overview",
+            Error:      err.Error(),
+        }
+    }
+    
+    response := GetTransactionOverViewResponse{
+        TotalAmount:   TransactionCard{Amount: 0, InvoiceCount: 0},
+        PendingAmount: TransactionCard{Amount: 0, InvoiceCount: 0},
+        PaidAmount:    TransactionCard{Amount: 0, InvoiceCount: 0},
+        OverdueAmount: TransactionCard{Amount: 0, InvoiceCount: 0},
+    }
+    
+    for _, row := range overviewData {
+        amountInCents, err := utils.ConvertUSDCToCents(row.TotalAmount)
+        if err != nil {
+			ts.log.Error("failed to parse USDC amount to cents", "error", err)
+            continue
+        }
+        
+        response.TotalAmount.Amount += amountInCents
+        response.TotalAmount.InvoiceCount += row.InvoiceCount
+
+        switch row.InvoiceStatus {
+        case "pending", "draft", "sent", "viewed":
+            response.PendingAmount.Amount += amountInCents
+            response.PendingAmount.InvoiceCount += row.InvoiceCount
+        case "paid":
+            response.PaidAmount.Amount += amountInCents
+            response.PaidAmount.InvoiceCount += row.InvoiceCount
+        case "overdue":
+            response.OverdueAmount.Amount += amountInCents
+            response.OverdueAmount.InvoiceCount += row.InvoiceCount
+        }
+    }
+    
+    return &utils.ApiResponse{
+        StatusCode: http.StatusOK,
+        Message:    "successful",
+        Data:       response,
+    }
+}

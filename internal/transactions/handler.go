@@ -22,6 +22,16 @@ func NewTransactionHandler(ts *TransactionService) *TransactionHandler {
 	}
 }
 
+func(h *TransactionHandler)GetTransactionOverviewCard(w http.ResponseWriter, r *http.Request){
+	userId, ok := utils.GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized request", http.StatusUnauthorized)
+		return 
+	}
+	res := h.service.GetTransactionCardForUser(r.Context(), userId)
+	utils.WriteToJson(w, res.StatusCode, res)
+}
+
 func (h *TransactionHandler) GetTransactionByIdHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := r.PathValue("id")

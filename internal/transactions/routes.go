@@ -14,6 +14,7 @@ func RegisterTransactionRoutes(apiV1 *httpx.RouteGroup, router *http.ServeMux, t
 
 	transactionGroup := apiV1.AddGroup("/transaction")
 
+	transactionGroup.HandleFunc("GET /stats", authMiddleware.Authenticate(http.HandlerFunc(t.GetTransactionOverviewCard)).ServeHTTP)
 	transactionGroup.HandleFunc("GET /id/{id}", authMiddleware.Authenticate(http.HandlerFunc(t.GetTransactionByIdHandler)).ServeHTTP)
 	transactionGroup.HandleFunc("DELETE /{id}", authMiddleware.Authenticate(http.HandlerFunc(t.DeleteTransactionByIdHandler)).ServeHTTP)
 	transactionGroup.HandleFunc("GET /", authMiddleware.Authenticate(http.HandlerFunc(t.GetManyTransactionHandler)).ServeHTTP)
