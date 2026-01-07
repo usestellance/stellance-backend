@@ -124,3 +124,12 @@ type InvoiceStatusRow struct {
 	Status string
 	Count  int
 }
+
+type SendInvoiceEmailData struct {
+	PrimaryRecipient string
+	CCRecipients     []string
+	PayerName        string
+	SenderName       string
+	InvoiceURL       string
+}
+

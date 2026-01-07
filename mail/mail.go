@@ -14,6 +14,14 @@ import (
 	"github.com/resend/resend-go/v2"
 )
 
+type SendInvoiceEmailData struct {
+	PrimaryRecipient string
+	CCRecipients     []string
+	PayerName        string
+	SenderName       string
+	InvoiceURL       string
+}
+
 var (
 	verification_Email_Sender = "noreply@usestellance.com"
 	//go:embed templates/*.html
@@ -81,6 +89,7 @@ func (m *Mailer) SendVerificationEmail(email, url string) error {
 	m.log.Debug(fmt.Sprintf("email sent successfully to %s", email))
 	return nil
 }
+
 func (m *Mailer) SendResetEmail(email, url, otp string) error {
 	subject := "Reset Password Request"
 	t, err := template.ParseFS(templateFs, "templates/reset_email.html")
@@ -111,33 +120,49 @@ func (m *Mailer) SendResetEmail(email, url, otp string) error {
 	return nil
 }
 
-func (m *Mailer) SendInvoiceUrlMail(email, payer_name, sender, url string) error {
+func (m *Mailer) SendInvoiceUrlMail(data SendInvoiceEmailData) error {
 	subject := "Invoice Review"
+	
 	t, err := template.ParseFS(templateFs, "templates/send_invoice.html")
 	if err != nil {
 		return fmt.Errorf("failed to read invoice email template: %w", err)
 	}
+	
 	var body bytes.Buffer
 	if err := t.Execute(&body, map[string]interface{}{
-		"URL": url,
-		"PAYER_NAME": payer_name,
-		"SENDER": sender,
+		"URL":        data.InvoiceURL,
+		"PAYER_NAME": data.PayerName,
+		"SENDER":     data.SenderName,
 	}); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)
 	}
+
 	params := &resend.SendEmailRequest{
 		From:    verification_Email_Sender,
-		To:      []string{email},
+		To:      []string{data.PrimaryRecipient},
 		Html:    body.String(),
 		Subject: subject,
 		ReplyTo: "support@usestellance.com",
 	}
 
-	_, err = m.client.Emails.Send(params)
-	if err != nil {
-		m.log.Error("error sending invoice email", "email_error", err)
-		return err
+	if len(data.CCRecipients) > 0 {
+		params.Cc = data.CCRecipients
 	}
-	m.log.Debug(fmt.Sprintf("email sent successfully to %s", email))
+
+	sent, err := m.client.Emails.Send(params)
+	if err != nil {
+		m.log.Error("error sending invoice email", 
+			"email_error", err,
+			"primary", data.PrimaryRecipient,
+			"cc_count", len(data.CCRecipients))
+		return fmt.Errorf("failed to send email: %w", err)
+	}
+
+	m.log.Debug("email sent successfully",
+		"email_id", sent.Id,
+		"primary_recipient", data.PrimaryRecipient,
+		"cc_recipients", data.CCRecipients,
+		"total_recipients", 1+len(data.CCRecipients))
+		
 	return nil
 }

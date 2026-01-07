@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -1344,7 +1345,27 @@ func (is *InvoiceService) EditInvoice(ctx context.Context, userId, invoiceId str
 	}
 }
 
-func (is *InvoiceService) SendInvoice(ctx context.Context, userId, invoiceId, email string) *utils.ApiResponse {
+// services/invoice_service.go
+
+func (is *InvoiceService) SendInvoice(ctx context.Context, userId, invoiceId string, emails []string) *utils.ApiResponse {
+	// Validate email array
+	if len(emails) == 0 {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusBadRequest,
+			Message:    "At least one recipient email is required",
+		}
+	}
+
+	// Validate all emails format
+	for _, email := range emails {
+		if email == "" || !isValidEmail(email) {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusBadRequest,
+				Message:    fmt.Sprintf("Invalid email address: %s", email),
+			}
+		}
+	}
+
 	var (
 		invoice_url string
 		payer_name  string
@@ -1410,39 +1431,99 @@ func (is *InvoiceService) SendInvoice(ctx context.Context, userId, invoiceId, em
 			Message:    "Failed to process request",
 		}
 	}
-	recipientEmail := email
-	if recipientEmail == "" {
-		recipientEmail = payer_email
+
+	// Determine primary recipient and CC recipients
+	primaryRecipient := emails[0]
+	var ccRecipients []string
+	
+	// If multiple emails provided, rest go to CC
+	if len(emails) > 1 {
+		ccRecipients = emails[1:]
 	}
 
-	if recipientEmail == "" {
-		return &utils.ApiResponse{
-			StatusCode: http.StatusBadRequest,
-			Message:    "No recipient email provided",
-		}
+	// Add payer email to CC if not already in the list
+	if payer_email != "" && !contains(emails, payer_email) {
+		ccRecipients = append(ccRecipients, payer_email)
 	}
 
+	// Remove duplicates from CC
+	ccRecipients = removeDuplicates(ccRecipients)
+
+	// Send email asynchronously
 	go func() {
 		senderName := strings.TrimSpace(fmt.Sprintf("%s %s", first_name, last_name))
+		if senderName == "" {
+			senderName = "Stellance User"
+		}
+		
 		invoiceURL := fmt.Sprintf("https://usestellance.com/client/%s", url.QueryEscape(invoice_url))
 
-		if err := is.mail.SendInvoiceUrlMail(recipientEmail, payer_name, senderName, invoiceURL); err != nil {
+		if err := is.mail.SendInvoiceUrlMail(mail.SendInvoiceEmailData{
+			PrimaryRecipient: primaryRecipient,
+			CCRecipients: ccRecipients,
+			PayerName: payer_name,
+			SenderName: senderName,
+			InvoiceURL: invoiceURL,
+		}); err != nil {
 			is.log.Error("failed to send invoice email",
 				"error", err,
 				"invoice_id", invoiceId,
-				"recipient", recipientEmail)
+				"primary_recipient", primaryRecipient,
+				"cc_count", len(ccRecipients))
 		} else {
 			is.log.Info("invoice email sent successfully",
 				"invoice_id", invoiceId,
-				"recipient", recipientEmail)
+				"primary_recipient", primaryRecipient,
+				"cc_recipients", ccRecipients,
+				"total_recipients", len(emails))
 		}
 	}()
 
 	is.DeleteFromRedisCache(ctx, invoiceId)
+	
+	responseMessage := fmt.Sprintf("Invoice sent successfully to %d recipient(s)", len(emails))
+	if len(ccRecipients) > 0 {
+		responseMessage = fmt.Sprintf("Invoice sent to %s with %d CC recipient(s)", primaryRecipient, len(ccRecipients))
+	}
+
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
-		Message:    "Invoice sent successfully",
+		Message:    responseMessage,
+		Data: map[string]interface{}{
+			"primary_recipient": primaryRecipient,
+			"cc_recipients":     ccRecipients,
+			"total_sent":        len(emails) + len(ccRecipients),
+		},
 	}
+}
+
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if strings.EqualFold(s, item) {
+			return true
+		}
+	}
+	return false
+}
+
+func removeDuplicates(slice []string) []string {
+	seen := make(map[string]bool)
+	result := []string{}
+	
+	for _, item := range slice {
+		lowerItem := strings.ToLower(strings.TrimSpace(item))
+		if lowerItem != "" && !seen[lowerItem] {
+			seen[lowerItem] = true
+			result = append(result, item)
+		}
+	}
+	
+	return result
+}
+
+func isValidEmail(email string) bool {
+	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+	return emailRegex.MatchString(email)
 }
 
 func (is *InvoiceService) ReviewInvoice(ctx context.Context, invoiceId string, approve bool, userId, role string) *utils.ApiResponse {

@@ -350,10 +350,13 @@ func (h *InvoiceHandler) SendInvoice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	invoiceID := r.PathValue("id")
-	var email string
-	if r.URL.Query().Get("email") != "" {
-		email = r.URL.Query().Get("email")
+	var email []string
+
+	if err := json.NewDecoder(r.Body).Decode(&email); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
 	}
+
 	response := h.service.SendInvoice(ctx, reqUserId, invoiceID, email)
 	utils.WriteToJson(w, response.StatusCode, response)
 }
