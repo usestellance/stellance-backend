@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	database "github.com/The-True-Hooha/stellance-backend/internal/db"
+	"github.com/The-True-Hooha/stellance-backend/internal/storage"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
@@ -14,6 +15,7 @@ type AppContainer struct {
 	Postgres *pgxpool.Pool
 	Log      *slog.Logger
 	Redis    *redis.Client
+	Storage  *storage.S3Storage
 }
 
 var (
@@ -21,7 +23,7 @@ var (
 	once      sync.Once
 )
 
-func InitializeContainer(ctx context.Context, dbConfig database.PostgresConfig, log *slog.Logger, redisConfig database.RedisConfig) error {
+func InitializeContainer(ctx context.Context, dbConfig database.PostgresConfig, log *slog.Logger, redisConfig database.RedisConfig, storageConfig storage.S3Config) error {
 	var initError error
 
 	once.Do(func() {
@@ -38,11 +40,19 @@ func InitializeContainer(ctx context.Context, dbConfig database.PostgresConfig, 
 			return
 		}
 
+		storage, err := storage.NewS3Storage(storageConfig)
+		if err != nil {
+			log.Error("failed to initialize railway storage client", "error", err)
+			initError = err
+			return
+		}
+
 		log.Info("All services initialized successfully")
 		container = &AppContainer{
 			Postgres: pool.Pool,
 			Redis:    redisClient,
 			Log:      log,
+			Storage:  storage,
 		}
 	})
 

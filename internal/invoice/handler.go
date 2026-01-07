@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/The-True-Hooha/stellance-backend/internal/logo"
 	"github.com/The-True-Hooha/stellance-backend/internal/user"
 	"github.com/The-True-Hooha/stellance-backend/pkg/utils"
 	"github.com/go-playground/validator/v10"
@@ -53,20 +54,105 @@ func (handler *InvoiceHandler) CreateNewInvoiceHandler(w http.ResponseWriter, r 
 		return
 	}
 
-	var dto CreateInvoiceDTO
-	if err := json.NewDecoder(r.Body).Decode(&dto); err != nil {
-		log.Error("failed to decode request", "error", err)
-		http.Error(w, "invalid request", http.StatusBadRequest)
+	err := r.ParseMultipartForm(10 << 20)
+	if err != nil {
+		log.Error("failed to parse form data", "error", err)
+		http.Error(w, "failed to parse form data", http.StatusBadRequest)
 		return
 	}
 
-	if err := handler.validator.Struct(dto); err != nil {
-		utils.HandleValidationError(w, err)
+	var logoFileData *logo.LogoFileData
+	file, fileHeader, err := r.FormFile("logo")
+	if err == nil {
+		defer file.Close()
+		contentType := fileHeader.Header.Get("Content-Type")
+		validTypes := map[string]bool{
+			"image/png":  true,
+			"image/jpeg": true,
+			"image/jpg":  true,
+		}
+
+		if !validTypes[contentType] {
+			utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{
+				StatusCode: http.StatusBadRequest,
+				Message:    "invalid file type. Only PNG, JPEG, JPG are allowed",
+			})
+			return
+		}
+
+		if fileHeader.Size > 2*1024*1024 {
+			utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{
+				StatusCode: http.StatusBadRequest,
+				Message:    "file size exceeds maximum allowed size of 2MB",
+			})
+			return
+		}
+
+		makeDefault := r.FormValue("make_default") == "true"
+
+		logoFileData = &logo.LogoFileData{
+			File:        file,
+			FileHeader:  fileHeader,
+			MakeDefault: makeDefault,
+		}
+
+	} else if err != http.ErrMissingFile {
+		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{
+			StatusCode: http.StatusBadRequest,
+			Message:    "error processing logo file",
+			Error:      err.Error(),
+		})
+		return
+	}
+
+	var dto CreateInvoiceDTO
+
+	dto.Title = r.FormValue("title")
+	dto.RecipientName = r.FormValue("payer_name")
+	dto.Email = r.FormValue("payer_email")
+	dto.Country = r.FormValue("country")
+	dto.DueDate = r.FormValue("due_date")
+	dto.TemplateID = TemplateIDType(r.FormValue("template_id"))
+
+	serviceFeeStr := r.FormValue("service_fee")
+	if serviceFeeStr != "" {
+		serviceFee, err := strconv.ParseFloat(serviceFeeStr, 64)
+		if err != nil {
+			utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{
+				StatusCode: http.StatusBadRequest,
+				Message:    "invalid service_fee value",
+			})
+			return
+		}
+		dto.ServiceFee = serviceFee
+	}
+
+	invoiceItemsJSON := r.FormValue("invoice_items")
+	if invoiceItemsJSON == "" {
+		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{
+			StatusCode: http.StatusBadRequest,
+			Message:    "invoice_items is required",
+		})
 		return
 	}
 
 	if len(dto.InvoiceItems) == 0 {
 		http.Error(w, "At least one invoice item is required", http.StatusBadRequest)
+		return
+	}
+
+	err = json.Unmarshal([]byte(invoiceItemsJSON), &dto.InvoiceItems)
+	if err != nil {
+		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{
+			StatusCode: http.StatusBadRequest,
+			Message:    "invalid invoice_items format",
+			Error:      err.Error(),
+		})
+		return
+	}
+
+	if err := handler.validator.Struct(dto); err != nil {
+		utils.HandleValidationError(w, err)
 		return
 	}
 
@@ -81,7 +167,7 @@ func (handler *InvoiceHandler) CreateNewInvoiceHandler(w http.ResponseWriter, r 
 		return
 	}
 
-	response := handler.service.GenerateNewInvoice(ctx, dto, userID)
+	response := handler.service.GenerateNewInvoice(ctx, dto, userID, logoFileData)
 	utils.WriteToJson(w, response.StatusCode, response)
 }
 
@@ -297,9 +383,9 @@ func (h *InvoiceHandler) ReviewInvoiceHandler(w http.ResponseWriter, r *http.Req
 	utils.WriteToJson(w, response.StatusCode, response)
 }
 
-func(h *InvoiceHandler) GetInvoiceStatsHandler(w http.ResponseWriter, r *http.Request){
+func (h *InvoiceHandler) GetInvoiceStatsHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	
+
 	userId, ok := utils.GetUserIDFromContext(ctx)
 	if !ok {
 		h.service.log.Warn("public access to invoice")
@@ -309,20 +395,20 @@ func(h *InvoiceHandler) GetInvoiceStatsHandler(w http.ResponseWriter, r *http.Re
 }
 
 func (ih *InvoiceHandler) GetInvoicesByStatus(w http.ResponseWriter, r *http.Request) {
-    
-    userID, ok := utils.GetUserIDFromContext(r.Context())
-    if !ok {
-        utils.WriteToJson(w, http.StatusUnauthorized, utils.ApiResponse{
-            StatusCode: http.StatusUnauthorized,
-            Message:    "unauthorized",
-        })
-        return
-    }
-    
-    var query InvoiceStatusQuery
-    query.Month = r.URL.Query().Get("month")
-    
-    response := ih.service.GetInvoicesByStatus(r.Context(), userID, query)
-    
-    utils.WriteToJson(w, response.StatusCode, response)
+
+	userID, ok := utils.GetUserIDFromContext(r.Context())
+	if !ok {
+		utils.WriteToJson(w, http.StatusUnauthorized, utils.ApiResponse{
+			StatusCode: http.StatusUnauthorized,
+			Message:    "unauthorized",
+		})
+		return
+	}
+
+	var query InvoiceStatusQuery
+	query.Month = r.URL.Query().Get("month")
+
+	response := ih.service.GetInvoicesByStatus(r.Context(), userID, query)
+
+	utils.WriteToJson(w, response.StatusCode, response)
 }

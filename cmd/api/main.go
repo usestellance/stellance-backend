@@ -8,6 +8,7 @@ import (
 	"github.com/The-True-Hooha/stellance-backend/cmd/server"
 	database "github.com/The-True-Hooha/stellance-backend/internal/db"
 	"github.com/The-True-Hooha/stellance-backend/internal/middleware"
+	"github.com/The-True-Hooha/stellance-backend/internal/storage"
 	"github.com/The-True-Hooha/stellance-backend/internal/tasks"
 	"github.com/The-True-Hooha/stellance-backend/pkg/config"
 	"github.com/The-True-Hooha/stellance-backend/pkg/logger"
@@ -46,8 +47,14 @@ func main() {
 		Index:    0,
 		Stage:    os.Getenv("STAGE"),
 	}
+	s3Storage := storage.S3Config{
+		AccessKeyID:     os.Getenv("AWS_ACCESS_KEY_ID"),
+		SecretAccessKey: os.Getenv("AWS_SECRET_ACCESS_KEY"),
+		BucketName:      os.Getenv("AWS_S3_BUCKET_NAME"),
+		Region:          os.Getenv("AWS_DEFAULT_REGION"),
+	}
 
-	err := config.InitializeContainer(ctx, pg, log, redis)
+	err := config.InitializeContainer(ctx, pg, log, redis, s3Storage)
 	if err != nil {
 		log.Error("failed to initialize app container", "error", err.Error())
 		os.Exit(1)
