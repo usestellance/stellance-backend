@@ -350,14 +350,27 @@ func (h *InvoiceHandler) SendInvoice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	invoiceID := r.PathValue("id")
-	var email []string
 
-	if err := json.NewDecoder(r.Body).Decode(&email); err != nil {
-		http.Error(w, "invalid request", http.StatusBadRequest)
+	var dto SendInvoiceDto
+	if err := json.NewDecoder(r.Body).Decode(&dto); err != nil {
+		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{
+			StatusCode: http.StatusBadRequest,
+			Message:    "invalid request body",
+			Error:      err.Error(),
+		})
 		return
 	}
 
-	response := h.service.SendInvoice(ctx, reqUserId, invoiceID, email)
+	if err := h.validator.Struct(dto); err != nil {
+		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{
+			StatusCode: http.StatusBadRequest,
+			Message:    "request failed",
+			Error:      err.Error(),
+		})
+		return
+	}
+
+	response := h.service.SendInvoice(ctx, reqUserId, invoiceID, dto.Emails)
 	utils.WriteToJson(w, response.StatusCode, response)
 }
 

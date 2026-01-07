@@ -133,3 +133,6 @@ type SendInvoiceEmailData struct {
 	InvoiceURL       string
 }
 
+type SendInvoiceDto struct {
+	Emails []string `json:"emails" validate:"required,min=1,max=10,dive,email"`
+}

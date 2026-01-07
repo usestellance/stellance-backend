@@ -62,3 +62,13 @@ Authorization: Bearer {{jwt}}
     "email": "test@frank.com",
     "comment_text": "I think we can bump the charges by 500%"
 }
+
+###
+POST {{baseUrl}}/invoice/send/{{{invoiceId}}}
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{jwt}}
+
+{
+  "emails": [""]
+}
