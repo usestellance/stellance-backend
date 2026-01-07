@@ -1,0 +1,64 @@
+@baseUrl = http://localhost:4000
+@jwt = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+@name = mike base
+@userId = 7f3a2c1e-9b6d-4c1e-9c5a-1f2b3c4d5e6f
+@invoiceId = 3c9d8e77-5b42-4d8a-b0e1-8b6a7f9c2d11
+@parentCommentId = 9a1b2c3d-4e5f-6789-abcd-ef0123456789
+@CommentId = 9a1b2c3d-4e5f-6789-abcd-ef0123456789
+
+
+###
+# Create a new comment (authenticated)
+POST {{baseUrl}}/comments
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{jwt}}
+
+{
+  "user_id": "{{userId}}",
+  "invoice_id": "{{invoiceId}}",
+  "commenter_name": "{{name}}",
+  "comment_text": "I love this, we can pay now",
+  "commenter_email": "mike@example.com"
+}
+
+
+###
+# Create a reply to an existing comment
+POST {{baseUrl}}/comments
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{jwt}}
+
+{
+  "user_id": "{{userId}}",
+  "invoice_id": "{{invoiceId}}",
+  "commenter_name": "{{name}}",
+  "comment_text": "Following up on this invoice.",
+  "parent_id": "{{parentCommentId}}"
+}
+
+
+###
+GET {{baseUrl}}/comments?invoice_id={{invoiceId}}&page=1&limit=20&sort_order=desc
+Accept: application/json
+Authorization: Bearer {{jwt}}
+
+###
+
+# returns the comments for an invoice queried with the commentId
+GET {{baseUrl}}/comments/{{CommentId}}
+Accept: application/json
+Authorization: Bearer {{jwt}}
+
+
+### 
+# update a comment by the id
+PATCH {{baseUrl}}/comments/{{CommentId}}
+Accept: application/json
+Authorization: Bearer {{jwt}}
+
+{
+    "email": "test@frank.com",
+    "comment_text": "I think we can bump the charges by 500%"
+}

@@ -42,6 +42,7 @@ type CreateCommentDTO struct {
 
 type UpdateCommentDTO struct {
 	CommentText string `json:"comment_text" validate:"required,min=1,max=2000"`
+	Email       string `json:"email,omitempty" validate:"omitempty,email"`
 }
 
 type GetCommentsQuery struct {
@@ -74,4 +75,19 @@ type CreateCommentQueryResponse struct {
 	Created_at time.Time
 	Verified   bool
 	Guest      bool
+}
+
+type GetInvoiceDto struct {
+	ID            string
+	UserID        string
+	InvoiceURL    string
+	InvoiceNumber string
+	InvoiceStatus string
+}
+
+type GetUserDto struct {
+	UserId    string
+	FirstName string
+	LastName  string
+	Email     string
 }
