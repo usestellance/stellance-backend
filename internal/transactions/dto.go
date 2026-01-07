@@ -49,9 +49,46 @@ type PaginatedTransactions struct {
 	TotalCount int                 `json:"total_count"`
 }
 
-
 type TransactionFiltersDto struct {
-	UserId  string            `json:"user_id,omitempty"`
-	Page    int               `json:"page" validate:"required,min=1"`
-	Count   int               `json:"count" validate:"required,min=1,max=15"`
+	UserId string `json:"user_id,omitempty"`
+	Page   int    `json:"page" validate:"required,min=1"`
+	Count  int    `json:"count" validate:"required,min=1,max=15"`
+}
+
+type TransactionCard struct {
+	Amount       int64 `json:"amount"`
+	InvoiceCount int   `json:"invoice_count"`
+}
+
+type GetTransactionOverViewResponse struct {
+	TotalAmount   TransactionCard `json:"total_amount"`
+	PendingAmount TransactionCard `json:"pending_amount"`
+	PaidAmount    TransactionCard `json:"paid_amount"`
+	OverdueAmount TransactionCard `json:"overdue_amount"`
+}
+
+type TransactionOverviewRow struct {
+	InvoiceStatus string
+	TotalAmount string
+	InvoiceCount int
+}
+type TransactionCashFlowQuery struct {
+    From string `form:"from" json:"from"`// Format: YYYY-MM-DD
+    To   string `form:"to" json:"to"` // Format: YYYY-MM-DD
+}
+
+type CashFlowDataPoint struct {
+    Date     string `json:"date"`
+    Amount   int64  `json:"amount"`
+    Invoices int    `json:"invoices"`
+}
+
+type GetTransactionCashFlowResponse struct {
+    CashFlow []CashFlowDataPoint `json:"cash_flow"`
+}
+
+type CashFlowRow struct {
+    Month        time.Time
+    TotalAmount  string
+    InvoiceCount int
 }

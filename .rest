@@ -1,0 +1,156 @@
+@baseUrl = http://localhost:4000
+@jwt = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+@name = mike base
+@userId = 7f3a2c1e-9b6d-4c1e-9c5a-1f2b3c4d5e6f
+@invoiceId = 3c9d8e77-5b42-4d8a-b0e1-8b6a7f9c2d11
+@parentCommentId = 9a1b2c3d-4e5f-6789-abcd-ef0123456789
+@CommentId = 9a1b2c3d-4e5f-6789-abcd-ef0123456789
+
+@invoiceItems = [
+  {
+    "name": "Design Work",
+    "quantity": 1,
+    "unit_price": 50000
+  },
+  {
+    "name": "Backend Development",
+    "quantity": 2,
+    "unit_price": 75000
+  }
+]
+
+
+###
+# Create a new comment (authenticated)
+POST {{baseUrl}}/comments
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{jwt}}
+
+{
+  "user_id": "{{userId}}",
+  "invoice_id": "{{invoiceId}}",
+  "commenter_name": "{{name}}",
+  "comment_text": "I love this, we can pay now",
+  "commenter_email": "mike@example.com"
+}
+
+
+###
+# Create a reply to an existing comment
+POST {{baseUrl}}/comments
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{jwt}}
+
+{
+  "user_id": "{{userId}}",
+  "invoice_id": "{{invoiceId}}",
+  "commenter_name": "{{name}}",
+  "comment_text": "Following up on this invoice.",
+  "parent_id": "{{parentCommentId}}"
+}
+
+
+###
+GET {{baseUrl}}/comments?invoice_id={{invoiceId}}&page=1&limit=20&sort_order=desc
+Accept: application/json
+Authorization: Bearer {{jwt}}
+
+###
+
+# returns the comments for an invoice queried with the commentId
+GET {{baseUrl}}/comments/{{CommentId}}
+Accept: application/json
+Authorization: Bearer {{jwt}}
+
+###
+
+# returns the invoice status data for the pie chart
+GET {{baseUrl}}/invoice/overview
+# query params {month=july} or {month=jul}
+Accept: application/json
+Authorization: Bearer {{jwt}}
+
+# returns the transaction card data on the overview page
+GET {{baseUrl}}/transaction/stats
+Accept: application/json
+Authorization: Bearer {{jwt}}
+
+# returns the cash inflow data for the line graph on the overview page
+GET {{baseUrl}}/transaction/inflow
+# query params = {from, to} in YYYY-MM-DD
+Accept: application/json
+Authorization: Bearer {{jwt}}
+
+
+### 
+# update a comment by the id
+PATCH {{baseUrl}}/comments/{{CommentId}}
+Accept: application/json
+Authorization: Bearer {{jwt}}
+
+{
+    "email": "test@frank.com",
+    "comment_text": "I think we can bump the charges by 500%"
+}
+
+###
+POST {{baseUrl}}/invoice/send/{{{invoiceId}}}
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{jwt}}
+
+{
+  "emails": [""]
+}
+
+###
+# still follow the post body from the previous impl, just use form data instead
+# and add fields for the template_id(required), logo
+POST {{baseUrl}}/invoice
+Authorization: Bearer {{jwt}}
+Content-Type: multipart/form-data
+
+--boundary
+Content-Disposition: form-data; name="title"
+
+Website Development Invoice
+--boundary
+Content-Disposition: form-data; name="payer_name"
+
+Mike Base
+--boundary
+Content-Disposition: form-data; name="payer_email"
+
+mike@example.com
+--boundary
+Content-Disposition: form-data; name="country"
+
+NG
+--boundary
+Content-Disposition: form-data; name="due_date"
+
+2026-02-15
+--boundary
+Content-Disposition: form-data; name="template_id"
+
+default
+--boundary
+Content-Disposition: form-data; name="service_fee"
+
+1500
+--boundary
+Content-Disposition: form-data; name="make_default"
+
+true
+--boundary
+Content-Disposition: form-data; name="invoice_items"
+
+{{invoiceItems}}
+--boundary
+Content-Disposition: form-data; name="logo"; filename="logo.png"
+Content-Type: image/png
+
+< ./logo.png
+--boundary--

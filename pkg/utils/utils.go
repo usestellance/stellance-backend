@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math"
 	"math/big"
 	"net/http"
 	"os"
@@ -355,4 +356,55 @@ func NullFloatPtr(nf sql.NullFloat64) *float64 {
 		return &nf.Float64
 	}
 	return nil
+}
+
+func ConvertUSDCToCents(usdcAmount string) (int64, error) {
+	amount, err := strconv.ParseFloat(usdcAmount, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse USDC amount: %w", err)
+	}
+
+	cents := int64(math.Round(amount * 100))
+	return cents, nil
+}
+
+func ParseMonthString(monthStr string) (time.Month, error) {
+	if monthStr == "" {
+		return 0, fmt.Errorf("empty month string")
+	}
+
+	monthStr = strings.ToLower(strings.TrimSpace(monthStr))
+
+	monthMap := map[string]time.Month{
+		"january": time.January, "jan": time.January,
+		"february": time.February, "feb": time.February,
+		"march": time.March, "mar": time.March,
+		"april": time.April, "apr": time.April,
+		"may":  time.May,
+		"june": time.June, "jun": time.June,
+		"july": time.July, "jul": time.July,
+		"august": time.August, "aug": time.August,
+		"september": time.September, "sep": time.September, "sept": time.September,
+		"october": time.October, "oct": time.October,
+		"november": time.November, "nov": time.November,
+		"december": time.December, "dec": time.December,
+	}
+
+	if month, exists := monthMap[monthStr]; exists {
+		return month, nil
+	}
+
+	monthNum, err := strconv.Atoi(monthStr)
+	if err == nil && monthNum >= 1 && monthNum <= 12 {
+		return time.Month(monthNum), nil
+	}
+
+	return 0, fmt.Errorf("invalid month format: %s", monthStr)
+}
+
+func CapitalizeStatus(status string) string {
+	if status == "" {
+		return status
+	}
+	return strings.ToUpper(status[:1]) + strings.ToLower(status[1:])
 }

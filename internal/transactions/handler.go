@@ -22,6 +22,16 @@ func NewTransactionHandler(ts *TransactionService) *TransactionHandler {
 	}
 }
 
+func(h *TransactionHandler)GetTransactionOverviewCard(w http.ResponseWriter, r *http.Request){
+	userId, ok := utils.GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized request", http.StatusUnauthorized)
+		return 
+	}
+	res := h.service.GetTransactionCardForUser(r.Context(), userId)
+	utils.WriteToJson(w, res.StatusCode, res)
+}
+
 func (h *TransactionHandler) GetTransactionByIdHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := r.PathValue("id")
@@ -109,5 +119,25 @@ func (handler *TransactionHandler) GetManyTransactionHandler(w http.ResponseWrit
 
 	response := handler.service.GetTransactionsPaginated(ctx, dto.Page, dto.Count, dto.UserId)
 	utils.WriteToJson(w, response.StatusCode, response)
+}
 
+func (th *TransactionHandler) GetTransactionCashFlow(w http.ResponseWriter, r *http.Request) {
+    userID, ok := utils.GetUserIDFromContext(r.Context())
+    if !ok {
+        utils.WriteToJson(w, http.StatusUnauthorized, utils.ApiResponse{
+            StatusCode: http.StatusUnauthorized,
+            Message:    "unauthorized",
+        })
+        return
+    }
+    
+    var query TransactionCashFlowQuery
+	query = TransactionCashFlowQuery{
+		From: r.URL.Query().Get("from"),
+		To: r.URL.Query().Get("to"),
+	}
+    
+    response := th.service.GetTransactionCashFlow(r.Context(), userID, query)
+    
+    utils.WriteToJson(w, response.StatusCode, response)
 }

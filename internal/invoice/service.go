@@ -9,9 +9,11 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
+	"github.com/The-True-Hooha/stellance-backend/internal/logo"
 	"github.com/The-True-Hooha/stellance-backend/internal/notifications"
 	"github.com/The-True-Hooha/stellance-backend/internal/user"
 	"github.com/The-True-Hooha/stellance-backend/mail"
@@ -19,7 +21,7 @@ import (
 	jwt_ "github.com/The-True-Hooha/stellance-backend/pkg/jwt"
 	"github.com/The-True-Hooha/stellance-backend/pkg/utils"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
@@ -29,24 +31,26 @@ const (
 )
 
 type InvoiceService struct {
-	log      *slog.Logger
-	postgres *pgxpool.Pool
-	redis    *redis.Client
-	jwt      *jwt_.JwtTokenServiceConfig
-	mail     *mail.Mailer
+	log         *slog.Logger
+	postgres    *pgxpool.Pool
+	redis       *redis.Client
+	jwt         *jwt_.JwtTokenServiceConfig
+	mail        *mail.Mailer
+	logoService logo.LogoService
 }
 
 func NewInvoiceService() *InvoiceService {
 	return &InvoiceService{
-		log:      config.GetAppContainer().Log,
-		postgres: config.GetAppContainer().Postgres,
-		redis:    config.GetAppContainer().Redis,
-		jwt:      jwt_.JwtTokenService(),
-		mail:     mail.NewMailer(),
+		log:         config.GetAppContainer().Log,
+		postgres:    config.GetAppContainer().Postgres,
+		redis:       config.GetAppContainer().Redis,
+		jwt:         jwt_.JwtTokenService(),
+		mail:        mail.NewMailer(),
+		logoService: NewInvoiceService().logoService,
 	}
 }
 
-func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvoiceDTO, userId string) *utils.ApiResponse {
+func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvoiceDTO, userId string, logoFile *logo.LogoFileData) *utils.ApiResponse {
 	subtotal, serviceFee, total, err := is.validateAndCalculateInvoice(dto)
 	if err != nil {
 		is.log.Error("error trying to calculate invoice numbers", "error", err)
@@ -55,6 +59,9 @@ func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvo
 			Message:    err.Error(),
 		}
 	}
+
+	var logoID sql.NullString
+	var logoURL sql.NullString
 
 	tx, err := is.postgres.Begin(ctx)
 	if err != nil {
@@ -65,6 +72,31 @@ func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvo
 		}
 	}
 	defer tx.Rollback(ctx)
+
+	if logoFile != nil {
+		createLogo, err := is.logoService.UploadAndCreateLogo(ctx, tx, userId, logoFile)
+		if err != nil {
+			is.log.Error("failed to upload and create new invoice", "error", err)
+			return &utils.ApiResponse{
+				StatusCode: http.StatusInternalServerError,
+				Message:    "failed to create new invoice, try again ",
+			}
+		}
+
+		logoID = sql.NullString{String: createLogo.LogoID, Valid: true}
+		logoURL = sql.NullString{String: createLogo.LogoUrl, Valid: true}
+	} else {
+		defaultLogo, err := is.logoService.GetDefaultLogoByUserID(ctx, userId)
+		if err != nil {
+			is.log.Error("failed to fetch default logo from database", "error", err)
+			return &utils.ApiResponse{
+				StatusCode: http.StatusInternalServerError,
+				Message:    "failed to create new invoice",
+			}
+		}
+		logoURL = sql.NullString{String: defaultLogo.LogoPresignedURL, Valid: true}
+		logoID = sql.NullString{String: defaultLogo.ID, Valid: true}
+	}
 
 	var businessName sql.NullString
 	var country string
@@ -127,13 +159,13 @@ func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvo
 	}
 	const invoiceQ = `
 	INSERT INTO invoice(invoice_number, invoice_url, created_by_id, payer_email, 
-	sub_total, service_fee, total, currency, title, status,due_date, address_country, payer_name)
-	VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)RETURNING id, created_at`
+	sub_total, service_fee, total, currency, title, status,due_date, address_country, payer_name, template_id, logo_id)
+	VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)RETURNING id, created_at`
 
 	var invoiceId string
 	var createdAt time.Time
 
-	err = tx.QueryRow(ctx, invoiceQ, invoiceNumber, invoice_url, userId, dto.Email, subtotal, serviceFee, total, utils.USDC, dto.Title, InvoiceStatusDraft, dueDate, dto.Country, dto.RecipientName).Scan(&invoiceId, &createdAt)
+	err = tx.QueryRow(ctx, invoiceQ, invoiceNumber, invoice_url, userId, dto.Email, subtotal, serviceFee, total, utils.USDC, dto.Title, InvoiceStatusDraft, dueDate, dto.Country, dto.RecipientName, dto.TemplateID, logoID).Scan(&invoiceId, &createdAt)
 	if err != nil {
 		is.log.Error("failed to create invoice", "error", err)
 		return &utils.ApiResponse{
@@ -203,6 +235,8 @@ func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvo
 		CreatedBy:     sender,
 		Approved:      &f,
 		ReviewDate:    nil,
+		TemplateID:    dto.TemplateID,
+		LogoURL:       logoURL.String,
 	}
 
 	is.log.Info("invoice created successfully",
@@ -1311,7 +1345,27 @@ func (is *InvoiceService) EditInvoice(ctx context.Context, userId, invoiceId str
 	}
 }
 
-func (is *InvoiceService) SendInvoice(ctx context.Context, userId, invoiceId, email string) *utils.ApiResponse {
+// services/invoice_service.go
+
+func (is *InvoiceService) SendInvoice(ctx context.Context, userId, invoiceId string, emails []string) *utils.ApiResponse {
+	// Validate email array
+	if len(emails) == 0 {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusBadRequest,
+			Message:    "At least one recipient email is required",
+		}
+	}
+
+	// Validate all emails format
+	for _, email := range emails {
+		if email == "" || !isValidEmail(email) {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusBadRequest,
+				Message:    fmt.Sprintf("Invalid email address: %s", email),
+			}
+		}
+	}
+
 	var (
 		invoice_url string
 		payer_name  string
@@ -1377,39 +1431,99 @@ func (is *InvoiceService) SendInvoice(ctx context.Context, userId, invoiceId, em
 			Message:    "Failed to process request",
 		}
 	}
-	recipientEmail := email
-	if recipientEmail == "" {
-		recipientEmail = payer_email
+
+	// Determine primary recipient and CC recipients
+	primaryRecipient := emails[0]
+	var ccRecipients []string
+	
+	// If multiple emails provided, rest go to CC
+	if len(emails) > 1 {
+		ccRecipients = emails[1:]
 	}
 
-	if recipientEmail == "" {
-		return &utils.ApiResponse{
-			StatusCode: http.StatusBadRequest,
-			Message:    "No recipient email provided",
-		}
+	// Add payer email to CC if not already in the list
+	if payer_email != "" && !contains(emails, payer_email) {
+		ccRecipients = append(ccRecipients, payer_email)
 	}
 
+	// Remove duplicates from CC
+	ccRecipients = removeDuplicates(ccRecipients)
+
+	// Send email asynchronously
 	go func() {
 		senderName := strings.TrimSpace(fmt.Sprintf("%s %s", first_name, last_name))
+		if senderName == "" {
+			senderName = "Stellance User"
+		}
+		
 		invoiceURL := fmt.Sprintf("https://usestellance.com/client/%s", url.QueryEscape(invoice_url))
 
-		if err := is.mail.SendInvoiceUrlMail(recipientEmail, payer_name, senderName, invoiceURL); err != nil {
+		if err := is.mail.SendInvoiceUrlMail(mail.SendInvoiceEmailData{
+			PrimaryRecipient: primaryRecipient,
+			CCRecipients: ccRecipients,
+			PayerName: payer_name,
+			SenderName: senderName,
+			InvoiceURL: invoiceURL,
+		}); err != nil {
 			is.log.Error("failed to send invoice email",
 				"error", err,
 				"invoice_id", invoiceId,
-				"recipient", recipientEmail)
+				"primary_recipient", primaryRecipient,
+				"cc_count", len(ccRecipients))
 		} else {
 			is.log.Info("invoice email sent successfully",
 				"invoice_id", invoiceId,
-				"recipient", recipientEmail)
+				"primary_recipient", primaryRecipient,
+				"cc_recipients", ccRecipients,
+				"total_recipients", len(emails))
 		}
 	}()
 
 	is.DeleteFromRedisCache(ctx, invoiceId)
+	
+	responseMessage := fmt.Sprintf("Invoice sent successfully to %d recipient(s)", len(emails))
+	if len(ccRecipients) > 0 {
+		responseMessage = fmt.Sprintf("Invoice sent to %s with %d CC recipient(s)", primaryRecipient, len(ccRecipients))
+	}
+
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
-		Message:    "Invoice sent successfully",
+		Message:    responseMessage,
+		Data: map[string]interface{}{
+			"primary_recipient": primaryRecipient,
+			"cc_recipients":     ccRecipients,
+			"total_sent":        len(emails) + len(ccRecipients),
+		},
 	}
+}
+
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if strings.EqualFold(s, item) {
+			return true
+		}
+	}
+	return false
+}
+
+func removeDuplicates(slice []string) []string {
+	seen := make(map[string]bool)
+	result := []string{}
+	
+	for _, item := range slice {
+		lowerItem := strings.ToLower(strings.TrimSpace(item))
+		if lowerItem != "" && !seen[lowerItem] {
+			seen[lowerItem] = true
+			result = append(result, item)
+		}
+	}
+	
+	return result
+}
+
+func isValidEmail(email string) bool {
+	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+	return emailRegex.MatchString(email)
 }
 
 func (is *InvoiceService) ReviewInvoice(ctx context.Context, invoiceId string, approve bool, userId, role string) *utils.ApiResponse {
@@ -1600,5 +1714,98 @@ func (is *InvoiceService) GetStats(ctx context.Context, userId string) *utils.Ap
 		StatusCode: http.StatusOK,
 		Message:    "successful",
 		Data:       stats,
+	}
+}
+
+func (ir *InvoiceService) GetInvoiceCountByStatusQuery(ctx context.Context, userID string, startDate, endDate time.Time) ([]InvoiceStatusRow, error) {
+	const query = `
+        SELECT 
+            status::text as status,
+            COUNT(*) as count
+        FROM invoice
+        WHERE created_by_id = $1
+            AND created_at >= $2
+            AND created_at < $3
+        GROUP BY status
+        ORDER BY status
+    `
+
+	rows, err := ir.postgres.Query(ctx, query, userID, startDate, endDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query invoice status counts: %w", err)
+	}
+	defer rows.Close()
+
+	var results []InvoiceStatusRow
+	for rows.Next() {
+		var row InvoiceStatusRow
+		if err := rows.Scan(&row.Status, &row.Count); err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+		results = append(results, row)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("row iteration error: %w", err)
+	}
+
+	return results, nil
+}
+
+func (is *InvoiceService) GetInvoicesByStatus(ctx context.Context, userID string, query InvoiceStatusQuery) *utils.ApiResponse {
+	var targetMonth time.Month
+	var targetYear int
+	var err error
+
+	now := time.Now()
+
+	if query.Month == "" {
+		targetMonth = now.Month()
+		targetYear = now.Year()
+	} else {
+		targetMonth, err = utils.ParseMonthString(query.Month)
+		if err != nil {
+			is.log.Error("failed to parse month for invoice status query", "error", err, "query_value", query)
+			return &utils.ApiResponse{
+				StatusCode: http.StatusBadRequest,
+				Message:    "invalid month format. Use full name (July), abbreviation (Jul), or number (07)",
+			}
+		}
+
+		targetYear = now.Year()
+		if targetMonth > now.Month() {
+			targetYear--
+		}
+	}
+
+	startDate := time.Date(targetYear, targetMonth, 1, 0, 0, 0, 0, time.UTC)
+	endDate := startDate.AddDate(0, 1, 0)
+
+	statusData, err := is.GetInvoiceCountByStatusQuery(ctx, userID, startDate, endDate)
+	if err != nil {
+		is.log.Error("failed to return data from postgres", "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "failed to retrieve invoice status data",
+		}
+	}
+
+	invoicesByStatus := make([]InvoiceStatusDataPoint, 0, len(statusData))
+
+	for _, row := range statusData {
+		invoicesByStatus = append(invoicesByStatus, InvoiceStatusDataPoint{
+			Status: utils.CapitalizeStatus(row.Status),
+			Value:  row.Count,
+		})
+	}
+
+	if len(invoicesByStatus) == 0 {
+		invoicesByStatus = []InvoiceStatusDataPoint{}
+	}
+
+	return &utils.ApiResponse{
+		StatusCode: http.StatusOK,
+		Message:    "successful",
+		Data:       invoicesByStatus,
 	}
 }
