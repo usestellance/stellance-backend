@@ -16,6 +16,7 @@ import (
 
 	"github.com/The-True-Hooha/stellance-backend/internal/auth"
 	"github.com/The-True-Hooha/stellance-backend/internal/invoice"
+	"github.com/The-True-Hooha/stellance-backend/internal/invoice_comments"
 	"github.com/The-True-Hooha/stellance-backend/internal/middleware"
 	"github.com/The-True-Hooha/stellance-backend/internal/notifications"
 	"github.com/The-True-Hooha/stellance-backend/internal/transactions"
@@ -94,12 +95,15 @@ func (server *Server) AddHttpRoutes() {
 
 	walletService := wallet.NewWalletService()
 	wallet.RegisterWalletRoutes(apiV1, server.router, walletService)
-	
+
 	transactionService := transactions.NewTransactionService()
 	transactions.RegisterTransactionRoutes(apiV1, server.router, transactionService)
 
 	notificationService := notifications.NewNotificationService()
 	notifications.RegisterNotificationRoutes(apiV1, server.router, notificationService)
+
+	ic := invoice_comments.NewInvoiceCommentService()
+	invoice_comments.RegisterInvoiceCommentRoutes(apiV1, server.router, ic)
 
 }
 
