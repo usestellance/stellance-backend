@@ -3,9 +3,9 @@ package logo
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/The-True-Hooha/stellance-backend/internal/storage"
 	"github.com/The-True-Hooha/stellance-backend/pkg/config"
@@ -144,6 +144,12 @@ func (ls *LogoService) UploadAndCreateLogo(ctx context.Context, tx pgx.Tx, userI
 		contentType = "application/octet-stream"
 	}
 
+	if seeker, ok := logoFile.File.(io.Seeker); ok {
+		if _, err := seeker.Seek(0, io.SeekStart); err != nil {
+			return nil, fmt.Errorf("failed to seek file: %w", err)
+		}
+	}
+
 	logoUpload, err := ls.storage.Upload(ctx, storage.UploadInput{
 		File:        logoFile.File,
 		Filename:    logoFile.FileHeader.Filename,
@@ -159,7 +165,7 @@ func (ls *LogoService) UploadAndCreateLogo(ctx context.Context, tx pgx.Tx, userI
 		return nil, fmt.Errorf("failed to upload to logo buck: %w", err)
 	}
 
-	downloadURL, err := ls.storage.GetPresignedDownloadURL(ctx, logoUpload.Key, 150*24*time.Hour)
+	downloadURL, err := ls.storage.GetPresignedDownloadURL(ctx, logoUpload.Key)
 	if err != nil {
 		ls.log.Error("failed to get presigned url for file", "file", logoFile.FileHeader.Filename)
 		return nil, fmt.Errorf("failed to generate presigned download URL: %w", err)

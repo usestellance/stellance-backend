@@ -1,21 +1,25 @@
-@baseUrl = http://localhost:4000
-@jwt = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+@baseUrl = http://localhost:4000/api/v1
+@jwt = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMTg0MjI3YTUtNTQyZi00YTUwLTk5YTgtZGFiZjAyMTdiN2ZmIiwiZW1haWwiOiJkYXZpZGhlcm8xMjVAZ21haWwuY29tIiwicm9sZSI6InVzZXIiLCJpc3MiOiJzdGVsbGFuY2UiLCJzdWIiOiIxODQyMjdhNS01NDJmLTRhNTAtOTlhOC1kYWJmMDIxN2I3ZmYiLCJhdWQiOlsic3RlbGxhbmNlOndlYiJdLCJleHAiOjE3Njg5MjgyMDAsIm5iZiI6MTc2ODg0MTgwMCwiaWF0IjoxNzY4ODQxODAwfQ.I33IyvD5yppcYjeJA7-x3ow_9vDXHrwLo7wb-knzikA
 @name = mike base
 @userId = 7f3a2c1e-9b6d-4c1e-9c5a-1f2b3c4d5e6f
 @invoiceId = 3c9d8e77-5b42-4d8a-b0e1-8b6a7f9c2d11
 @parentCommentId = 9a1b2c3d-4e5f-6789-abcd-ef0123456789
 @CommentId = 9a1b2c3d-4e5f-6789-abcd-ef0123456789
 
-@invoiceItems = [
+@invoice_items = [
   {
-    "name": "Design Work",
+    "invoice_type": "per_unit",
+    "description": "Design Work",
     "quantity": 1,
-    "unit_price": 50000
+    "unit_price": 50000,
+    "amount": 50000
   },
   {
-    "name": "Backend Development",
+    "invoice_type": "per_unit",
+    "description": "Backend Development",
     "quantity": 2,
-    "unit_price": 75000
+    "unit_price": 75000,
+    "amount": 150000
   }
 ]
 
@@ -110,7 +114,7 @@ Authorization: Bearer {{jwt}}
 # and add fields for the template_id(required), logo
 POST {{baseUrl}}/invoice
 Authorization: Bearer {{jwt}}
-Content-Type: multipart/form-data
+Content-Type: multipart/form-data; boundary=boundary
 
 --boundary
 Content-Disposition: form-data; name="title"
@@ -135,7 +139,7 @@ Content-Disposition: form-data; name="due_date"
 --boundary
 Content-Disposition: form-data; name="template_id"
 
-default
+template_001
 --boundary
 Content-Disposition: form-data; name="service_fee"
 
@@ -143,14 +147,17 @@ Content-Disposition: form-data; name="service_fee"
 --boundary
 Content-Disposition: form-data; name="make_default"
 
-true
+false
 --boundary
 Content-Disposition: form-data; name="invoice_items"
 
-{{invoiceItems}}
+[{"invoice_type":"per_unit","description":"Design Work","quantity":1,"unit_price":50000,"amount":50000},{"invoice_type":"per_unit","description":"Backend Development","quantity":2,"unit_price":75000,"amount":150000}]
 --boundary
-Content-Disposition: form-data; name="logo"; filename="logo.png"
+Content-Disposition: form-data; name="logo"; filename="stellance.png"
 Content-Type: image/png
 
-< ./logo.png
+< ./stellance.png
 --boundary--
+
+# < ./logo.png
+# --boundary--

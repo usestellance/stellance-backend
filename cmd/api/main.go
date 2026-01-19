@@ -52,6 +52,7 @@ func main() {
 		SecretAccessKey: os.Getenv("AWS_SECRET_ACCESS_KEY"),
 		BucketName:      os.Getenv("AWS_S3_BUCKET_NAME"),
 		Region:          os.Getenv("AWS_DEFAULT_REGION"),
+		Endpoint:        "https://storage.railway.app",
 	}
 
 	err := config.InitializeContainer(ctx, pg, log, redis, s3Storage)

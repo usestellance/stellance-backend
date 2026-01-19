@@ -87,15 +87,17 @@ func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvo
 		logoURL = sql.NullString{String: createLogo.LogoUrl, Valid: true}
 	} else {
 		defaultLogo, err := is.logoService.GetDefaultLogoByUserID(ctx, userId)
-		if err != nil {
+		if err == nil && defaultLogo != nil {
+			logoURL = sql.NullString{String: defaultLogo.LogoPresignedURL, Valid: true}
+			logoID = sql.NullString{String: defaultLogo.ID, Valid: true}
+		} else if err != nil && err != pgx.ErrNoRows {
 			is.log.Error("failed to fetch default logo from database", "error", err)
 			return &utils.ApiResponse{
 				StatusCode: http.StatusInternalServerError,
 				Message:    "failed to create new invoice",
 			}
 		}
-		logoURL = sql.NullString{String: defaultLogo.LogoPresignedURL, Valid: true}
-		logoID = sql.NullString{String: defaultLogo.ID, Valid: true}
+		// If no default logo (ErrNoRows or nil), leave logoID and logoURL as null
 	}
 
 	var businessName sql.NullString
@@ -216,6 +218,11 @@ func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvo
 	}
 	f := false
 
+	logoURLStr := ""
+	if logoURL.Valid {
+		logoURLStr = logoURL.String
+	}
+
 	invoiceResponse := InvoiceResponse{
 		ID:            invoiceId,
 		InvoiceNumber: invoiceNumber,
@@ -236,8 +243,9 @@ func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvo
 		Approved:      &f,
 		ReviewDate:    nil,
 		TemplateID:    dto.TemplateID,
-		LogoURL:       logoURL.String,
+		LogoURL:       logoURLStr,
 	}
+	is.log.Info("the new logo", "url", logoURLStr)
 
 	is.log.Info("invoice created successfully",
 		"invoice_id", invoiceId,
@@ -250,7 +258,6 @@ func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvo
 		Message:    "Invoice created successfully",
 		Data:       invoiceResponse,
 	}
-
 }
 
 func (s *InvoiceService) GenerateInvoiceNumber(ctx context.Context, userID string) (string, error) {
@@ -1435,7 +1442,7 @@ func (is *InvoiceService) SendInvoice(ctx context.Context, userId, invoiceId str
 	// Determine primary recipient and CC recipients
 	primaryRecipient := emails[0]
 	var ccRecipients []string
-	
+
 	// If multiple emails provided, rest go to CC
 	if len(emails) > 1 {
 		ccRecipients = emails[1:]
@@ -1455,15 +1462,15 @@ func (is *InvoiceService) SendInvoice(ctx context.Context, userId, invoiceId str
 		if senderName == "" {
 			senderName = "Stellance User"
 		}
-		
+
 		invoiceURL := fmt.Sprintf("https://usestellance.com/client/%s", url.QueryEscape(invoice_url))
 
 		if err := is.mail.SendInvoiceUrlMail(mail.SendInvoiceEmailData{
 			PrimaryRecipient: primaryRecipient,
-			CCRecipients: ccRecipients,
-			PayerName: payer_name,
-			SenderName: senderName,
-			InvoiceURL: invoiceURL,
+			CCRecipients:     ccRecipients,
+			PayerName:        payer_name,
+			SenderName:       senderName,
+			InvoiceURL:       invoiceURL,
 		}); err != nil {
 			is.log.Error("failed to send invoice email",
 				"error", err,
@@ -1480,7 +1487,7 @@ func (is *InvoiceService) SendInvoice(ctx context.Context, userId, invoiceId str
 	}()
 
 	is.DeleteFromRedisCache(ctx, invoiceId)
-	
+
 	responseMessage := fmt.Sprintf("Invoice sent successfully to %d recipient(s)", len(emails))
 	if len(ccRecipients) > 0 {
 		responseMessage = fmt.Sprintf("Invoice sent to %s with %d CC recipient(s)", primaryRecipient, len(ccRecipients))
@@ -1509,7 +1516,7 @@ func contains(slice []string, item string) bool {
 func removeDuplicates(slice []string) []string {
 	seen := make(map[string]bool)
 	result := []string{}
-	
+
 	for _, item := range slice {
 		lowerItem := strings.ToLower(strings.TrimSpace(item))
 		if lowerItem != "" && !seen[lowerItem] {
@@ -1517,7 +1524,7 @@ func removeDuplicates(slice []string) []string {
 			result = append(result, item)
 		}
 	}
-	
+
 	return result
 }
 

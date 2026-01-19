@@ -17,9 +17,10 @@ import (
 )
 
 type S3Storage struct {
-	client *s3.Client
-	bucket string
-	region string
+	client   *s3.Client
+	bucket   string
+	region   string
+	endpoint string
 }
 
 type S3Config struct {
@@ -27,6 +28,7 @@ type S3Config struct {
 	SecretAccessKey string
 	BucketName      string
 	Region          string
+	Endpoint        string
 }
 
 func NewS3Storage(cfg S3Config) (*S3Storage, error) {
@@ -44,12 +46,18 @@ func NewS3Storage(cfg S3Config) (*S3Storage, error) {
 		return nil, fmt.Errorf("failed to load S3 config: %w", err)
 	}
 
-	client := s3.NewFromConfig(awsCfg)
+	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+		if cfg.Endpoint != "" {
+			o.BaseEndpoint = aws.String(cfg.Endpoint)
+		}
+		o.UsePathStyle = false // Railway uses virtual-hosted style
+	})
 
 	return &S3Storage{
-		client: client,
-		bucket: cfg.BucketName,
-		region: cfg.Region,
+		client:   client,
+		bucket:   cfg.BucketName,
+		region:   cfg.Region,
+		endpoint: cfg.Endpoint,
 	}, nil
 }
 
@@ -73,17 +81,13 @@ func (s *S3Storage) GetPresignedUploadURL(ctx context.Context, key, contentType 
 	return request.URL, nil
 }
 
-func (s *S3Storage) GetPresignedDownloadURL(ctx context.Context, key string, expiry time.Duration) (string, error) {
-	if expiry == 0 {
-		expiry = 90 *24 * time.Hour
-	}
-
+func (s *S3Storage) GetPresignedDownloadURL(ctx context.Context, key string) (string, error) {
 	presignClient := s3.NewPresignClient(s.client)
 
 	request, err := presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
-	}, s3.WithPresignExpires(expiry))
+	}, s3.WithPresignExpires(7*24*time.Hour))
 
 	if err != nil {
 		return "", fmt.Errorf("failed to generate presigned download URL: %w", err)
