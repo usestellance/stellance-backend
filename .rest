@@ -152,9 +152,12 @@ false
 Content-Disposition: form-data; name="invoice_items"
 
 [{"invoice_type":"per_unit","description":"Design Work","quantity":1,"unit_price":50000,"amount":50000},{"invoice_type":"per_unit","description":"Backend Development","quantity":2,"unit_price":75000,"amount":150000}]
+--boundary
+Content-Disposition: form-data; name="logo"; filename="stellance.png"
+Content-Type: image/png
+
+< ./stellance.png
 --boundary--
-# Content-Disposition: form-data; name="logo"; filename="logo.png"
-# Content-Type: image/png
 
 # < ./logo.png
 # --boundary--

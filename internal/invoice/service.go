@@ -245,6 +245,7 @@ func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvo
 		TemplateID:    dto.TemplateID,
 		LogoURL:       logoURLStr,
 	}
+	is.log.Info("the new logo", "url", logoURLStr)
 
 	is.log.Info("invoice created successfully",
 		"invoice_id", invoiceId,
