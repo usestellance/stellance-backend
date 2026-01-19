@@ -2,6 +2,7 @@ package invoice
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -57,7 +58,7 @@ func (handler *InvoiceHandler) CreateNewInvoiceHandler(w http.ResponseWriter, r 
 	err := r.ParseMultipartForm(10 << 20)
 	if err != nil {
 		log.Error("failed to parse form data", "error", err)
-		http.Error(w, "failed to parse form data", http.StatusBadRequest)
+		http.Error(w, "incomplete form data: failed to parse form data", http.StatusBadRequest)
 		return
 	}
 
@@ -135,11 +136,8 @@ func (handler *InvoiceHandler) CreateNewInvoiceHandler(w http.ResponseWriter, r 
 		})
 		return
 	}
-
-	if len(dto.InvoiceItems) == 0 {
-		http.Error(w, "At least one invoice item is required", http.StatusBadRequest)
-		return
-	}
+	fmt.Println(invoiceItemsJSON, "printing from fmt the invoice items")
+	log.Info("received invoice_items", "json", invoiceItemsJSON)
 
 	err = json.Unmarshal([]byte(invoiceItemsJSON), &dto.InvoiceItems)
 	if err != nil {
@@ -148,6 +146,11 @@ func (handler *InvoiceHandler) CreateNewInvoiceHandler(w http.ResponseWriter, r 
 			Message:    "invalid invoice_items format",
 			Error:      err.Error(),
 		})
+		return
+	}
+
+	if len(dto.InvoiceItems) == 0 {
+		http.Error(w, "At least one invoice item is required", http.StatusBadRequest)
 		return
 	}
 
