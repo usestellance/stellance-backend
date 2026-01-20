@@ -1,10 +1,10 @@
 @baseUrl = http://localhost:4000/api/v1
 @jwt = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMTg0MjI3YTUtNTQyZi00YTUwLTk5YTgtZGFiZjAyMTdiN2ZmIiwiZW1haWwiOiJkYXZpZGhlcm8xMjVAZ21haWwuY29tIiwicm9sZSI6InVzZXIiLCJpc3MiOiJzdGVsbGFuY2UiLCJzdWIiOiIxODQyMjdhNS01NDJmLTRhNTAtOTlhOC1kYWJmMDIxN2I3ZmYiLCJhdWQiOlsic3RlbGxhbmNlOndlYiJdLCJleHAiOjE3Njg5MjgyMDAsIm5iZiI6MTc2ODg0MTgwMCwiaWF0IjoxNzY4ODQxODAwfQ.I33IyvD5yppcYjeJA7-x3ow_9vDXHrwLo7wb-knzikA
 @name = mike base
-@userId = 7f3a2c1e-9b6d-4c1e-9c5a-1f2b3c4d5e6f
-@invoiceId = 3c9d8e77-5b42-4d8a-b0e1-8b6a7f9c2d11
-@parentCommentId = 9a1b2c3d-4e5f-6789-abcd-ef0123456789
-@CommentId = 9a1b2c3d-4e5f-6789-abcd-ef0123456789
+@userId = 184227a5-542f-4a50-99a8-dabf0217b7ff
+@invoiceId = 23ae52b9-d39a-4c53-9867-ff4125a54a82
+@parentCommentId = ebc238aa-8923-4131-a5a1-6c14fde5ba98
+@CommentId = ebc238aa-8923-4131-a5a1-6c14fde5ba98
 
 @invoice_items = [
   {
@@ -51,7 +51,7 @@ Authorization: Bearer {{jwt}}
   "user_id": "{{userId}}",
   "invoice_id": "{{invoiceId}}",
   "commenter_name": "{{name}}",
-  "comment_text": "Following up on this invoice.",
+  "comment_text": "Following up on this invoice. We should also add something else",
   "parent_id": "{{parentCommentId}}"
 }
 
@@ -76,11 +76,13 @@ GET {{baseUrl}}/invoice/overview
 Accept: application/json
 Authorization: Bearer {{jwt}}
 
+###
 # returns the transaction card data on the overview page
 GET {{baseUrl}}/transaction/stats
 Accept: application/json
 Authorization: Bearer {{jwt}}
 
+###
 # returns the cash inflow data for the line graph on the overview page
 GET {{baseUrl}}/transaction/inflow
 # query params = {from, to} in YYYY-MM-DD
@@ -100,13 +102,27 @@ Authorization: Bearer {{jwt}}
 }
 
 ###
-POST {{baseUrl}}/invoice/send/{{{invoiceId}}}
+# get invoice by id
+GET {{baseUrl}}/invoice/23ae52b9-d39a-4c53-9867-ff4125a54a82
+Accept: application/json
+Authorization: Bearer {{jwt}}
+
+
+###
+# get invoice
+GET {{baseUrl}}/invoice
+Accept: application/json
+Authorization: Bearer {{jwt}}
+
+
+###
+POST {{baseUrl}}/invoice/send/{{invoiceId}}
 Accept: application/json
 Content-Type: application/json
 Authorization: Bearer {{jwt}}
 
 {
-  "emails": [""]
+  "emails": ["man1@test.com", "man2@test.com"]
 }
 
 ###
@@ -158,6 +174,3 @@ Content-Type: image/png
 
 < ./stellance.png
 --boundary--
-
-# < ./logo.png
-# --boundary--

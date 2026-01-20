@@ -12,6 +12,7 @@ import (
 	"github.com/The-True-Hooha/stellance-backend/pkg/config"
 	jwt_ "github.com/The-True-Hooha/stellance-backend/pkg/jwt"
 	"github.com/The-True-Hooha/stellance-backend/pkg/utils"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
@@ -100,6 +101,17 @@ func (ins *InvoiceCommentsService) CreateCommentQuery(ctx context.Context, comme
 		Guest      bool
 	)
 
+	
+	var userID interface{} = nil
+	if comment.UserID != "" {
+		userID = comment.UserID
+	}
+
+	var parentID interface{} = nil
+	if comment.ParentID != "" {
+		parentID = comment.ParentID
+	}
+
 	const query = `
 	INSERT INTO invoice_comments (
 		invoice_id, user_id, commenter_name, commenter_email, 
@@ -107,11 +119,11 @@ func (ins *InvoiceCommentsService) CreateCommentQuery(ctx context.Context, comme
 		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, created_at, is_verified, is_guest
 		`
-	err = tx.QueryRow(ctx, query, comment.InvoiceID, comment.UserID, comment.CommenterName, email,
-		comment.CommentText, comment.ParentID).Scan(&ID, &Created_at, &Verified, &Guest)
+	err = tx.QueryRow(ctx, query, comment.InvoiceID, userID, comment.CommenterName, email,
+		comment.CommentText, parentID).Scan(&ID, &Created_at, &Verified, &Guest)
 	if err != nil {
-		ins.log.Error("failed to execute query to start insert operation on invoice comments", "error", err)
-		return nil, fmt.Errorf("failed to create invoice: %w", err)
+		ins.log.Error("failed to execute query to insert invoice comment", "error", err)
+		return nil, fmt.Errorf("failed to create invoice comment: %w", err)
 	}
 
 	if err = tx.Commit(ctx); err != nil {
@@ -119,7 +131,7 @@ func (ins *InvoiceCommentsService) CreateCommentQuery(ctx context.Context, comme
 		return nil, fmt.Errorf("failed to create invoice comment: %w", err)
 	}
 
-	ins.log.Info("new invoice comment added", "comment", comment)
+	ins.log.Info("new invoice comment added", "comment_id", ID)
 	return &CreateCommentQueryResponse{
 		ID:         ID,
 		Created_at: Created_at,
@@ -418,15 +430,18 @@ func (cs *InvoiceCommentsService) CreateComment(ctx context.Context, dto CreateC
 		InvoiceID:     dto.InvoiceID,
 		CommenterName: dto.CommenterName,
 		CommentText:   dto.CommentText,
+		ParentID:      dto.ParentID,
 	}
 
-	// Set parent comment ID if this is a reply
-	if dto.ParentID != "" {
-		comment.ParentID = dto.ParentID
-	}
+	if userID != nil && *userID != "" {
+		if _, err := uuid.Parse(*userID); err != nil {
+			cs.log.Error("invalid user ID format", "user_id", *userID, "error", err)
+			return &utils.ApiResponse{
+				StatusCode: http.StatusBadRequest,
+				Message:    "invalid user ID format",
+			}
+		}
 
-	// Handle registered user vs guest commenter
-	if userID != nil {
 		user, err := cs.GetUserByIDQuery(ctx, *userID)
 		if err != nil {
 			cs.log.Error("failed to get user", "user_id", *userID, "error", err)
@@ -442,6 +457,7 @@ func (cs *InvoiceCommentsService) CreateComment(ctx context.Context, dto CreateC
 			comment.CommenterName = fmt.Sprintf("%s %s", user.FirstName, user.LastName)
 		}
 	} else {
+		// Guest commenter - leave UserID empty/default
 		if dto.CommenterEmail == "" {
 			return &utils.ApiResponse{
 				StatusCode: http.StatusBadRequest,
@@ -449,6 +465,7 @@ func (cs *InvoiceCommentsService) CreateComment(ctx context.Context, dto CreateC
 			}
 		}
 		comment.CommenterEmail = dto.CommenterEmail
+		// Don't set UserID at all for guests
 	}
 
 	createdComment, err := cs.CreateCommentQuery(ctx, *comment)

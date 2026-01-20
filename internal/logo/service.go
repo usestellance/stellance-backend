@@ -191,3 +191,25 @@ func (ls *LogoService) UploadAndCreateLogo(ctx context.Context, tx pgx.Tx, userI
 		LogoUrl: downloadURL,
 	}, nil
 }
+
+func (ls *LogoService) GetSignedDownloadURL(ctx context.Context, logoID string) (string, error) {
+	const query = `SELECT s3_key FROM logos WHERE id = $1`
+	var s3Key string
+	
+	err := ls.postgres.QueryRow(ctx, query, logoID).Scan(&s3Key)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return "", fmt.Errorf("logo not found")
+		}
+		ls.log.Error("failed to fetch logo key", "error", err, "logo_id", logoID)
+		return "", fmt.Errorf("failed to fetch logo: %w", err)
+	}
+	
+	url, err := ls.storage.GetPresignedDownloadURL(ctx, s3Key)
+	if err != nil {
+		ls.log.Error("failed to generate presigned URL", "error", err, "s3_key", s3Key)
+		return "", fmt.Errorf("failed to generate presigned URL: %w", err)
+	}
+	
+	return url, nil
+}

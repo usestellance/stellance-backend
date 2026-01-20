@@ -22,7 +22,7 @@ func NewInvoiceCommentHandler(s *InvoiceCommentsService) *InvoiceCommentHandler 
 }
 
 func (ch *InvoiceCommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
-	userID, _ := utils.GetUserEmailFromContext(r.Context())
+	userID, _ := utils.GetUserIDFromContext(r.Context())
 	var userIDPtr *string
 	if userID != "" {
 		userIDPtr = &userID
@@ -52,7 +52,7 @@ func (ch *InvoiceCommentHandler) CreateComment(w http.ResponseWriter, r *http.Re
 }
 
 func (ch *InvoiceCommentHandler) GetComments(w http.ResponseWriter, r *http.Request) {
-	userID, _ := utils.GetUserEmailFromContext(r.Context())
+	userID, _ := utils.GetUserIDFromContext(r.Context())
 	var userIDPtr *string
 	if userID != "" {
 		userIDPtr = &userID
@@ -87,7 +87,7 @@ func (ch *InvoiceCommentHandler) GetComments(w http.ResponseWriter, r *http.Requ
 }
 
 func (ch *InvoiceCommentHandler) GetCommentByID(w http.ResponseWriter, r *http.Request) {
-	userID, _ := utils.GetUserEmailFromContext(r.Context())
+	userID, _ := utils.GetUserIDFromContext(r.Context())
 	var userIDPtr *string
 	if userID != "" {
 		userIDPtr = &userID
@@ -107,7 +107,7 @@ func (ch *InvoiceCommentHandler) GetCommentByID(w http.ResponseWriter, r *http.R
 }
 
 func (ch *InvoiceCommentHandler) UpdateComment(w http.ResponseWriter, r *http.Request) {
-	userID, _ := utils.GetUserEmailFromContext(r.Context())
+	userID, _ := utils.GetUserIDFromContext(r.Context())
 	var userIDPtr *string
 	if userID != "" {
 		userIDPtr = &userID
@@ -147,7 +147,7 @@ func (ch *InvoiceCommentHandler) UpdateComment(w http.ResponseWriter, r *http.Re
 }
 
 func (ch *InvoiceCommentHandler) DeleteComment(w http.ResponseWriter, r *http.Request) {
-	userID, _ := utils.GetUserEmailFromContext(r.Context())
+	userID, _ := utils.GetUserIDFromContext(r.Context())
 	var userIDPtr *string
 	if userID != "" {
 		userIDPtr = &userID
