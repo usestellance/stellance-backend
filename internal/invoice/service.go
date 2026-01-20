@@ -430,6 +430,7 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 			title              sql.NullString
 			paidAt             sql.NullTime
 			country            sql.NullString
+			logoID             sql.NullString
 			approved           bool
 			approvedDate       sql.NullTime
 			rejectedDate       sql.NullTime
@@ -457,6 +458,7 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 			&approved,
 			&approvedDate,
 			&rejectedDate,
+			&logoID,
 		)
 		if err != nil {
 			is.log.Error("failed to scan invoice", "error", err)
@@ -482,6 +484,16 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 			reviewDate = rejectedDate
 		}
 
+		logoURL := ""
+		if logoID.Valid {
+			url, err := is.logoService.GetSignedDownloadURL(ctx, logoID.String)
+			if err != nil {
+				is.log.Warn("failed to get logo URL", "error", err, "logo_id", logoID.String)
+			} else {
+				logoURL = url
+			}
+		}
+
 		sender := InvoiceSenderDetails{
 			UserId:       user_id,
 			Name:         first_name + " " + last_name,
@@ -490,6 +502,7 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 			BusinessName: &bName.String,
 		}
 		invoice.CreatedBy = sender
+		invoice.LogoURL = logoURL
 		invoice.ReviewDate = &reviewDate.Time
 		invoice.Approved = &approved
 		invoices = append(invoices, invoice)
@@ -610,7 +623,8 @@ func (is *InvoiceService) buildInvoiceQuery(filters InvoiceFiltersDto, userId st
 			i.address_country,
 			i.approved,
 			i.approved_date,
-			i.rejected_date
+			i.rejected_date,
+			i.logo_id
 		FROM invoice i
 		WHERE i.created_by_id = $1
 	`

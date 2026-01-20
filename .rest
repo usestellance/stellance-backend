@@ -107,6 +107,14 @@ Authorization: Bearer {{jwt}}
 
 
 ###
+
+# get invoice
+GET {{baseUrl}}/invoice
+Accept: application/json
+Authorization: Bearer {{jwt}}
+
+
+###
 POST {{baseUrl}}/invoice/send/{{{invoiceId}}}
 Accept: application/json
 Content-Type: application/json
