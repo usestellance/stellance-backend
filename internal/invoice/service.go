@@ -933,7 +933,7 @@ func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invo
 			i.payer_email, i.payer_name, i.sub_total, i.service_fee, i.total,
 			i.currency, i.status, i.due_date, i.paid_at,
 			i.created_at, i.updated_at, i.address_country, i.created_by_id,
-			i.approved, i.approved_date, i.rejected_date,
+			i.approved, i.approved_date, i.rejected_date, i.logo_id,
 			u.first_name, u.last_name, u.country, u.email, u.business_name, u.phone_number,
 			json_agg(
 				json_build_object(
@@ -980,6 +980,7 @@ func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invo
 		Title          sql.NullString  `db:"title"`
 		PayerEmail     string          `db:"payer_email"`
 		PayerName      sql.NullString  `db:"payer_name"`
+		LogoID         sql.NullString  `db:"logo_id"`
 		SubTotal       float64         `db:"sub_total"`
 		ServiceFee     float64         `db:"service_fee"`
 		Total          float64         `db:"total"`
@@ -1018,6 +1019,7 @@ func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invo
 		&invoice.Approved,
 		&invoice.ApprovedDate,
 		&invoice.RejectedDate,
+		&invoice.LogoID,
 		&first_name,
 		&last_name,
 		&sender_country,
@@ -1081,6 +1083,17 @@ func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invo
 		reviewDate = invoice.RejectedDate
 	}
 
+	logoURL := ""
+	if invoice.LogoID.Valid {
+
+		url, err := is.logoService.GetSignedDownloadURL(ctx, invoice.LogoID.String)
+		if err != nil {
+			log.Warn("failed to get logo URL", "error", err, "logo_id", invoice.LogoID.String)
+		} else {
+			logoURL = url
+		}
+	}
+
 	response := InvoiceResponse{
 		ID:            invoice.ID,
 		InvoiceNumber: invoice.InvoiceNumber,
@@ -1100,6 +1113,7 @@ func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invo
 		CreatedBy:     sender,
 		Items:         items,
 		Approved:      &invoice.Approved,
+		LogoURL:       logoURL,
 	}
 
 	if invoice.PaidAt.Valid {
@@ -1380,10 +1394,8 @@ func (is *InvoiceService) EditInvoice(ctx context.Context, userId, invoiceId str
 	}
 }
 
-// services/invoice_service.go
 
 func (is *InvoiceService) SendInvoice(ctx context.Context, userId, invoiceId string, emails []string) *utils.ApiResponse {
-	// Validate email array
 	if len(emails) == 0 {
 		return &utils.ApiResponse{
 			StatusCode: http.StatusBadRequest,
@@ -1391,7 +1403,6 @@ func (is *InvoiceService) SendInvoice(ctx context.Context, userId, invoiceId str
 		}
 	}
 
-	// Validate all emails format
 	for _, email := range emails {
 		if email == "" || !isValidEmail(email) {
 			return &utils.ApiResponse{
@@ -1467,24 +1478,19 @@ func (is *InvoiceService) SendInvoice(ctx context.Context, userId, invoiceId str
 		}
 	}
 
-	// Determine primary recipient and CC recipients
 	primaryRecipient := emails[0]
 	var ccRecipients []string
 
-	// If multiple emails provided, rest go to CC
 	if len(emails) > 1 {
 		ccRecipients = emails[1:]
 	}
 
-	// Add payer email to CC if not already in the list
 	if payer_email != "" && !contains(emails, payer_email) {
 		ccRecipients = append(ccRecipients, payer_email)
 	}
 
-	// Remove duplicates from CC
 	ccRecipients = removeDuplicates(ccRecipients)
 
-	// Send email asynchronously
 	go func() {
 		senderName := strings.TrimSpace(fmt.Sprintf("%s %s", first_name, last_name))
 		if senderName == "" {
