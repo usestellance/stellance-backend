@@ -100,6 +100,13 @@ Authorization: Bearer {{jwt}}
 }
 
 ###
+# get invoice by id
+GET {{baseUrl}}/invoice/23ae52b9-d39a-4c53-9867-ff4125a54a82
+Accept: application/json
+Authorization: Bearer {{jwt}}
+
+
+###
 POST {{baseUrl}}/invoice/send/{{{invoiceId}}}
 Accept: application/json
 Content-Type: application/json
@@ -158,6 +165,3 @@ Content-Type: image/png
 
 < ./stellance.png
 --boundary--
-
-# < ./logo.png
-# --boundary--

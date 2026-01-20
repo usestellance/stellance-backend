@@ -661,6 +661,7 @@ func (is *InvoiceService) GetInvoiceById(ctx context.Context, invoiceId, userId,
 	}
 	var bName sql.NullString
 	var sender_country string
+	var logoID sql.NullString
 	var first_name string
 	var last_name string
 	var email string
@@ -713,6 +714,7 @@ func (is *InvoiceService) GetInvoiceById(ctx context.Context, invoiceId, userId,
 				i.approved,
 				i.approved_date,
 				i.rejected_date,
+				i.logo_id,
 				COALESCE(
 					json_agg(
 						json_build_object(
@@ -782,6 +784,7 @@ func (is *InvoiceService) GetInvoiceById(ctx context.Context, invoiceId, userId,
 		&result.Approved,
 		&result.ApprovedDate,
 		&result.RejectedDate,
+		&logoID,
 		&result.Items,
 	)
 
@@ -825,6 +828,16 @@ func (is *InvoiceService) GetInvoiceById(ctx context.Context, invoiceId, userId,
 		BusinessName: &bName.String,
 	}
 
+	logoURL := ""
+	if logoID.Valid {
+		url, err := is.logoService.GetSignedDownloadURL(ctx, logoID.String)
+		if err != nil {
+			log.Warn("failed to get logo URL", "error", err, "logo_id", logoID.String)
+		} else {
+			logoURL = url
+		}
+	}
+
 	if result.Approved && result.ApprovedDate.Valid {
 		result.ReviewDate = result.ApprovedDate
 	} else {
@@ -850,6 +863,7 @@ func (is *InvoiceService) GetInvoiceById(ctx context.Context, invoiceId, userId,
 		Items:         items,
 		CreatedBy:     sender,
 		Approved:      &result.Approved,
+		LogoURL:       logoURL,
 	}
 
 	if result.PaidAt.Valid {

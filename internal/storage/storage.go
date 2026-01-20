@@ -50,7 +50,7 @@ func NewS3Storage(cfg S3Config) (*S3Storage, error) {
 		if cfg.Endpoint != "" {
 			o.BaseEndpoint = aws.String(cfg.Endpoint)
 		}
-		o.UsePathStyle = false // Railway uses virtual-hosted style
+		o.UsePathStyle = false
 	})
 
 	return &S3Storage{
