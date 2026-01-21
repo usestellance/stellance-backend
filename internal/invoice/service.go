@@ -461,6 +461,7 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 			&rejectedDate,
 			&logoID,
 			&notes,
+			&invoice.TemplateID,
 		)
 		if err != nil {
 			is.log.Error("failed to scan invoice", "error", err)
@@ -630,7 +631,8 @@ func (is *InvoiceService) buildInvoiceQuery(filters InvoiceFiltersDto, userId st
 			i.approved_date,
 			i.rejected_date,
 			i.logo_id,
-			i.notes
+			i.notes,
+			i.template_id
 		FROM invoice i
 		WHERE i.created_by_id = $1
 	`
@@ -736,6 +738,7 @@ func (is *InvoiceService) GetInvoiceById(ctx context.Context, invoiceId, userId,
 				i.rejected_date,
 				i.logo_id,
 				i.notes,
+				i.template_id,
 				COALESCE(
 					json_agg(
 						json_build_object(
@@ -771,6 +774,7 @@ func (is *InvoiceService) GetInvoiceById(ctx context.Context, invoiceId, userId,
 		ServiceFee     float64         `db:"service_fee"`
 		Total          float64         `db:"total"`
 		Currency       string          `db:"currency"`
+		TemplateID     string          `db:"template_id"`
 		Status         string          `db:"status"`
 		DueDate        time.Time       `db:"due_date"`
 		PaidAt         sql.NullTime    `db:"paid_at"`
@@ -808,6 +812,7 @@ func (is *InvoiceService) GetInvoiceById(ctx context.Context, invoiceId, userId,
 		&result.RejectedDate,
 		&logoID,
 		&result.Notes,
+		&result.TemplateID,
 		&result.Items,
 	)
 
