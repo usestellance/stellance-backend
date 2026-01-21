@@ -161,13 +161,13 @@ func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvo
 	}
 	const invoiceQ = `
 	INSERT INTO invoice(invoice_number, invoice_url, created_by_id, payer_email, 
-	sub_total, service_fee, total, currency, title, status,due_date, address_country, payer_name, template_id, logo_id)
-	VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)RETURNING id, created_at`
+	sub_total, service_fee, total, currency, title, status,due_date, address_country, payer_name, template_id, logo_id, notes)
+	VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)RETURNING id, created_at`
 
 	var invoiceId string
 	var createdAt time.Time
 
-	err = tx.QueryRow(ctx, invoiceQ, invoiceNumber, invoice_url, userId, dto.Email, subtotal, serviceFee, total, utils.USDC, dto.Title, InvoiceStatusDraft, dueDate, dto.Country, dto.RecipientName, dto.TemplateID, logoID).Scan(&invoiceId, &createdAt)
+	err = tx.QueryRow(ctx, invoiceQ, invoiceNumber, invoice_url, userId, dto.Email, subtotal, serviceFee, total, utils.USDC, dto.Title, InvoiceStatusDraft, dueDate, dto.Country, dto.RecipientName, dto.TemplateID, logoID, dto.Note).Scan(&invoiceId, &createdAt)
 	if err != nil {
 		is.log.Error("failed to create invoice", "error", err)
 		return &utils.ApiResponse{
@@ -244,8 +244,8 @@ func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvo
 		ReviewDate:    nil,
 		TemplateID:    dto.TemplateID,
 		LogoURL:       logoURLStr,
+		Note:          dto.Note,
 	}
-	is.log.Info("the new logo", "url", logoURLStr)
 
 	is.log.Info("invoice created successfully",
 		"invoice_id", invoiceId,
@@ -431,6 +431,7 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 			paidAt             sql.NullTime
 			country            sql.NullString
 			logoID             sql.NullString
+			notes              sql.NullString
 			approved           bool
 			approvedDate       sql.NullTime
 			rejectedDate       sql.NullTime
@@ -459,6 +460,8 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 			&approvedDate,
 			&rejectedDate,
 			&logoID,
+			&notes,
+			&invoice.TemplateID,
 		)
 		if err != nil {
 			is.log.Error("failed to scan invoice", "error", err)
@@ -503,6 +506,9 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 		}
 		invoice.CreatedBy = sender
 		invoice.LogoURL = logoURL
+		if notes.Valid {
+			invoice.Note = notes.String
+		}
 		invoice.ReviewDate = &reviewDate.Time
 		invoice.Approved = &approved
 		invoices = append(invoices, invoice)
@@ -624,7 +630,9 @@ func (is *InvoiceService) buildInvoiceQuery(filters InvoiceFiltersDto, userId st
 			i.approved,
 			i.approved_date,
 			i.rejected_date,
-			i.logo_id
+			i.logo_id,
+			i.notes,
+			i.template_id
 		FROM invoice i
 		WHERE i.created_by_id = $1
 	`
@@ -729,6 +737,8 @@ func (is *InvoiceService) GetInvoiceById(ctx context.Context, invoiceId, userId,
 				i.approved_date,
 				i.rejected_date,
 				i.logo_id,
+				i.notes,
+				i.template_id,
 				COALESCE(
 					json_agg(
 						json_build_object(
@@ -759,10 +769,12 @@ func (is *InvoiceService) GetInvoiceById(ctx context.Context, invoiceId, userId,
 		Title          sql.NullString  `db:"title"`
 		PayerEmail     string          `db:"payer_email"`
 		PayerName      sql.NullString  `db:"payer_name"`
+		Notes          sql.NullString  `db:"notes"`
 		SubTotal       float64         `db:"sub_total"`
 		ServiceFee     float64         `db:"service_fee"`
 		Total          float64         `db:"total"`
 		Currency       string          `db:"currency"`
+		TemplateID     string          `db:"template_id"`
 		Status         string          `db:"status"`
 		DueDate        time.Time       `db:"due_date"`
 		PaidAt         sql.NullTime    `db:"paid_at"`
@@ -799,6 +811,8 @@ func (is *InvoiceService) GetInvoiceById(ctx context.Context, invoiceId, userId,
 		&result.ApprovedDate,
 		&result.RejectedDate,
 		&logoID,
+		&result.Notes,
+		&result.TemplateID,
 		&result.Items,
 	)
 
@@ -858,6 +872,10 @@ func (is *InvoiceService) GetInvoiceById(ctx context.Context, invoiceId, userId,
 		result.ReviewDate = result.RejectedDate
 	}
 
+	if result.Notes.Valid {
+
+	}
+
 	invoice := InvoiceResponse{
 		ID:            result.ID,
 		InvoiceNumber: result.InvoiceNumber,
@@ -878,6 +896,7 @@ func (is *InvoiceService) GetInvoiceById(ctx context.Context, invoiceId, userId,
 		CreatedBy:     sender,
 		Approved:      &result.Approved,
 		LogoURL:       logoURL,
+		// Note:          result.Notes.String,
 	}
 
 	if result.PaidAt.Valid {
@@ -1393,7 +1412,6 @@ func (is *InvoiceService) EditInvoice(ctx context.Context, userId, invoiceId str
 		Message:    "Invoice updated successfully",
 	}
 }
-
 
 func (is *InvoiceService) SendInvoice(ctx context.Context, userId, invoiceId string, emails []string) *utils.ApiResponse {
 	if len(emails) == 0 {
