@@ -429,3 +429,116 @@ func (ih *InvoiceHandler) GetInvoicesByStatus(w http.ResponseWriter, r *http.Req
 
 	utils.WriteToJson(w, response.StatusCode, response)
 }
+
+func (handler *InvoiceHandler) UpdateInvoiceHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	invoiceID := r.PathValue("id")
+
+	userID, ok := utils.GetUserIDFromContext(ctx)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	err := r.ParseMultipartForm(10 << 20)
+	if err != nil {
+		handler.service.log.Error("failed to parse form data", "error", err)
+		http.Error(w, "failed to parse form data", http.StatusBadRequest)
+		return
+	}
+
+	var logoFileData *logo.LogoFileData
+	file, fileHeader, err := r.FormFile("logo")
+	if err == nil {
+		defer file.Close()
+		contentType := fileHeader.Header.Get("Content-Type")
+		validTypes := map[string]bool{
+			"image/png":  true,
+			"image/jpeg": true,
+			"image/jpg":  true,
+		}
+
+		if !validTypes[contentType] {
+			utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{
+				StatusCode: http.StatusBadRequest,
+				Message:    "invalid file type. Only PNG, JPEG, JPG are allowed",
+			})
+			return
+		}
+
+		if fileHeader.Size > 2*1024*1024 {
+			utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{
+				StatusCode: http.StatusBadRequest,
+				Message:    "file size exceeds maximum allowed size of 2MB",
+			})
+			return
+		}
+
+		makeDefault := r.FormValue("make_default") == "true"
+		logoFileData = &logo.LogoFileData{
+			File:        file,
+			FileHeader:  fileHeader,
+			MakeDefault: makeDefault,
+		}
+	} else if err != http.ErrMissingFile {
+		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{
+			StatusCode: http.StatusBadRequest,
+			Message:    "error processing logo file",
+			Error:      err.Error(),
+		})
+		return
+	}
+
+	var dto UpdateInvoiceDTO
+
+	if title := r.FormValue("title"); title != "" {
+		dto.Title = title
+	}
+	if payerName := r.FormValue("payer_name"); payerName != "" {
+		dto.RecipientName = payerName
+	}
+	if email := r.FormValue("payer_email"); email != "" {
+		dto.Email = email
+	}
+	if country := r.FormValue("country"); country != "" {
+		dto.Country = country
+	}
+	if dueDate := r.FormValue("due_date"); dueDate != "" {
+		dto.DueDate = dueDate
+	}
+	if templateID := r.FormValue("template_id"); templateID != "" {
+		dto.TemplateID = TemplateIDType(templateID)
+	}
+
+	if serviceFeeStr := r.FormValue("service_fee"); serviceFeeStr != "" {
+		serviceFee, err := strconv.ParseFloat(serviceFeeStr, 64)
+		if err != nil {
+			utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{
+				StatusCode: http.StatusBadRequest,
+				Message:    "invalid service_fee value",
+			})
+			return
+		}
+		dto.ServiceFee = &serviceFee
+	}
+
+	if invoiceItemsJSON := r.FormValue("invoice_items"); invoiceItemsJSON != "" {
+		err = json.Unmarshal([]byte(invoiceItemsJSON), &dto.InvoiceItems)
+		if err != nil {
+			utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{
+				StatusCode: http.StatusBadRequest,
+				Message:    "invalid invoice_items format",
+				Error:      err.Error(),
+			})
+			return
+		}
+	}
+
+	if err := handler.validator.Struct(dto); err != nil {
+		utils.HandleValidationError(w, err)
+		return
+	}
+
+	response := handler.service.UpdateInvoice(ctx, invoiceID, userID, dto, logoFileData)
+	utils.WriteToJson(w, response.StatusCode, response)
+}

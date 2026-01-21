@@ -138,3 +138,14 @@ type SendInvoiceEmailData struct {
 type SendInvoiceDto struct {
 	Emails []string `json:"emails" validate:"required,min=1,max=10,dive,email"`
 }
+
+type UpdateInvoiceDTO struct {
+	Title         string         `json:"title" validate:"omitempty,min=3"`
+	RecipientName string         `json:"payer_name" validate:"omitempty"`
+	Email         string         `json:"payer_email" validate:"omitempty,email"`
+	Country       string         `json:"country" validate:"omitempty"`
+	InvoiceItems  []InvoiceItems `json:"invoice_items" validate:"omitempty,min=1"`
+	ServiceFee    *float64       `json:"service_fee" validate:"omitempty,gte=0"`
+	DueDate       string         `json:"due_date" validate:"omitempty,datetime=2006-01-02"`
+	TemplateID    TemplateIDType `json:"template_id" validate:"omitempty"`
+}

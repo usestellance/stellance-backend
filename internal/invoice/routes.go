@@ -23,5 +23,5 @@ func RegisterInvoiceRoutes(apiV1 *httpx.RouteGroup, router *http.ServeMux, invoi
 	invoiceGroup.HandleFunc("POST /send/{id}", authMiddleware.Authenticate(http.HandlerFunc(invoiceHandler.SendInvoice)).ServeHTTP)
 	invoiceGroup.HandleFunc("GET /stats", authMiddleware.Authenticate(http.HandlerFunc(invoiceHandler.GetInvoiceStatsHandler)).ServeHTTP)
 	invoiceGroup.HandleFunc("GET /overview", authMiddleware.Authenticate(http.HandlerFunc(invoiceHandler.GetInvoicesByStatus)).ServeHTTP)
-
+	invoiceGroup.HandleFunc("PUT /{id}", authMiddleware.Authenticate(http.HandlerFunc(invoiceHandler.UpdateInvoiceHandler)).ServeHTTP)
 }
