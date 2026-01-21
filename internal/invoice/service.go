@@ -872,10 +872,6 @@ func (is *InvoiceService) GetInvoiceById(ctx context.Context, invoiceId, userId,
 		result.ReviewDate = result.RejectedDate
 	}
 
-	if result.Notes.Valid {
-
-	}
-
 	invoice := InvoiceResponse{
 		ID:            result.ID,
 		InvoiceNumber: result.InvoiceNumber,
@@ -896,7 +892,8 @@ func (is *InvoiceService) GetInvoiceById(ctx context.Context, invoiceId, userId,
 		CreatedBy:     sender,
 		Approved:      &result.Approved,
 		LogoURL:       logoURL,
-		// Note:          result.Notes.String,
+		TemplateID:    TemplateIDType(result.TemplateID),
+		Note:          result.Notes.String,
 	}
 
 	if result.PaidAt.Valid {
@@ -1866,5 +1863,257 @@ func (is *InvoiceService) GetInvoicesByStatus(ctx context.Context, userID string
 		StatusCode: http.StatusOK,
 		Message:    "successful",
 		Data:       invoicesByStatus,
+	}
+}
+
+func (is *InvoiceService) UpdateInvoice(ctx context.Context, invoiceID, userID string, dto UpdateInvoiceDTO, logoFile *logo.LogoFileData) *utils.ApiResponse {
+	if _, err := uuid.Parse(invoiceID); err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusBadRequest,
+			Message:    "Invalid invoice ID format",
+		}
+	}
+
+	const checkQuery = `
+		SELECT id, status, created_by_id, logo_id
+  		FROM invoice
+		WHERE id = $1
+    	AND status NOT IN ('sent', 'viewed', 'paid', 'overdue')
+	`
+
+	var existingInvoiceID, status, ownerID string
+	var existingLogoID sql.NullString
+
+	err := is.postgres.QueryRow(ctx, checkQuery, invoiceID).Scan(&existingInvoiceID, &status, &ownerID, &existingLogoID)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusNotFound,
+				Message:    "Invoice not found",
+			}
+		}
+		is.log.Error("failed to fetch invoice", "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to process request",
+		}
+	}
+
+	if ownerID != userID {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusForbidden,
+			Message:    "You don't have permission to update this invoice",
+		}
+	}
+
+	tx, err := is.postgres.Begin(ctx)
+	if err != nil {
+		is.log.Error("failed to begin transaction", "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to process request",
+		}
+	}
+	defer tx.Rollback(ctx)
+
+	var logoID sql.NullString
+
+	if logoFile != nil {
+		createLogo, err := is.logoService.UploadAndCreateLogo(ctx, tx, userID, logoFile)
+		if err != nil {
+			is.log.Error("failed to upload logo", "error", err)
+			return &utils.ApiResponse{
+				StatusCode: http.StatusInternalServerError,
+				Message:    "Failed to upload logo",
+			}
+		}
+		// logo has been created, just update the logo id in the invoice database
+		logoID = sql.NullString{String: createLogo.LogoID, Valid: true}
+	} else {
+		logoID = existingLogoID
+		// if existingLogoID.Valid {
+			// url, _ := is.logoService.GetSignedDownloadURL(ctx, existingLogoID.String)
+			// logoURL = sql.NullString{String: url, Valid: true}
+		// }
+	}
+
+	updates := []string{}
+	args := []interface{}{invoiceID}
+	argPosition := 2
+
+	if dto.Title != "" {
+		updates = append(updates, fmt.Sprintf("title = $%d", argPosition))
+		args = append(args, dto.Title)
+		argPosition++
+	}
+
+	if dto.RecipientName != "" {
+		updates = append(updates, fmt.Sprintf("payer_name = $%d", argPosition))
+		args = append(args, dto.RecipientName)
+		argPosition++
+	}
+
+	if dto.Email != "" {
+		updates = append(updates, fmt.Sprintf("payer_email = $%d", argPosition))
+		args = append(args, dto.Email)
+		argPosition++
+	}
+
+	if dto.Country != "" {
+		updates = append(updates, fmt.Sprintf("address_country = $%d", argPosition))
+		args = append(args, dto.Country)
+		argPosition++
+	}
+
+	if dto.DueDate != "" {
+		dueDate, err := time.Parse("2006-01-02", dto.DueDate)
+		if err != nil {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusBadRequest,
+				Message:    "Invalid due date format. Use YYYY-MM-DD",
+			}
+		}
+
+		if dueDate.Before(time.Now().Truncate(24 * time.Hour)) {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusBadRequest,
+				Message:    "Due date cannot be in the past",
+			}
+		}
+
+		updates = append(updates, fmt.Sprintf("due_date = $%d", argPosition))
+		args = append(args, dueDate)
+		argPosition++
+	}
+
+	if dto.TemplateID != "" {
+		updates = append(updates, fmt.Sprintf("template_id = $%d", argPosition))
+		args = append(args, dto.TemplateID)
+		argPosition++
+	}
+
+	if len(dto.InvoiceItems) > 0 || dto.ServiceFee != nil {
+		var subtotal float64
+		var serviceFee float64
+
+		if len(dto.InvoiceItems) > 0 {
+			for _, item := range dto.InvoiceItems {
+				subtotal += item.Amount
+			}
+		} else {
+			const subQuery = `SELECT sub_total FROM invoice WHERE id = $1`
+			tx.QueryRow(ctx, subQuery, invoiceID).Scan(&subtotal)
+		}
+
+		if dto.ServiceFee != nil {
+			serviceFee = *dto.ServiceFee
+		} else {
+			const feeQuery = `SELECT service_fee FROM invoice WHERE id = $1`
+			tx.QueryRow(ctx, feeQuery, invoiceID).Scan(&serviceFee)
+		}
+
+		total := subtotal + serviceFee
+
+		updates = append(updates, fmt.Sprintf("sub_total = $%d", argPosition))
+		args = append(args, subtotal)
+		argPosition++
+
+		updates = append(updates, fmt.Sprintf("service_fee = $%d", argPosition))
+		args = append(args, serviceFee)
+		argPosition++
+
+		updates = append(updates, fmt.Sprintf("total = $%d", argPosition))
+		args = append(args, total)
+		argPosition++
+	}
+
+	if logoFile != nil {
+		updates = append(updates, fmt.Sprintf("logo_id = $%d", argPosition))
+		args = append(args, logoID)
+		argPosition++
+	}
+
+	updates = append(updates, "updated_at = NOW()")
+
+	if len(updates) == 1 {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusBadRequest,
+			Message:    "No fields to update",
+		}
+	}
+
+	updateQuery := fmt.Sprintf(`
+		UPDATE invoice 
+		SET %s
+		WHERE id = $1
+		RETURNING updated_at
+	`, strings.Join(updates, ", "))
+
+	var updatedAt time.Time
+	err = tx.QueryRow(ctx, updateQuery, args...).Scan(&updatedAt)
+	if err != nil {
+		is.log.Error("failed to update invoice", "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to update invoice",
+		}
+	}
+
+	if len(dto.InvoiceItems) > 0 {
+		const deleteItemsQuery = `DELETE FROM invoice_items WHERE invoice_id = $1`
+		_, err = tx.Exec(ctx, deleteItemsQuery, invoiceID)
+		if err != nil {
+			is.log.Error("failed to delete old invoice items", "error", err)
+			return &utils.ApiResponse{
+				StatusCode: http.StatusInternalServerError,
+				Message:    "Failed to update invoice items",
+			}
+		}
+
+		const itemQuery = `
+			INSERT INTO invoice_items (
+				invoice_id, item_type, description, quantity, unit_price, discount, amount
+			) VALUES($1, $2, $3, $4, $5, $6, $7)`
+
+		for _, item := range dto.InvoiceItems {
+			_, err = tx.Exec(ctx, itemQuery,
+				invoiceID,
+				item.InvoiceType,
+				item.Description,
+				item.Quantity,
+				item.UnitPrice,
+				item.Discount,
+				item.Amount,
+			)
+			if err != nil {
+				is.log.Error("failed to insert invoice item", "error", err)
+				return &utils.ApiResponse{
+					StatusCode: http.StatusInternalServerError,
+					Message:    "Failed to update invoice items",
+				}
+			}
+		}
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		is.log.Error("failed to commit transaction", "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to complete update",
+		}
+	}
+
+	cacheKey := fmt.Sprintf("invoice:%s", invoiceID)
+	_ = is.DeleteFromRedisCache(ctx, cacheKey)
+
+	is.log.Info("invoice updated successfully", "invoice_id", invoiceID)
+
+	return &utils.ApiResponse{
+		StatusCode: http.StatusOK,
+		Message:    "Invoice updated successfully",
+		Data: map[string]interface{}{
+			"invoice_id": invoiceID,
+			"updated_at": updatedAt,
+		},
 	}
 }
