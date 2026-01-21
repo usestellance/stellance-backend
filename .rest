@@ -1,5 +1,5 @@
 @baseUrl = http://localhost:4000/api/v1
-@jwt = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMTg0MjI3YTUtNTQyZi00YTUwLTk5YTgtZGFiZjAyMTdiN2ZmIiwiZW1haWwiOiJkYXZpZGhlcm8xMjVAZ21haWwuY29tIiwicm9sZSI6InVzZXIiLCJpc3MiOiJzdGVsbGFuY2UiLCJzdWIiOiIxODQyMjdhNS01NDJmLTRhNTAtOTlhOC1kYWJmMDIxN2I3ZmYiLCJhdWQiOlsic3RlbGxhbmNlOndlYiJdLCJleHAiOjE3Njg5MjgyMDAsIm5iZiI6MTc2ODg0MTgwMCwiaWF0IjoxNzY4ODQxODAwfQ.I33IyvD5yppcYjeJA7-x3ow_9vDXHrwLo7wb-knzikA
+@jwt = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMTg0MjI3YTUtNTQyZi00YTUwLTk5YTgtZGFiZjAyMTdiN2ZmIiwiZW1haWwiOiJkYXZpZGhlcm8xMjVAZ21haWwuY29tIiwicm9sZSI6InVzZXIiLCJpc3MiOiJzdGVsbGFuY2UiLCJzdWIiOiIxODQyMjdhNS01NDJmLTRhNTAtOTlhOC1kYWJmMDIxN2I3ZmYiLCJhdWQiOlsic3RlbGxhbmNlOndlYiJdLCJleHAiOjE3NjkwNzM2ODIsIm5iZiI6MTc2ODk4NzI4MiwiaWF0IjoxNzY4OTg3MjgyfQ.yeWuWrTwkJ9JHmdnILRn1JK26JkdNP6b1kmldaDPbDM
 @name = mike base
 @userId = 184227a5-542f-4a50-99a8-dabf0217b7ff
 @invoiceId = 23ae52b9-d39a-4c53-9867-ff4125a54a82
@@ -165,12 +165,16 @@ Content-Disposition: form-data; name="make_default"
 
 false
 --boundary
+Content-Disposition: form-data; name="note"
+
+thank you for your patronage
+--boundary
 Content-Disposition: form-data; name="invoice_items"
 
 [{"invoice_type":"per_unit","description":"Design Work","quantity":1,"unit_price":50000,"amount":50000},{"invoice_type":"per_unit","description":"Backend Development","quantity":2,"unit_price":75000,"amount":150000}]
---boundary
-Content-Disposition: form-data; name="logo"; filename="stellance.png"
-Content-Type: image/png
+# --boundary
+# Content-Disposition: form-data; name="logo"; filename="stellance.png"
+# Content-Type: image/png
 
-< ./stellance.png
+# < ./stellance.png
 --boundary--

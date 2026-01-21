@@ -2,7 +2,6 @@ package invoice
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -114,6 +113,7 @@ func (handler *InvoiceHandler) CreateNewInvoiceHandler(w http.ResponseWriter, r 
 	dto.Country = r.FormValue("country")
 	dto.DueDate = r.FormValue("due_date")
 	dto.TemplateID = TemplateIDType(r.FormValue("template_id"))
+	dto.Note = r.FormValue("note")
 
 	serviceFeeStr := r.FormValue("service_fee")
 	if serviceFeeStr != "" {
@@ -136,8 +136,6 @@ func (handler *InvoiceHandler) CreateNewInvoiceHandler(w http.ResponseWriter, r 
 		})
 		return
 	}
-	fmt.Println(invoiceItemsJSON, "printing from fmt the invoice items")
-	log.Info("received invoice_items", "json", invoiceItemsJSON)
 
 	err = json.Unmarshal([]byte(invoiceItemsJSON), &dto.InvoiceItems)
 	if err != nil {

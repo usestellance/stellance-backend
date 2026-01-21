@@ -38,6 +38,7 @@ type CreateInvoiceDTO struct {
 	DueDate       string         `json:"due_date" validate:"required,datetime=2006-01-02"`
 	TemplateID    TemplateIDType `json:"template_id" validate:"required"`
 	MakeDefault   bool           `json:"make_default,omitempty"`
+	Note          string         `json:"note,omitempty"`
 }
 
 type InvoiceItems struct {
@@ -75,6 +76,7 @@ type InvoiceResponse struct {
 	ReviewDate         *time.Time           `json:"review_date"`
 	TemplateID         TemplateIDType       `json:"template_id" validate:"required"`
 	LogoURL            string               `json:"logo_url,omitempty"`
+	Note               string               `json:"note,omitempty"`
 }
 
 type InvoiceListResponseDto struct {
