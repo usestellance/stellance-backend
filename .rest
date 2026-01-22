@@ -107,6 +107,10 @@ GET {{baseUrl}}/invoice/23ae52b9-d39a-4c53-9867-ff4125a54a82
 Accept: application/json
 Authorization: Bearer {{jwt}}
 
+###
+GET {{baseUrl}}/invoice/query?search=mike
+Accept: application/json
+Authorization: Bearer {{jwt}}
 
 ###
 # get invoice
