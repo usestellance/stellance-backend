@@ -289,6 +289,25 @@ func (h *InvoiceHandler) GetInvoiceSearchHandler(w http.ResponseWriter, r *http.
 
 }
 
+func (h *InvoiceHandler) QueryInvoiceBySearch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userID, ok := utils.GetUserIDFromContext(ctx)
+	if !ok {
+		h.service.log.Warn("public access to invoice")
+	}
+
+	// role, ok := utils.GetRoleFromContext(ctx)
+	// if !ok {
+	// 	h.service.log.Warn("public access to invoice")
+	// }
+
+	search := r.URL.Query().Get("search")
+
+	response := h.service.GetInvoiceBySearchOnUser(ctx, search, userID, 0, 0)
+	utils.WriteToJson(w, response.StatusCode, response)
+
+}
+
 func (h *InvoiceHandler) DeleteInvoiceHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	reqUserId, ok := utils.GetUserIDFromContext(ctx)

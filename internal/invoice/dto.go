@@ -91,6 +91,15 @@ type PaginationMeta struct {
 	TotalPages        int `json:"total_pages"`
 }
 
+type SearchPaginationMeta struct {
+	Total      int  `json:"total"`
+	Limit      int  `json:"limit"`
+	Offset     int  `json:"offset"`
+	HasNext    bool `json:"has_next"`
+	HasPrev    bool `json:"has_prev"`
+}
+
+
 type InvoiceFiltersDto struct {
 	Status  InvoiceStatus     `json:"status,omitempty" validate:"omitempty,invoice_status"`
 	UserId  string            `json:"user_id,omitempty"`

@@ -949,7 +949,7 @@ func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invo
 			i.payer_email, i.payer_name, i.sub_total, i.service_fee, i.total,
 			i.currency, i.status, i.due_date, i.paid_at,
 			i.created_at, i.updated_at, i.address_country, i.created_by_id,
-			i.approved, i.approved_date, i.rejected_date, i.logo_id,
+			i.approved, i.approved_date, i.rejected_date, i.logo_id, template_id,
 			u.first_name, u.last_name, u.country, u.email, u.business_name, u.phone_number,
 			json_agg(
 				json_build_object(
@@ -995,6 +995,7 @@ func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invo
 		InvoiceURL     string          `db:"invoice_url"`
 		Title          sql.NullString  `db:"title"`
 		PayerEmail     string          `db:"payer_email"`
+		TemplateID     string          `db:"template_id"`
 		PayerName      sql.NullString  `db:"payer_name"`
 		LogoID         sql.NullString  `db:"logo_id"`
 		SubTotal       float64         `db:"sub_total"`
@@ -1036,6 +1037,7 @@ func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invo
 		&invoice.ApprovedDate,
 		&invoice.RejectedDate,
 		&invoice.LogoID,
+		&invoice.TemplateID,
 		&first_name,
 		&last_name,
 		&sender_country,
@@ -1151,6 +1153,248 @@ func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invo
 	}
 }
 
+func (is *InvoiceService) GetInvoiceBySearchOnUser(
+	ctx context.Context,
+	search string,
+	userId string,
+	limit int,
+	offset int,
+) *utils.ApiResponse {
+
+	log := is.log
+
+	const defaultLimit = 10
+	const maxLimit = 50
+
+	if limit <= 0 {
+		limit = defaultLimit
+	}
+	if limit > maxLimit {
+		limit = maxLimit
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	searchTerm := "%" + strings.TrimSpace(search) + "%"
+	cacheKey := fmt.Sprintf("invoice-search:%s:%s:%d:%d", userId, searchTerm, limit, offset)
+
+	if cached, err := is.getFromCache(ctx, cacheKey); err == nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusOK,
+			Message:    "Invoices retrieved successfully",
+			Data:       cached,
+		}
+	}
+
+	var total int
+	countQuery := `
+		SELECT COUNT(DISTINCT i.id)
+		FROM invoice i
+		WHERE
+			i.created_by_id = $1
+			AND (
+				i.invoice_number ILIKE $2 OR
+				i.payer_email   ILIKE $2 OR
+				i.title         ILIKE $2 OR
+				i.payer_name    ILIKE $2 OR
+				i.template_id   ILIKE $2
+			);
+	`
+
+	if err := is.postgres.QueryRow(ctx, countQuery, userId, searchTerm).Scan(&total); err != nil {
+		log.Error("failed to count invoices", "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to search invoices",
+		}
+	}
+
+	const searchInvoiceQuery = `
+		WITH invoice_data AS (
+			SELECT
+				i.id, 
+				i.invoice_number, 
+				i.invoice_url, 
+				i.title, 
+				i.payer_email, 
+				i.payer_name, 
+				i.sub_total, 
+				i.service_fee, 
+				i.total, 
+				i.currency, 
+				i.status, 
+				i.due_date, 
+				i.paid_at, 
+				i.created_at, 
+				i.updated_at, 
+				i.address_country, 
+				i.created_by_id, 
+				i.approved, 
+				i.approved_date, 
+				i.rejected_date, 
+				i.logo_id, 
+				i.template_id, 
+				i.notes,
+
+				u.first_name,
+				u.last_name,
+				u.country AS user_country,
+				u.email,
+				u.business_name,
+				u.phone_number,
+				json_agg(
+					json_build_object(
+						'invoice_type', ii.item_type,
+						'description', ii.description,
+						'quantity', ii.quantity,
+						'unit_price', ii.unit_price,
+						'discount', ii.discount,
+						'amount', ii.amount
+					)
+					ORDER BY ii.created_at
+				) FILTER (WHERE ii.id IS NOT NULL) AS items,
+				GREATEST(
+					similarity(i.invoice_number, $2),
+					similarity(i.payer_email,   $2),
+					similarity(i.title,         $2),
+					similarity(i.payer_name,    $2),
+					similarity(i.template_id,   $2)
+				) AS relevance
+			FROM invoice i
+			LEFT JOIN users u ON i.created_by_id = u.id
+			LEFT JOIN invoice_items ii ON i.id = ii.invoice_id
+			WHERE
+				i.created_by_id = $1
+				AND (
+					i.invoice_number ILIKE $2 OR
+					i.payer_email   ILIKE $2 OR
+					i.title         ILIKE $2 OR
+					i.payer_name    ILIKE $2 OR
+					i.template_id   ILIKE $2
+				)
+			GROUP BY i.id, u.id
+		)
+		SELECT *
+		FROM invoice_data
+		ORDER BY relevance DESC, created_at DESC
+		LIMIT $3 OFFSET $4;
+	`
+
+	rows, err := is.postgres.Query(ctx, searchInvoiceQuery, userId, searchTerm, limit, offset)
+	if err != nil {
+		log.Error("failed to execute invoice search", "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to search invoices",
+		}
+	}
+	defer rows.Close()
+
+	var responses []InvoiceResponse
+
+	for rows.Next() {
+		var inv struct {
+			ID            string
+			InvoiceNumber string
+			InvoiceURL    string
+			Title         sql.NullString
+			PayerEmail    string
+			PayerName     sql.NullString
+			SubTotal      float64
+			ServiceFee    float64
+			Total         float64
+			Currency      string
+			Status        string
+			DueDate       time.Time
+			PaidAt        sql.NullTime
+			CreatedAt     time.Time
+			UpdatedAt     time.Time
+			Country       sql.NullString
+			CreatedBy     string
+			Note          sql.NullString
+			Approved      bool
+			ApprovedDate  sql.NullTime
+			RejectedDate  sql.NullTime
+			LogoID        sql.NullString
+			Items         json.RawMessage
+			FirstName     string
+			LastName      string
+			UserCountry   string
+			Email         string
+			TemplateID    string
+			Business      sql.NullString
+			Phone         sql.NullString
+			Relevance     float64
+		}
+		err := rows.Scan(&inv.ID, &inv.InvoiceNumber, &inv.InvoiceURL, &inv.Title, &inv.PayerEmail, &inv.PayerName, &inv.SubTotal, &inv.ServiceFee, &inv.Total, &inv.Currency, &inv.Status, &inv.DueDate, &inv.PaidAt, &inv.CreatedAt, &inv.UpdatedAt, &inv.Country, &inv.CreatedBy, &inv.Approved, &inv.ApprovedDate, &inv.RejectedDate, &inv.LogoID, &inv.TemplateID, &inv.Note, &inv.FirstName, &inv.LastName, &inv.UserCountry, &inv.Email, &inv.Business, &inv.Phone, &inv.Items, &inv.Relevance)
+		if err != nil {
+			log.Error("failed to scan invoice row", "error", err)
+			continue
+		}
+
+		var items []InvoiceItems
+		_ = json.Unmarshal(inv.Items, &items)
+
+		logoURL := ""
+		if inv.LogoID.Valid {
+			url, err := is.logoService.GetSignedDownloadURL(ctx, inv.LogoID.String)
+			if err != nil {
+				is.log.Warn("failed to get logo URL", "error", err, "logo_id", inv.LogoID.String)
+			} else {
+				logoURL = url
+			}
+		}
+		response := InvoiceResponse{
+			ID:            inv.ID,
+			InvoiceNumber: inv.InvoiceNumber,
+			InvoiceURL:    inv.InvoiceURL,
+			Title:         inv.Title.String,
+			PayerEmail:    inv.PayerEmail,
+			PayerName:     inv.PayerName.String,
+			SubTotal:      inv.SubTotal,
+			ServiceFee:    inv.ServiceFee,
+			Total:         inv.Total,
+			Currency:      inv.Currency,
+			LogoURL:       logoURL,
+			Status:        inv.Status,
+			Note:          inv.Note.String,
+			DueDate:       inv.DueDate,
+			CreatedAt:     inv.CreatedAt,
+			UpdatedAt:     inv.UpdatedAt,
+			Country:       inv.Country.String,
+			TemplateID:    TemplateIDType(inv.TemplateID),
+			Items:         items,
+			Approved:      &inv.Approved,
+		}
+		responses = append(responses, response)
+	}
+
+	meta := SearchPaginationMeta{
+		Total:   total,
+		Limit:   limit,
+		Offset:  offset,
+		HasNext: offset+limit < total,
+		HasPrev: offset > 0,
+	}
+
+	payload := struct {
+		Invoice []InvoiceResponse    `json:"invoice"`
+		Meta     SearchPaginationMeta `json:"meta"`
+	}{
+		Invoice: responses,
+		Meta:     meta,
+	}
+
+	go is.cacheInvoice(context.Background(), cacheKey, payload)
+
+	return &utils.ApiResponse{
+		StatusCode: http.StatusOK,
+		Message:    "Invoices retrieved successfully",
+		Data:       payload,
+	}
+}
+
 func (is *InvoiceService) canAccessInvoice(ownerID, userID, role string) bool {
 	return ownerID == userID || role == string(user.RoleAdmin)
 }
@@ -1169,15 +1413,19 @@ func (is *InvoiceService) getFromCache(ctx context.Context, key string) (interfa
 	return &invoice, nil
 }
 
-func (is *InvoiceService) cacheInvoice(ctx context.Context, key string, invoice *InvoiceResponse) {
-	data, err := json.Marshal(invoice)
+func (is *InvoiceService) cacheInvoice(
+	ctx context.Context,
+	key string,
+	value any,
+) {
+	data, err := json.Marshal(value)
 	if err != nil {
-		is.log.Error("failed to marshal invoice for cache", "error", err)
+		is.log.Error("failed to marshal cache value", "error", err, "key", key)
 		return
 	}
 
 	if err := is.redis.Set(ctx, key, data, 90*time.Second).Err(); err != nil {
-		is.log.Error("failed to cache invoice", "error", err)
+		is.log.Error("failed to set cache value", "error", err, "key", key)
 	}
 }
 
@@ -1932,8 +2180,8 @@ func (is *InvoiceService) UpdateInvoice(ctx context.Context, invoiceID, userID s
 	} else {
 		logoID = existingLogoID
 		// if existingLogoID.Valid {
-			// url, _ := is.logoService.GetSignedDownloadURL(ctx, existingLogoID.String)
-			// logoURL = sql.NullString{String: url, Valid: true}
+		// url, _ := is.logoService.GetSignedDownloadURL(ctx, existingLogoID.String)
+		// logoURL = sql.NullString{String: url, Valid: true}
 		// }
 	}
 
