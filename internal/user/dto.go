@@ -26,6 +26,7 @@ type UserProfileDto struct {
 	Role            UserRole    `json:"role,omitempty"`
 	Wallet          *UserWallet `json:"wallet,omitempty"`
 	AuthType        string      `json:"auth_type,omitempty"`
+	ProviderID *string `json:"provider_id,omitempty"`
 }
 
 type CompleteProfileRequestDto struct {
