@@ -35,3 +35,8 @@ type ChangePasswordDTO struct {
 	OldPassword string `json:"old_password" validate:"required,min=8.passwd"`
 	NewPassword string `json:"new_password" validate:"required,min=8,max=100,passwd"`
 }
+
+type ProviderLogin struct {
+	Email         string   `json:"email" validate:"required,email"`
+	ProviderID    string   `json:"provider_id" validate:"required"`
+}

@@ -536,7 +536,7 @@ func (as *AuthServiceConfig) ChangeUserPassword(ctx context.Context, dto ChangeP
 	const getPasswordQuery = `SELECT password from users where id = $1 AND is_active = true`
 	var passwordH string
 	var email string
-	
+
 	err := as.postgres.QueryRow(ctx, getPasswordQuery, userID).Scan(&passwordH)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -591,7 +591,7 @@ func (as *AuthServiceConfig) ChangeUserPassword(ctx context.Context, dto ChangeP
 
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
-		Message: "password changed successfully",
+		Message:    "password changed successfully",
 		Data: map[string]interface{}{
 			"changedAt": time.Now(),
 		},
@@ -673,5 +673,107 @@ func (as *AuthServiceConfig) ResetPassword(ctx context.Context, dto ResetPasswor
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
 		Message:    "Password updated successfully",
+	}
+}
+
+func (as *AuthServiceConfig) HandleSocialAuth(ctx context.Context, dto ProviderLogin) *utils.ApiResponse {
+	dto.Email = strings.ToLower(strings.TrimSpace(dto.Email))
+
+	user, err := user.NewUserService().FindUserByEmail(ctx, dto.Email)
+	if err != nil {
+		as.log.Error("error fetching user from database", "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "service unavailable, kindly contact support",
+		}
+	}
+
+	// the user is not nil, user with such email exists
+	if user != nil && user.AuthType != "password" {
+		accessToken, err := as.jwt.GenerateNewAccessToken(user.ID, user.Email, string("user"))
+		if err != nil {
+			as.log.Error(fmt.Sprintf("error generating access token for user with Id =>> %s", user.ID), "error", err)
+			return &utils.ApiResponse{
+				StatusCode: http.StatusInternalServerError,
+				Message:    "service unavailable, kindly contact support",
+				Error:      err.Error(),
+			}
+		}
+
+		profileComplete := user.FirstName != nil && user.LastName != nil
+		return &utils.ApiResponse{
+			StatusCode: http.StatusOK,
+			Message:    "login successful",
+			Data: &AuthLoginResponseDto{
+				EmailVerified:   user.EmailVerified,
+				ProfileComplete: profileComplete,
+				ExpiresIn:       time.Now().Add(1 * time.Hour).Unix(),
+				AccessToken:     accessToken,
+			},
+		}
+	} else {
+		tx, err := as.postgres.Begin(ctx)
+		if err != nil {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusInternalServerError,
+				Message:    "service unavailable, kindly contact support",
+				Error:      err.Error(),
+			}
+		}
+		defer tx.Rollback(ctx)
+
+		const createUserQ = `
+		 INSERT INTO users (email, provider_id) VALUES ($1, $2) RETURNING id, email, created_at, is_active
+		`
+
+		err = tx.QueryRow(ctx, createUserQ, dto.Email, dto.ProviderID).Scan(&user.ID,
+			&user.Email,
+			&user.CreatedAt,
+			&user.IsActive,
+		)
+
+		if err != nil {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusInternalServerError,
+				Message:    "service unavailable, kindly contact support",
+				Error:      err.Error(),
+			}
+		}
+
+		if err = tx.Commit(ctx); err != nil {
+			as.log.Error("failed to commit and save new user record", "error", err)
+			return &utils.ApiResponse{
+				StatusCode: http.StatusInternalServerError,
+				Message:    "service unavailable, kindly contact support",
+				Error:      err.Error(),
+			}
+		}
+
+		accessToken, err := as.jwt.GenerateNewAccessToken(user.ID, user.Email, string("user"))
+		if err != nil {
+			as.log.Error(fmt.Sprintf("error generating access token for user with Id =>> %s", user.ID), "error", err)
+			return &utils.ApiResponse{
+				StatusCode: http.StatusInternalServerError,
+				Message:    "service unavailable, kindly contact support",
+				Error:      err.Error(),
+			}
+		}
+
+		err = as.GenerateAndSendEmail(ctx, dto.Email, user.ID, as.log)
+		if err != nil {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusInternalServerError,
+				Message:    "Server currently unavailable",
+			}
+		}
+		as.log.Debug(fmt.Sprintf("new user with ID %s created successfully", user.ID))
+		return &utils.ApiResponse{
+			StatusCode: http.StatusCreated,
+			Message:    "account has successfully been created, and email sent for verification",
+			Data: map[string]interface{}{
+				"accessToken": accessToken,
+				"expiresIn":   time.Now().Add(1 * time.Hour).Unix(),
+			},
+		}
 	}
 }
