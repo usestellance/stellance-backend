@@ -30,3 +30,8 @@ type ResetPasswordDto struct {
 	ConfirmPassword string `json:"confirm_password" validate:"required,passwd"`
 	Otp             string `json:"otp" validate:"required,min=2,max=6"`
 }
+
+type ChangePasswordDTO struct {
+	OldPassword string `json:"old_password" validate:"required,min=8.passwd"`
+	NewPassword string `json:"new_password" validate:"required,min=8,max=100,passwd"`
+}

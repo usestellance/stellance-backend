@@ -19,5 +19,6 @@ func RegisterAuthRoutes(apiV1 *httpx.RouteGroup, router *http.ServeMux, authServ
 	authGroup.HandleFunc("GET /validate", authHandler.ValidateEmailHandler)
 	authGroup.HandleFunc("GET /reset", authHandler.RequestPasswordReset)
 	authGroup.HandleFunc("POST /reset-password", authHandler.UpdatePassword)
+	authGroup.HandleFunc("POST /change-password", authHandler.ChangePassword)
 	authGroup.HandleFunc("POST /token", authMiddleware.Authenticate(http.HandlerFunc(authHandler.RefreshTokenHandler)).ServeHTTP)
 }

@@ -531,6 +531,73 @@ func (m *AuthServiceConfig) GenerateOTP() string {
 	return otp
 }
 
+func (as *AuthServiceConfig) ChangeUserPassword(ctx context.Context, dto ChangePasswordDTO, userID string) *utils.ApiResponse {
+
+	const getPasswordQuery = `SELECT password from users where id = $1 AND is_active = true`
+	var passwordH string
+	var email string
+	
+	err := as.postgres.QueryRow(ctx, getPasswordQuery, userID).Scan(&passwordH)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusNotFound,
+				Message:    "invalid request, contact support",
+			}
+		}
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to get user profile details",
+		}
+	}
+
+	err = utils.CompareHash(passwordH, dto.OldPassword)
+	if err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusForbidden,
+			Message:    "invalid request, credentials does not match",
+		}
+	}
+
+	const q = `
+		UPDATE users 
+			SET password = $1, updated_at = NOW()
+			WHERE id = $2 AND is_active = true
+			RETURNING email
+	`
+
+	hash, err := utils.HashString(dto.NewPassword)
+	if err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "service unavailable, kindly contact support",
+			Error:      err.Error(),
+		}
+	}
+
+	err = as.postgres.QueryRow(ctx, q, hash, userID).Scan(&email)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusNotFound,
+				Message:    "invalid request, contact support",
+			}
+		}
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to get user profile details",
+		}
+	}
+
+	return &utils.ApiResponse{
+		StatusCode: http.StatusOK,
+		Message: "password changed successfully",
+		Data: map[string]interface{}{
+			"changedAt": time.Now(),
+		},
+	}
+}
+
 func (as *AuthServiceConfig) ResetPassword(ctx context.Context, dto ResetPasswordDto) *utils.ApiResponse {
 	data, err := as.redis.Get(ctx, fmt.Sprintf("email_otp_%s", strings.ToLower(dto.Email))).Result()
 	if err != nil {

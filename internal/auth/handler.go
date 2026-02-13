@@ -2,7 +2,6 @@ package auth
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -129,14 +128,30 @@ func (h *AuthHandler) RequestPasswordReset(w http.ResponseWriter, r *http.Reques
 	utils.WriteToJson(w, data.StatusCode, data)
 }
 
+func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, ok := utils.GetUserIDFromContext(ctx)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	}
+	
+	var dto ChangePasswordDTO
+	if err := json.NewDecoder(r.Body).Decode(&dto); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+	}
+
+	data := h.service.ChangeUserPassword(ctx, dto, id)
+
+	utils.WriteToJson(w, data.StatusCode, data)	
+}
+
 func (h *AuthHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	var dto ResetPasswordDto
 	if err := json.NewDecoder(r.Body).Decode(&dto); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
-
-	fmt.Println(dto, "checking the dto")
 
 	if err := h.validator.Struct(dto); err != nil {
 		utils.HandleValidationError(w, err)
