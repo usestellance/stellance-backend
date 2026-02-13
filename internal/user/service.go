@@ -37,7 +37,7 @@ func NewUserService() *UserService {
 func (s *UserService) FindUserByEmail(ctx context.Context, email string) (*UserProfileDto, error) {
 	email = strings.ToLower(email)
 	const query string = `
-		SELECT id, email, password, permission, email_verified, first_name, last_name, country, business_name, phone_number
+		SELECT id, email, auth_type, password, permission, email_verified, first_name, last_name, country, business_name, phone_number, provider_id
 		FROM users
 		WHERE email = $1
 	`
@@ -45,9 +45,11 @@ func (s *UserService) FindUserByEmail(ctx context.Context, email string) (*UserP
 	var phone_number sql.NullString
 	var user UserProfileDto
 	var country_ sql.NullString
+	var provider_id sql.NullString
 	err := s.postgres.QueryRow(ctx, query, email).Scan(
 		&user.ID,
 		&user.Email,
+		&user.AuthType,
 		&user.Password,
 		&user.Role,
 		&user.EmailVerified,
@@ -56,7 +58,11 @@ func (s *UserService) FindUserByEmail(ctx context.Context, email string) (*UserP
 		&country_,
 		&business_name,
 		&phone_number,
+		&provider_id,
 	)
+	if provider_id.Valid {
+		user.ProviderID = &provider_id.String
+	}
 	if business_name.Valid {
 		user.BusinessName = &business_name.String
 	}
@@ -251,7 +257,7 @@ func (s *UserService) GetProfileByID(ctx context.Context, userID string) *utils.
 		lastName     sql.NullString
 		businessName sql.NullString
 		phoneNumber  sql.NullString
-		country  sql.NullString
+		country      sql.NullString
 	)
 
 	const query = `

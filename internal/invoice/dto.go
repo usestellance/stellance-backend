@@ -92,13 +92,12 @@ type PaginationMeta struct {
 }
 
 type SearchPaginationMeta struct {
-	Total      int  `json:"total"`
-	Limit      int  `json:"limit"`
-	Offset     int  `json:"offset"`
-	HasNext    bool `json:"has_next"`
-	HasPrev    bool `json:"has_prev"`
+	Total   int  `json:"total"`
+	Limit   int  `json:"limit"`
+	Offset  int  `json:"offset"`
+	HasNext bool `json:"has_next"`
+	HasPrev bool `json:"has_prev"`
 }
-
 
 type InvoiceFiltersDto struct {
 	Status  InvoiceStatus     `json:"status,omitempty" validate:"omitempty,invoice_status"`
@@ -106,6 +105,7 @@ type InvoiceFiltersDto struct {
 	Page    int               `json:"page" validate:"required,min=1"`
 	Count   int               `json:"count" validate:"required,min=1,max=15"`
 	OrderBy utils.OrderByType `json:"order_by" validate:"required,order_by"`
+	Search  string            `json:"search,omitempty"`
 }
 
 type InvoiceSenderDetails struct {

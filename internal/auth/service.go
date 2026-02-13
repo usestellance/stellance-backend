@@ -531,6 +531,73 @@ func (m *AuthServiceConfig) GenerateOTP() string {
 	return otp
 }
 
+func (as *AuthServiceConfig) ChangeUserPassword(ctx context.Context, dto ChangePasswordDTO, userID string) *utils.ApiResponse {
+
+	const getPasswordQuery = `SELECT password from users where id = $1 AND is_active = true`
+	var passwordH string
+	var email string
+
+	err := as.postgres.QueryRow(ctx, getPasswordQuery, userID).Scan(&passwordH)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusNotFound,
+				Message:    "invalid request, contact support",
+			}
+		}
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to get user profile details",
+		}
+	}
+
+	err = utils.CompareHash(passwordH, dto.OldPassword)
+	if err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusForbidden,
+			Message:    "invalid request, credentials does not match",
+		}
+	}
+
+	const q = `
+		UPDATE users 
+			SET password = $1, updated_at = NOW()
+			WHERE id = $2 AND is_active = true
+			RETURNING email
+	`
+
+	hash, err := utils.HashString(dto.NewPassword)
+	if err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "service unavailable, kindly contact support",
+			Error:      err.Error(),
+		}
+	}
+
+	err = as.postgres.QueryRow(ctx, q, hash, userID).Scan(&email)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusNotFound,
+				Message:    "invalid request, contact support",
+			}
+		}
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to get user profile details",
+		}
+	}
+
+	return &utils.ApiResponse{
+		StatusCode: http.StatusOK,
+		Message:    "password changed successfully",
+		Data: map[string]interface{}{
+			"changedAt": time.Now(),
+		},
+	}
+}
+
 func (as *AuthServiceConfig) ResetPassword(ctx context.Context, dto ResetPasswordDto) *utils.ApiResponse {
 	data, err := as.redis.Get(ctx, fmt.Sprintf("email_otp_%s", strings.ToLower(dto.Email))).Result()
 	if err != nil {
@@ -607,4 +674,107 @@ func (as *AuthServiceConfig) ResetPassword(ctx context.Context, dto ResetPasswor
 		StatusCode: http.StatusOK,
 		Message:    "Password updated successfully",
 	}
+}
+
+func (as *AuthServiceConfig) HandleSocialAuth(ctx context.Context, dto ProviderLogin) *utils.ApiResponse {
+	dto.Email = strings.ToLower(strings.TrimSpace(dto.Email))
+
+	user, err := user.NewUserService().FindUserByEmail(ctx, dto.Email)
+	if err != nil {
+		as.log.Error("error getting user from database", "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "service unavailable, kindly contact support",
+		}
+	}
+
+	// the user is not nil, user with such email exists
+	if user != nil && user.AuthType != "password" && user.ProviderID != nil {
+		accessToken, err := as.jwt.GenerateNewAccessToken(user.ID, user.Email, string("user"))
+		if err != nil {
+			as.log.Error(fmt.Sprintf("error generating access token for user with Id =>> %s", user.ID), "error", err)
+			return &utils.ApiResponse{
+				StatusCode: http.StatusInternalServerError,
+				Message:    "service unavailable, kindly contact support",
+				Error:      err.Error(),
+			}
+		}
+
+		profileComplete := user.FirstName != nil && user.LastName != nil
+		return &utils.ApiResponse{
+			StatusCode: http.StatusOK,
+			Message:    "login successful",
+			Data: &AuthLoginResponseDto{
+				EmailVerified:   user.EmailVerified,
+				ProfileComplete: profileComplete,
+				ExpiresIn:       time.Now().Add(1 * time.Hour).Unix(),
+				AccessToken:     accessToken,
+			},
+		}
+	}
+
+	tx, err := as.postgres.Begin(ctx)
+	if err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "service unavailable, kindly contact support",
+			Error:      err.Error(),
+		}
+	}
+	defer tx.Rollback(ctx)
+
+	const createUserQ = `
+		INSERT INTO users (email, provider_id) VALUES ($1, $2) RETURNING id, email, created_at, is_active
+	`
+
+	err = tx.QueryRow(ctx, createUserQ, dto.Email, dto.ProviderID).Scan(&user.ID,
+		&user.Email,
+		&user.CreatedAt,
+		&user.IsActive,
+	)
+
+	if err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "service unavailable, kindly contact support",
+			Error:      err.Error(),
+		}
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		as.log.Error("failed to commit and save new user record", "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "service unavailable, kindly contact support",
+			Error:      err.Error(),
+		}
+	}
+
+	accessToken, err := as.jwt.GenerateNewAccessToken(user.ID, user.Email, string("user"))
+	if err != nil {
+		as.log.Error(fmt.Sprintf("error generating access token for user with Id =>> %s", user.ID), "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "service unavailable, kindly contact support",
+			Error:      err.Error(),
+		}
+	}
+
+	err = as.GenerateAndSendEmail(ctx, dto.Email, user.ID, as.log)
+	if err != nil {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Server currently unavailable",
+		}
+	}
+	as.log.Debug(fmt.Sprintf("new user with ID %s created successfully", user.ID))
+	return &utils.ApiResponse{
+		StatusCode: http.StatusCreated,
+		Message:    "account has successfully been created, and email sent for verification",
+		Data: map[string]interface{}{
+			"accessToken": accessToken,
+			"expiresIn":   time.Now().Add(1 * time.Hour).Unix(),
+		},
+	}
+
 }
