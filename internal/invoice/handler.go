@@ -237,6 +237,11 @@ func (handler *InvoiceHandler) GetManyInvoiceHandler(w http.ResponseWriter, r *h
 		dto.OrderBy = utils.OrderByType(orderBy)
 	}
 
+	search := r.URL.Query().Get("search")
+	if search != "" {
+		dto.Search = search
+	}
+
 	log.Info("fetching invoices",
 		"user_id", userID,
 		"filters", dto,

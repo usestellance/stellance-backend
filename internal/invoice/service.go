@@ -605,8 +605,72 @@ func (is *InvoiceService) fetchAllInvoiceItems(ctx context.Context, invoiceIDs [
 	return itemMap, nil
 }
 
+// func (is *InvoiceService) buildInvoiceQuery(filters InvoiceFiltersDto, userId string) (string, []interface{}) {
+// 	offset := (filters.Page - 1) * filters.Count
+
+// 	if filters.Search != "" {
+
+// 	}
+
+// 	query := `
+// 		SELECT
+// 			i.id,
+// 			i.invoice_number,
+// 			i.invoice_url,
+// 			i.title,
+// 			i.payer_email,
+// 			i.payer_name,
+// 			i.payer_wallet_address,
+// 			i.sub_total,
+// 			i.service_fee,
+// 			i.total,
+// 			i.currency,
+// 			i.status,
+// 			i.due_date,
+// 			i.paid_at,
+// 			i.created_at,
+// 			i.updated_at,
+// 			i.address_country,
+// 			i.approved,
+// 			i.approved_date,
+// 			i.rejected_date,
+// 			i.logo_id,
+// 			i.notes,
+// 			i.template_id
+// 		FROM invoice i
+// 		WHERE i.created_by_id = $1
+// 	`
+// 	args := []interface{}{userId}
+// 	argCount := 1
+
+// 	if filters.Status != "" {
+// 		argCount++
+// 		query += fmt.Sprintf(" AND i.status = $%d", argCount)
+// 		args = append(args, filters.Status)
+// 		if filters.Status == "overdue" {
+// 			query += " AND i.due_date < CURRENT_DATE AND i.status != 'paid'"
+// 		}
+// 	}
+
+// 	query += fmt.Sprintf(" ORDER BY i.created_at %s", filters.OrderBy)
+
+// 	argCount++
+// 	query += fmt.Sprintf(" LIMIT $%d", argCount)
+// 	args = append(args, filters.Count)
+
+// 	argCount++
+// 	query += fmt.Sprintf(" OFFSET $%d", argCount)
+// 	args = append(args, offset)
+
+// 	return query, args
+// }
+
 func (is *InvoiceService) buildInvoiceQuery(filters InvoiceFiltersDto, userId string) (string, []interface{}) {
 	offset := (filters.Page - 1) * filters.Count
+
+	if filters.Search != "" {
+		return is.buildSearchQuery(filters, userId, offset)
+	}
 
 	query := `
 		SELECT 
@@ -649,6 +713,77 @@ func (is *InvoiceService) buildInvoiceQuery(filters InvoiceFiltersDto, userId st
 	}
 
 	query += fmt.Sprintf(" ORDER BY i.created_at %s", filters.OrderBy)
+
+	argCount++
+	query += fmt.Sprintf(" LIMIT $%d", argCount)
+	args = append(args, filters.Count)
+
+	argCount++
+	query += fmt.Sprintf(" OFFSET $%d", argCount)
+	args = append(args, offset)
+
+	return query, args
+}
+
+func (is *InvoiceService) buildSearchQuery(filters InvoiceFiltersDto, userId string, offset int) (string, []interface{}) {
+	searchTerm := "%" + strings.TrimSpace(filters.Search) + "%"
+
+	query := `
+		SELECT 
+			i.id,
+			i.invoice_number,
+			i.invoice_url,
+			i.title,
+			i.payer_email,
+			i.payer_name,
+			i.payer_wallet_address,
+			i.sub_total,
+			i.service_fee,
+			i.total,
+			i.currency,
+			i.status,
+			i.due_date,
+			i.paid_at,
+			i.created_at,
+			i.updated_at,
+			i.address_country,
+			i.approved,
+			i.approved_date,
+			i.rejected_date,
+			i.logo_id,
+			i.notes,
+			i.template_id,
+			GREATEST(
+				similarity(COALESCE(i.invoice_number, ''), $2),
+				similarity(COALESCE(i.payer_email, ''), $2),
+				similarity(COALESCE(i.title, ''), $2),
+				similarity(COALESCE(i.payer_name, ''), $2),
+				similarity(COALESCE(i.template_id, ''), $2)
+			) AS relevance
+		FROM invoice i
+		WHERE i.created_by_id = $1
+			AND (
+				i.invoice_number ILIKE $3 OR
+				i.payer_email ILIKE $3 OR
+				i.title ILIKE $3 OR
+				i.payer_name ILIKE $3 OR
+				i.template_id ILIKE $3
+			)
+	`
+
+	args := []interface{}{userId, strings.TrimSpace(filters.Search), searchTerm}
+	argCount := 3
+
+	if filters.Status != "" {
+		argCount++
+		query += fmt.Sprintf(" AND i.status = $%d", argCount)
+		args = append(args, filters.Status)
+		if filters.Status == "overdue" {
+			query += " AND i.due_date < CURRENT_DATE AND i.status != 'paid'"
+		}
+	}
+
+	query += " ORDER BY relevance DESC, i.created_at DESC"
 
 	argCount++
 	query += fmt.Sprintf(" LIMIT $%d", argCount)
@@ -1380,10 +1515,10 @@ func (is *InvoiceService) GetInvoiceBySearchOnUser(
 
 	payload := struct {
 		Invoice []InvoiceResponse    `json:"invoice"`
-		Meta     SearchPaginationMeta `json:"meta"`
+		Meta    SearchPaginationMeta `json:"meta"`
 	}{
 		Invoice: responses,
-		Meta:     meta,
+		Meta:    meta,
 	}
 
 	go is.cacheInvoice(context.Background(), cacheKey, payload)
