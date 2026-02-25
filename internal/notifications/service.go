@@ -3,7 +3,9 @@ package notifications
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 
 	"github.com/The-True-Hooha/stellance-backend/mail"
@@ -116,7 +118,8 @@ func (ns *NotificationService) UpdateNotificationViewStatus(ctx context.Context,
 	}
 }
 
-func (ns *NotificationService) GetUserNotifications(ctx context.Context, userID string, viewed *bool) *utils.ApiResponse {
+func (ns *NotificationService) GetUserNotifications(ctx context.Context, userID string, dto GetNotificationsQuery) *utils.ApiResponse {
+	offset := (dto.Page - 1) * dto.Count
 	const countQuery = `
 		SELECT
 			COUNT(*) FILTER (WHERE viewed = false) AS unread_count,
@@ -126,7 +129,7 @@ func (ns *NotificationService) GetUserNotifications(ctx context.Context, userID 
 		WHERE user_id = $1
 	`
 
-	var unreadCount, readCount, totalCount int32
+	var unreadCount, readCount, totalCount int
 	err := ns.postgres.QueryRow(ctx, countQuery, userID).Scan(&unreadCount, &readCount, &totalCount)
 	if err != nil {
 		ns.log.Error("failed to query database for notifications")
@@ -143,13 +146,23 @@ func (ns *NotificationService) GetUserNotifications(ctx context.Context, userID 
 	`
 
 	args := []interface{}{userID}
+	argCount := 1
 
-	if viewed != nil {
-		query += " AND viewed = $2"
-		args = append(args, *viewed)
+	if dto.Viewed != nil {
+		argCount++
+		query += fmt.Sprintf(" AND VIEWED = $%d", argCount)
+		args = append(args, *dto.Viewed)
 	}
 
-	query += " ORDER BY created_at DESC"
+	query += fmt.Sprintf(" ORDER BY created_at %s", dto.OrderBy)
+
+	argCount++
+	query += fmt.Sprintf(" LIMIT $%d", argCount)
+	args = append(args, dto.Count)
+
+	argCount++
+	query += fmt.Sprintf(" OFFSET $%d", argCount)
+	args = append(args, offset)
 
 	rows, err := ns.postgres.Query(ctx, query, args...)
 	if err != nil {
@@ -160,14 +173,15 @@ func (ns *NotificationService) GetUserNotifications(ctx context.Context, userID 
 		}
 	}
 	defer rows.Close()
-
+	
 	var result []Notification
 	for rows.Next() {
 		var notif Notification
 		var viewedAt sql.NullTime
-
+		
 		err := rows.Scan(&notif.Id, &notif.Title, &notif.Body, &notif.Viewed, &viewedAt)
 		if err != nil {
+			ns.log.Error("failed to scan into results for notifications")
 			return &utils.ApiResponse{
 				StatusCode: http.StatusInternalServerError,
 				Message:    "Service unreachable",
@@ -183,14 +197,38 @@ func (ns *NotificationService) GetUserNotifications(ctx context.Context, userID 
 		result = append(result, notif)
 	}
 
+	if err = rows.Err(); err != nil {
+		ns.log.Error("row iteration error", "error", err)
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Service unreachable",
+		}
+	}
+
+	filteredCount := totalCount
+	if dto.Viewed != nil {
+		if *dto.Viewed {
+			filteredCount = readCount
+		}else{
+			filteredCount = unreadCount
+		}
+	}
+
+	totalPages := int(math.Ceil((float64(filteredCount) / float64(dto.Count))))
+
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
 		Message:    "successful",
-		Data: Notifications{
-			Notification: result,
-			UnreadCount:  unreadCount,
-			ReadCount:    readCount,
-			TotalCount:   totalCount,
+		Data: GetNotificationResponse{
+			Notifications: result,
+			Meta: PaginationMeta{
+				Page: dto.Page,
+				PageCount: len(result),
+				UnreadCount: unreadCount,
+				ReadCount: readCount,
+				TotalPages: totalPages,
+
+			},
 		},
 	}
 }

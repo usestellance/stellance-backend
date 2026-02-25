@@ -75,8 +75,8 @@ Accept: application/json
 Authorization: Bearer {{jwt}}
 
 ####
-# get all the notifications
-GET {{baseUrl}}/notifications
+# get all the notifications: the query you can send (viewed:boolean, count:number, page:number, order_by: DESC or ASC)
+GET {{baseUrl}}/notification
 Accept: application/json
 Authorization: Bearer {{jwt}}
 
