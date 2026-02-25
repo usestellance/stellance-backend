@@ -213,7 +213,6 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 			userCopy.Wallet.Balance.XLM = &bal.XLM
 		}
 
-		
 		if !existingUser.EmailVerified {
 			err = config.GenerateAndSendEmail(ctx, email, existingUser.ID, config.log)
 			if err != nil {
@@ -639,7 +638,7 @@ func (as *AuthServiceConfig) ResetPassword(ctx context.Context, dto ResetPasswor
 func (as *AuthServiceConfig) HandleSocialAuth(ctx context.Context, dto ProviderLogin) *utils.ApiResponse {
 	dto.Email = strings.ToLower(strings.TrimSpace(dto.Email))
 
-	user, err := user.NewUserService().FindUserByEmail(ctx, dto.Email)
+	existingUser, err := user.NewUserService().FindUserByEmail(ctx, dto.Email)
 	if err != nil {
 		as.log.Error("error getting user from database", "error", err)
 		return &utils.ApiResponse{
@@ -648,11 +647,10 @@ func (as *AuthServiceConfig) HandleSocialAuth(ctx context.Context, dto ProviderL
 		}
 	}
 
-	// the user is not nil, user with such email exists
-	if user != nil && user.AuthType != "password" && user.ProviderID != nil {
-		accessToken, err := as.jwt.GenerateNewAccessToken(user.ID, user.Email, string("user"))
+	if existingUser != nil && existingUser.AuthType != "password" && existingUser.ProviderID != nil {
+		accessToken, err := as.jwt.GenerateNewAccessToken(existingUser.ID, existingUser.Email, string("user"))
 		if err != nil {
-			as.log.Error(fmt.Sprintf("error generating access token for user with Id =>> %s", user.ID), "error", err)
+			as.log.Error(fmt.Sprintf("error generating access token for user with Id =>> %s", existingUser.ID), "error", err)
 			return &utils.ApiResponse{
 				StatusCode: http.StatusInternalServerError,
 				Message:    "service unavailable, kindly contact support",
@@ -660,12 +658,12 @@ func (as *AuthServiceConfig) HandleSocialAuth(ctx context.Context, dto ProviderL
 			}
 		}
 
-		profileComplete := user.FirstName != nil && user.LastName != nil
+		profileComplete := existingUser.FirstName != nil && existingUser.LastName != nil
 		return &utils.ApiResponse{
 			StatusCode: http.StatusOK,
 			Message:    "login successful",
 			Data: &AuthLoginResponseDto{
-				EmailVerified:   user.EmailVerified,
+				EmailVerified:   existingUser.EmailVerified,
 				ProfileComplete: profileComplete,
 				ExpiresIn:       time.Now().Add(1 * time.Hour).Unix(),
 				AccessToken:     accessToken,
@@ -683,17 +681,21 @@ func (as *AuthServiceConfig) HandleSocialAuth(ctx context.Context, dto ProviderL
 	}
 	defer tx.Rollback(ctx)
 
+	newUser := &user.User{}
+
 	const createUserQ = `
-		INSERT INTO users (email, provider_id) VALUES ($1, $2) RETURNING id, email, created_at, is_active
+		INSERT INTO users (email, provider_id) 
+		VALUES ($1, $2) 
+		RETURNING id, email
 	`
 
-	err = tx.QueryRow(ctx, createUserQ, dto.Email, dto.ProviderID).Scan(&user.ID,
-		&user.Email,
-		&user.CreatedAt,
-		&user.IsActive,
+	err = tx.QueryRow(ctx, createUserQ, dto.Email, dto.ProviderID).Scan(
+		&newUser.Id,
+		&newUser.Email,
 	)
 
 	if err != nil {
+		as.log.Error("failed to create new user", "error", err)
 		return &utils.ApiResponse{
 			StatusCode: http.StatusInternalServerError,
 			Message:    "service unavailable, kindly contact support",
@@ -710,9 +712,9 @@ func (as *AuthServiceConfig) HandleSocialAuth(ctx context.Context, dto ProviderL
 		}
 	}
 
-	accessToken, err := as.jwt.GenerateNewAccessToken(user.ID, user.Email, string("user"))
+	accessToken, err := as.jwt.GenerateNewAccessToken(newUser.Id, newUser.Email, string("user"))
 	if err != nil {
-		as.log.Error(fmt.Sprintf("error generating access token for user with Id =>> %s", user.ID), "error", err)
+		as.log.Error(fmt.Sprintf("error generating access token for user with Id =>> %s", newUser.Id), "error", err)
 		return &utils.ApiResponse{
 			StatusCode: http.StatusInternalServerError,
 			Message:    "service unavailable, kindly contact support",
@@ -720,14 +722,17 @@ func (as *AuthServiceConfig) HandleSocialAuth(ctx context.Context, dto ProviderL
 		}
 	}
 
-	err = as.GenerateAndSendEmail(ctx, dto.Email, user.ID, as.log)
+	err = as.GenerateAndSendEmail(ctx, dto.Email, newUser.Id, as.log)
 	if err != nil {
+		as.log.Error("failed to send verification email", "error", err)
 		return &utils.ApiResponse{
 			StatusCode: http.StatusInternalServerError,
 			Message:    "Server currently unavailable",
 		}
 	}
-	as.log.Debug(fmt.Sprintf("new user with ID %s created successfully", user.ID))
+
+	as.log.Debug(fmt.Sprintf("new user with ID %s created successfully", newUser.Id))
+
 	return &utils.ApiResponse{
 		StatusCode: http.StatusCreated,
 		Message:    "account has successfully been created, and email sent for verification",
@@ -736,5 +741,4 @@ func (as *AuthServiceConfig) HandleSocialAuth(ctx context.Context, dto ProviderL
 			"expiresIn":   time.Now().Add(1 * time.Hour).Unix(),
 		},
 	}
-
 }

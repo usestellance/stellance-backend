@@ -40,11 +40,10 @@ Authorization: Bearer {{jwt}}
 POST {{baseUrl}}/auth/social
 Accept: application/json
 Content-Type: application/json
-Authorization: Bearer {{jwt}}
 
 {
-    "email": "computerman@gmail.com",
-    "provider_id": "computerman323."
+    "email": "verydarkman@gmail.com",
+    "provider_id": "computerman323.3edrsf"
 }
 
 ####
