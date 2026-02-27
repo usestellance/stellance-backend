@@ -2099,42 +2099,88 @@ func (is *InvoiceService) ReviewInvoice(ctx context.Context, invoiceId string, a
 }
 
 func (is *InvoiceService) UpdateOverdueInvoices(ctx context.Context) error {
-	const query = `
+	is.log.Info("Starting invoice status update")
+	
+	var draftCount, rejectedCount, notRejectedCount int
+	
+	is.postgres.QueryRow(ctx, `SELECT COUNT(*) FROM invoice WHERE status = 'draft'`).Scan(&draftCount)
+	is.postgres.QueryRow(ctx, `SELECT COUNT(*) FROM invoice WHERE status = 'draft' AND approved = false`).Scan(&rejectedCount)
+	is.postgres.QueryRow(ctx, `SELECT COUNT(*) FROM invoice WHERE status = 'draft' AND (approved IS NULL OR approved = true)`).Scan(&notRejectedCount)
+	
+	is.log.Info("Draft invoice breakdown",
+		"total_draft", draftCount,
+		"rejected", rejectedCount,
+		"not_rejected", notRejectedCount,
+	)
+	
+	const cancelledQuery = `
+		UPDATE invoice 
+		SET 
+			status = 'cancelled',
+			updated_at = NOW()
+		WHERE 
+			status IN ('draft', 'sent', 'viewed', 'pending')
+			AND approved = false
+		RETURNING id`
+
+	cancelledRows, err := is.postgres.Query(ctx, cancelledQuery)
+	if err != nil {
+		is.log.Error("Failed to update rejected invoices to cancelled", "error", err)
+		return err
+	}
+
+	var cancelledIDs []string
+	for cancelledRows.Next() {
+		var invoiceID string
+		if err := cancelledRows.Scan(&invoiceID); err != nil {
+			is.log.Error("Failed to scan cancelled invoice ID", "error", err)
+			continue
+		}
+		cancelledIDs = append(cancelledIDs, invoiceID)
+		is.DeleteFromRedisCache(ctx, invoiceID)
+	}
+	cancelledRows.Close()
+
+	const overdueQuery = `
 		UPDATE invoice 
 		SET 
 			status = 'overdue',
 			updated_at = NOW()
 		WHERE 
-			status IN ('sent', 'viewed', 'approved', 'pending')
+			status IN ('draft', 'sent', 'viewed', 'pending')
 			AND due_date < CURRENT_DATE
 			AND paid_at IS NULL
+			AND (approved IS NULL OR approved = true)
 		RETURNING id`
 
-	rows, err := is.postgres.Query(ctx, query)
+	overdueRows, err := is.postgres.Query(ctx, overdueQuery)
 	if err != nil {
 		is.log.Error("Failed to update overdue invoices", "error", err)
 		return err
 	}
-	defer rows.Close()
+	defer overdueRows.Close()
 
-	var updatedIDs []string
-
-	for rows.Next() {
+	var overdueIDs []string
+	for overdueRows.Next() {
 		var invoiceID string
-		if err := rows.Scan(&invoiceID); err != nil {
-			is.log.Error("Failed to scan invoice ID", "error", err)
+		if err := overdueRows.Scan(&invoiceID); err != nil {
+			is.log.Error("Failed to scan overdue invoice ID", "error", err)
 			continue
 		}
-		updatedIDs = append(updatedIDs, invoiceID)
+		overdueIDs = append(overdueIDs, invoiceID)
 		is.DeleteFromRedisCache(ctx, invoiceID)
 	}
 
-	if err := rows.Err(); err != nil {
+	if err := overdueRows.Err(); err != nil {
 		is.log.Error("Row iteration error", "error", err)
 		return err
 	}
 
-	is.log.Info("Updated overdue invoices", "count", len(updatedIDs))
+	is.log.Info("Updated invoice statuses", 
+		"cancelled_count", len(cancelledIDs),
+		"overdue_count", len(overdueIDs),
+	)
+	
 	return nil
 }
 

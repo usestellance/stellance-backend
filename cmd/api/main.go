@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/The-True-Hooha/stellance-backend/cmd/server"
@@ -63,24 +64,55 @@ func main() {
 
 	defer config.Shutdown()
 
-	server := server.SetServerConfig()
-	server.StartHttpServer(ctx)
 	addr := fmt.Sprintf("%s:%s", redis.Host, redis.Port)
-
-	scheduler := asynq.NewScheduler(asynq.RedisClientOpt{
+	redisOpt := asynq.RedisClientOpt{
 		Addr:     addr,
 		Password: redis.Password,
 		DB:       redis.Index,
-	}, nil)
+	}
+
+	worker, scheduler := startBackgroundWorkers(ctx, redisOpt, log)
+	defer func() {
+		scheduler.Shutdown()
+		worker.Shutdown()
+	}()
+
+	server := server.SetServerConfig()
+	server.StartHttpServer(ctx)
+}
+
+func startBackgroundWorkers(ctx context.Context, redisOpt asynq.RedisClientOpt, log *slog.Logger) (*asynq.Server, *asynq.Scheduler) {
+	worker := asynq.NewServer(redisOpt, asynq.Config{
+		Concurrency: 10,
+	})
+
+	mux := asynq.NewServeMux()
+	mux.HandleFunc(tasks.TypeUpdateOverdueInvoices, tasks.HandleUpdateOverdueInvoices)
+	go func() {
+		if err := worker.Run(mux); err != nil {
+			log.Error("asynq worker stopped running", "error", err)
+		}
+	}()
+
+	scheduler := asynq.NewScheduler(redisOpt, nil)
 	task, err := tasks.NewUpdateOverdueInvoicesTask()
 	if err != nil {
-		log.Error("failed to run scheduler to update invoices tasks")
+		log.Error("failed to create update invoice overdue tasks", "error", err)
 	} else {
-		scheduler.Register("0 1 * * *", task)
-		err := scheduler.Run()
-		if err != nil {
-			log.Error("failed to start scheduler", "error", err)
+		if _, err := scheduler.Register("0 0 * * *", task); err != nil {
+			log.Error("failed to register scheduled task", "error", err)
 		}
 	}
 
+	go func() {
+		if err := scheduler.Run(); err != nil {
+			log.Error("asynq scheduler stopped", "error", err)
+		}
+	}()
+	log.Info("Background workers started",
+		"scheduler_cron", "0 1 * * *",
+		"worker_concurrency", 10,
+	)
+
+	return worker, scheduler
 }
