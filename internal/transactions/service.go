@@ -230,14 +230,11 @@ func (s *TransactionService) GetTransactionsPaginated(ctx context.Context, page,
 func (tr *TransactionService) GetTransactionOverviewByUserQuery(ctx context.Context, userID string) ([]TransactionOverviewRow, error) {
 	const query = `
 		SELECT 
-			COALESCE(i.status::text, 'no_invoice') as invoice_status,
-			COALESCE(SUM(t.amount), 0) as total_amount,
-			COUNT(DISTINCT t.invoice_id) as invoice_count
-		FROM transactions t
-		LEFT JOIN invoice i ON t.invoice_id = i.id
+			i.status::text as invoice_status,
+			COALESCE(SUM(i.total), 0) as total_amount,
+			COUNT(i.id) as invoice_count
+		FROM invoice i
 		WHERE i.created_by_id = $1
-			AND t.currency = 'usdc'
-			AND t.status = 'confirmed'
 		GROUP BY i.status
 	`
 
