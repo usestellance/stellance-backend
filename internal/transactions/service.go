@@ -419,10 +419,10 @@ func (ts *TransactionService) GetTransactionCashFlow(ctx context.Context, userID
 			continue
 		}
 
-		monthName := row.Month.Format("Jan")
+		dateStr := row.Month.Format("2026-01-02")
 
 		cashFlow = append(cashFlow, CashFlowDataPoint{
-			Date:     monthName,
+			Date:     dateStr,
 			Amount:   amountInCents,
 			Invoices: row.InvoiceCount,
 		})
