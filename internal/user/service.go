@@ -46,11 +46,13 @@ func (s *UserService) FindUserByEmail(ctx context.Context, email string) (*UserP
 	var user UserProfileDto
 	var country_ sql.NullString
 	var provider_id sql.NullString
+	var password sql.NullString
+
 	err := s.postgres.QueryRow(ctx, query, email).Scan(
 		&user.ID,
 		&user.Email,
 		&user.AuthType,
-		&user.Password,
+		&password,
 		&user.Role,
 		&user.EmailVerified,
 		&user.FirstName,
@@ -71,6 +73,10 @@ func (s *UserService) FindUserByEmail(ctx context.Context, email string) (*UserP
 	}
 	if country_.Valid {
 		user.Country = &country_.String
+	}
+
+	if password.Valid{
+		user.Password = &password.String
 	}
 
 	if err != nil {
