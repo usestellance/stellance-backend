@@ -647,30 +647,41 @@ func (as *AuthServiceConfig) HandleSocialAuth(ctx context.Context, dto ProviderL
 		}
 	}
 
-	if existingUser != nil && existingUser.AuthType != "password" && existingUser.ProviderID != nil {
-		accessToken, err := as.jwt.GenerateNewAccessToken(existingUser.ID, existingUser.Email, string("user"))
-		if err != nil {
-			as.log.Error(fmt.Sprintf("error generating access token for user with Id =>> %s", existingUser.ID), "error", err)
+	if existingUser != nil {
+		if existingUser.AuthType == "password" {
+			as.log.Error(fmt.Sprintf("error logging in, user must log with correct auth type =>> %s, user email ===> %s", existingUser.AuthType, existingUser.Email))
 			return &utils.ApiResponse{
-				StatusCode: http.StatusInternalServerError,
-				Message:    "service unavailable, kindly contact support",
+				StatusCode: http.StatusForbidden,
+				Message:    "Kindly login with your password, or contact support",
 			}
 		}
 
-		profileComplete := existingUser.FirstName != nil && existingUser.LastName != nil
-		return &utils.ApiResponse{
-			StatusCode: http.StatusOK,
-			Message:    "login successful",
-			Data: &AuthLoginResponseDto{
-				EmailVerified:   existingUser.EmailVerified,
-				ProfileComplete: profileComplete,
-				ExpiresIn:       time.Now().Add(1 * time.Hour).Unix(),
-				AccessToken:     accessToken,
-				User: &user.User{
-					Id:    existingUser.ID,
-					Email: existingUser.Email,
+		if existingUser.AuthType != "password" && existingUser.ProviderID != nil {
+
+			accessToken, err := as.jwt.GenerateNewAccessToken(existingUser.ID, existingUser.Email, string("user"))
+			if err != nil {
+				as.log.Error(fmt.Sprintf("error generating access token for user with Id =>> %s", existingUser.ID), "error", err)
+				return &utils.ApiResponse{
+					StatusCode: http.StatusInternalServerError,
+					Message:    "service unavailable, kindly contact support",
+				}
+			}
+
+			profileComplete := existingUser.FirstName != nil && existingUser.LastName != nil
+			return &utils.ApiResponse{
+				StatusCode: http.StatusOK,
+				Message:    "login successful",
+				Data: &AuthLoginResponseDto{
+					EmailVerified:   existingUser.EmailVerified,
+					ProfileComplete: profileComplete,
+					ExpiresIn:       time.Now().Add(1 * time.Hour).Unix(),
+					AccessToken:     accessToken,
+					User: &user.User{
+						Id:    existingUser.ID,
+						Email: existingUser.Email,
+					},
 				},
-			},
+			}
 		}
 	}
 
