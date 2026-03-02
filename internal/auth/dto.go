@@ -21,7 +21,7 @@ type AuthLoginResponseDto struct {
 	ExpiresIn       int64     `json:"expires_in,omitempty"`
 	EmailVerified   bool      `json:"email_verified"`
 	ProfileComplete bool      `json:"profile_complete"`
-	User            user.User `json:"user"`
+	User            *user.User `json:"user,omitempty"`
 }
 
 type ResetPasswordDto struct {

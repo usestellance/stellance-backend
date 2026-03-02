@@ -243,7 +243,7 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 				ExpiresIn:       time.Now().Add(1 * time.Hour).Unix(),
 				EmailVerified:   existingUser.EmailVerified,
 				ProfileComplete: profileComplete,
-				User:            *userCopy,
+				User:            userCopy,
 			},
 		}
 
@@ -654,7 +654,6 @@ func (as *AuthServiceConfig) HandleSocialAuth(ctx context.Context, dto ProviderL
 			return &utils.ApiResponse{
 				StatusCode: http.StatusInternalServerError,
 				Message:    "service unavailable, kindly contact support",
-				Error:      err.Error(),
 			}
 		}
 
@@ -667,6 +666,10 @@ func (as *AuthServiceConfig) HandleSocialAuth(ctx context.Context, dto ProviderL
 				ProfileComplete: profileComplete,
 				ExpiresIn:       time.Now().Add(1 * time.Hour).Unix(),
 				AccessToken:     accessToken,
+				User: &user.User{
+					Id:    existingUser.ID,
+					Email: existingUser.Email,
+				},
 			},
 		}
 	}
@@ -676,7 +679,6 @@ func (as *AuthServiceConfig) HandleSocialAuth(ctx context.Context, dto ProviderL
 		return &utils.ApiResponse{
 			StatusCode: http.StatusInternalServerError,
 			Message:    "service unavailable, kindly contact support",
-			Error:      err.Error(),
 		}
 	}
 	defer tx.Rollback(ctx)
@@ -684,12 +686,12 @@ func (as *AuthServiceConfig) HandleSocialAuth(ctx context.Context, dto ProviderL
 	newUser := &user.User{}
 
 	const createUserQ = `
-		INSERT INTO users (email, provider_id) 
-		VALUES ($1, $2) 
+		INSERT INTO users (email, provider_id, auth_type) 
+		VALUES ($1, $2, $3) 
 		RETURNING id, email
 	`
 
-	err = tx.QueryRow(ctx, createUserQ, dto.Email, dto.ProviderID).Scan(
+	err = tx.QueryRow(ctx, createUserQ, dto.Email, dto.ProviderID, "google").Scan(
 		&newUser.Id,
 		&newUser.Email,
 	)
@@ -699,7 +701,6 @@ func (as *AuthServiceConfig) HandleSocialAuth(ctx context.Context, dto ProviderL
 		return &utils.ApiResponse{
 			StatusCode: http.StatusInternalServerError,
 			Message:    "service unavailable, kindly contact support",
-			Error:      err.Error(),
 		}
 	}
 
@@ -708,7 +709,6 @@ func (as *AuthServiceConfig) HandleSocialAuth(ctx context.Context, dto ProviderL
 		return &utils.ApiResponse{
 			StatusCode: http.StatusInternalServerError,
 			Message:    "service unavailable, kindly contact support",
-			Error:      err.Error(),
 		}
 	}
 
@@ -718,7 +718,6 @@ func (as *AuthServiceConfig) HandleSocialAuth(ctx context.Context, dto ProviderL
 		return &utils.ApiResponse{
 			StatusCode: http.StatusInternalServerError,
 			Message:    "service unavailable, kindly contact support",
-			Error:      err.Error(),
 		}
 	}
 
