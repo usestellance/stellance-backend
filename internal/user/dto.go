@@ -12,7 +12,7 @@ const (
 type UserProfileDto struct {
 	ID              string      `json:"id"`
 	Email           string      `json:"email,omitempty"`
-	Password        string      `json:"password,omitempty"`
+	Password        *string      `json:"password,omitempty"`
 	FirstName       *string     `json:"first_name,omitempty"`
 	LastName        *string     `json:"last_name,omitempty"`
 	BusinessName    *string     `json:"business_name,omitempty"`

@@ -168,7 +168,7 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 			Message:    "invalid login credentials, contact support",
 		}
 	} else {
-		err = utils.CompareHash(existingUser.Password, dto.Password)
+		err = utils.CompareHash(*existingUser.Password, dto.Password)
 		if err != nil {
 			return &utils.ApiResponse{
 				StatusCode: http.StatusForbidden,
@@ -737,8 +737,8 @@ func (as *AuthServiceConfig) HandleSocialAuth(ctx context.Context, dto ProviderL
 		StatusCode: http.StatusCreated,
 		Message:    "account has successfully been created, and email sent for verification",
 		Data: map[string]interface{}{
-			"accessToken": accessToken,
-			"expiresIn":   time.Now().Add(1 * time.Hour).Unix(),
+			"access_token": accessToken,
+			"expires_in":   time.Now().Add(1 * time.Hour).Unix(),
 		},
 	}
 }
