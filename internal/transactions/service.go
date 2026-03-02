@@ -310,19 +310,17 @@ func (ts *TransactionService) GetTransactionCardForUser(ctx context.Context, use
 func (tr *TransactionService) GetTransactionCashFlowQuery(ctx context.Context, userID string, fromDate, toDate time.Time) ([]CashFlowRow, error) {
 	const query = `
 		SELECT 
-			DATE_TRUNC('month', t.created_at) as month,
-			COALESCE(SUM(t.amount), 0) as total_amount,
-			COUNT(DISTINCT t.invoice_id) as invoice_count
-		FROM transactions t
-		INNER JOIN invoice i ON t.invoice_id = i.id
+			DATE_TRUNC('month', i.created_at) as month,
+			COALESCE(SUM(i.total), 0) as total_amount,
+			COUNT(i.id) as invoice_count
+		FROM invoice i
 		WHERE i.created_by_id = $1
-			AND t.currency = 'usdc'
-			AND t.status = 'confirmed'
-			AND t.created_at >= $2
-			AND t.created_at < $3
-		GROUP BY DATE_TRUNC('month', t.created_at)
+			AND i.status = 'paid'
+			AND i.created_at >= $2
+			AND i.created_at < $3
+		GROUP BY DATE_TRUNC('month', i.created_at)
 		ORDER BY month ASC
-	`
+`
 
 	rows, err := tr.postgres.Query(ctx, query, userID, fromDate, toDate)
 	if err != nil {
@@ -368,7 +366,6 @@ func (ts *TransactionService) GetTransactionCashFlow(ctx context.Context, userID
 			return &utils.ApiResponse{
 				StatusCode: http.StatusBadRequest,
 				Message:    "invalid 'from' date format. Use YYYY-MM-DD",
-				Error:      err.Error(),
 			}
 		}
 		toDate, err = time.Parse("2006-01-02", query.To)
@@ -376,7 +373,6 @@ func (ts *TransactionService) GetTransactionCashFlow(ctx context.Context, userID
 			return &utils.ApiResponse{
 				StatusCode: http.StatusBadRequest,
 				Message:    "invalid 'to' date format. Use YYYY-MM-DD",
-				Error:      err.Error(),
 			}
 		}
 
@@ -394,7 +390,6 @@ func (ts *TransactionService) GetTransactionCashFlow(ctx context.Context, userID
 			return &utils.ApiResponse{
 				StatusCode: http.StatusInternalServerError,
 				Message:    "failed to retrieve user creation date",
-				Error:      err.Error(),
 			}
 		}
 
@@ -412,7 +407,6 @@ func (ts *TransactionService) GetTransactionCashFlow(ctx context.Context, userID
 		return &utils.ApiResponse{
 			StatusCode: http.StatusInternalServerError,
 			Message:    "failed to retrieve transaction cash flow",
-			Error:      err.Error(),
 		}
 	}
 
