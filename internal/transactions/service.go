@@ -310,17 +310,18 @@ func (ts *TransactionService) GetTransactionCardForUser(ctx context.Context, use
 func (tr *TransactionService) GetTransactionCashFlowQuery(ctx context.Context, userID string, fromDate, toDate time.Time) ([]CashFlowRow, error) {
 	const query = `
 		SELECT 
-			DATE_TRUNC('month', i.created_at) as month,
+			TO_CHAR(DATE_TRUNC('month', i.paid_at), 'YYYY-MM-DD') as month,
 			COALESCE(SUM(i.total), 0) as total_amount,
 			COUNT(i.id) as invoice_count
 		FROM invoice i
 		WHERE i.created_by_id = $1
 			AND i.status = 'paid'
-			AND i.created_at >= $2
-			AND i.created_at < $3
-		GROUP BY DATE_TRUNC('month', i.created_at)
-		ORDER BY month ASC
-`
+			AND i.paid_at IS NOT NULL
+			AND i.paid_at >= $2
+			AND i.paid_at < $3
+		GROUP BY DATE_TRUNC('month', i.paid_at)
+		ORDER BY DATE_TRUNC('month', i.paid_at) ASC
+	`
 
 	rows, err := tr.postgres.Query(ctx, query, userID, fromDate, toDate)
 	if err != nil {
@@ -331,9 +332,18 @@ func (tr *TransactionService) GetTransactionCashFlowQuery(ctx context.Context, u
 	var results []CashFlowRow
 	for rows.Next() {
 		var row CashFlowRow
-		if err := rows.Scan(&row.Month, &row.TotalAmount, &row.InvoiceCount); err != nil {
+		var monthStr string
+
+		if err := rows.Scan(&monthStr, &row.TotalAmount, &row.InvoiceCount); err != nil {
 			return nil, fmt.Errorf("failed to scan row: %w", err)
 		}
+
+		parsedMonth, err := time.Parse("2006-01-02", monthStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse month: %w", err)
+		}
+
+		row.Month = parsedMonth
 		results = append(results, row)
 	}
 
@@ -419,7 +429,7 @@ func (ts *TransactionService) GetTransactionCashFlow(ctx context.Context, userID
 			continue
 		}
 
-		dateStr := row.Month.Format("2026-01-02")
+		dateStr := row.Month.Format("2006-01-02")
 
 		cashFlow = append(cashFlow, CashFlowDataPoint{
 			Date:     dateStr,
