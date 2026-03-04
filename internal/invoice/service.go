@@ -1108,7 +1108,7 @@ func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invo
 			i.payer_email, i.payer_name, i.sub_total, i.service_fee, i.total,
 			i.currency, i.status, i.due_date, i.paid_at,
 			i.created_at, i.updated_at, i.address_country, i.created_by_id,
-			i.approved, i.approved_date, i.rejected_date, i.logo_id, template_id,
+			i.approved, i.approved_date, i.rejected_date, i.logo_id, template_id, i.notes,
 			u.first_name, u.last_name, u.country, u.email, u.business_name, u.phone_number,
 			json_agg(
 				json_build_object(
@@ -1167,6 +1167,7 @@ func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invo
 		CreatedAt      time.Time       `db:"created_at"`
 		UpdatedAt      time.Time       `db:"updated_at"`
 		AddressCountry sql.NullString  `db:"address_country"`
+		Notes          sql.NullString  `db:"note"`
 		CreatedBy      string          `db:"created_by_id"`
 		Items          json.RawMessage `db:"items"`
 		Approved       bool            `db:"approved"`
@@ -1197,6 +1198,7 @@ func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invo
 		&invoice.RejectedDate,
 		&invoice.LogoID,
 		&invoice.TemplateID,
+		&invoice.Notes,
 		&first_name,
 		&last_name,
 		&sender_country,
@@ -1291,6 +1293,8 @@ func (is *InvoiceService) GetInvoiceSearch(ctx context.Context, invoiceUrl, invo
 		Items:         items,
 		Approved:      &invoice.Approved,
 		LogoURL:       logoURL,
+		TemplateID:    TemplateIDType(invoice.TemplateID),
+		Note:          invoice.Notes.String,
 	}
 
 	if invoice.PaidAt.Valid {
@@ -2100,19 +2104,19 @@ func (is *InvoiceService) ReviewInvoice(ctx context.Context, invoiceId string, a
 
 func (is *InvoiceService) UpdateOverdueInvoices(ctx context.Context) error {
 	is.log.Info("Starting invoice status update")
-	
+
 	var draftCount, rejectedCount, notRejectedCount int
-	
+
 	is.postgres.QueryRow(ctx, `SELECT COUNT(*) FROM invoice WHERE status = 'draft'`).Scan(&draftCount)
 	is.postgres.QueryRow(ctx, `SELECT COUNT(*) FROM invoice WHERE status = 'draft' AND approved = false`).Scan(&rejectedCount)
 	is.postgres.QueryRow(ctx, `SELECT COUNT(*) FROM invoice WHERE status = 'draft' AND (approved IS NULL OR approved = true)`).Scan(&notRejectedCount)
-	
+
 	is.log.Info("Draft invoice breakdown",
 		"total_draft", draftCount,
 		"rejected", rejectedCount,
 		"not_rejected", notRejectedCount,
 	)
-	
+
 	const cancelledQuery = `
 		UPDATE invoice 
 		SET 
@@ -2176,11 +2180,11 @@ func (is *InvoiceService) UpdateOverdueInvoices(ctx context.Context) error {
 		return err
 	}
 
-	is.log.Info("Updated invoice statuses", 
+	is.log.Info("Updated invoice statuses",
 		"cancelled_count", len(cancelledIDs),
 		"overdue_count", len(overdueIDs),
 	)
-	
+
 	return nil
 }
 
