@@ -12,9 +12,8 @@ func RegisterInvoiceCommentRoutes(apiV1 *httpx.RouteGroup, router *http.ServeMux
 	authMiddleware := middleware.NewAuthMiddleware(service.jwtService)
 	commentGroup := apiV1.AddGroup("/comments")
 
-	// TODO: make the comments open to outsiders
-	commentGroup.HandleFunc("POST /", authMiddleware.Authenticate(http.HandlerFunc(ch.CreateComment)).ServeHTTP)
-	commentGroup.HandleFunc("GET /", authMiddleware.Authenticate(http.HandlerFunc(ch.GetComments)).ServeHTTP)
-	commentGroup.HandleFunc("GET /{id}", authMiddleware.Authenticate(http.HandlerFunc(ch.GetCommentByID)).ServeHTTP)
-	commentGroup.HandleFunc("PATCH /{id}", authMiddleware.Authenticate(http.HandlerFunc(ch.UpdateComment)).ServeHTTP)
+	commentGroup.HandleFunc("POST /", authMiddleware.IsPublicAccess(http.HandlerFunc(ch.CreateComment)).ServeHTTP)
+	commentGroup.HandleFunc("GET /", authMiddleware.IsPublicAccess(http.HandlerFunc(ch.GetComments)).ServeHTTP)
+	commentGroup.HandleFunc("GET /{id}", authMiddleware.IsPublicAccess(http.HandlerFunc(ch.GetCommentByID)).ServeHTTP)
+	commentGroup.HandleFunc("PATCH /{id}", authMiddleware.IsPublicAccess(http.HandlerFunc(ch.UpdateComment)).ServeHTTP)
 }

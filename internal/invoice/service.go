@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -1871,30 +1872,7 @@ func (is *InvoiceService) SendInvoice(ctx context.Context, userId, invoiceId str
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			var exists bool
-			var isOwner bool
-			checkErr := is.postgres.QueryRow(ctx, `
-				SELECT 
-					EXISTS(SELECT 1 FROM invoice WHERE id = $1),
-					EXISTS(SELECT 1 FROM invoice WHERE id = $1 AND created_by_id = $2)
-			`, invoiceId, userId).Scan(&exists, &isOwner)
-
-			if checkErr != nil || !exists {
-				return &utils.ApiResponse{
-					StatusCode: http.StatusNotFound,
-					Message:    "Invoice not found",
-				}
-			}
-			if !isOwner {
-				return &utils.ApiResponse{
-					StatusCode: http.StatusForbidden,
-					Message:    "Access denied",
-				}
-			}
-			return &utils.ApiResponse{
-				StatusCode: http.StatusBadRequest,
-				Message:    "Invoice already sent or paid",
-			}
+			return is.handleInvoiceNotFound(ctx, invoiceId, userId)
 		}
 
 		is.log.Error("failed to send invoice", "error", err, "user_id", userId)
@@ -1904,18 +1882,54 @@ func (is *InvoiceService) SendInvoice(ctx context.Context, userId, invoiceId str
 		}
 	}
 
-	primaryRecipient := emails[0]
-	var ccRecipients []string
-
-	if len(emails) > 1 {
-		ccRecipients = emails[1:]
+	secret := os.Getenv("INVOICE_ACCESS_SECRET")
+	if secret == "" {
+		is.log.Error("INVOICE_ACCESS_SECRET not set")
+		return &utils.ApiResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Server configuration error",
+		}
 	}
 
+	allRecipients := append([]string{}, emails...)
 	if payer_email != "" && !contains(emails, payer_email) {
-		ccRecipients = append(ccRecipients, payer_email)
+		allRecipients = append(allRecipients, payer_email)
+	}
+	allRecipients = removeDuplicates(allRecipients)
+
+	type EmailData struct {
+		Recipient string
+		Name      string
+		URL       string
 	}
 
-	ccRecipients = removeDuplicates(ccRecipients)
+	emailsToSend := make([]EmailData, 0, len(allRecipients))
+
+	for _, recipient := range allRecipients {
+		name := is.GetNameFromEmail(recipient)
+
+		token, err := utils.GenerateInvoiceAccessToken(invoice_url, recipient, name, secret)
+		if err != nil {
+			is.log.Error("failed to generate access token",
+				"error", err,
+				"recipient", recipient)
+			return &utils.ApiResponse{
+				StatusCode: http.StatusInternalServerError,
+				Message:    "Failed to generate secure access tokens",
+			}
+		}
+
+		invoiceURL := fmt.Sprintf("https://usestellance.com/client/%s?token=%s&name=%s",
+			url.QueryEscape(invoice_url),
+			url.QueryEscape(token),
+			url.QueryEscape(name))
+
+		emailsToSend = append(emailsToSend, EmailData{
+			Recipient: recipient,
+			Name:      name,
+			URL:       invoiceURL,
+		})
+	}
 
 	go func() {
 		senderName := strings.TrimSpace(fmt.Sprintf("%s %s", first_name, last_name))
@@ -1923,43 +1937,44 @@ func (is *InvoiceService) SendInvoice(ctx context.Context, userId, invoiceId str
 			senderName = "Stellance User"
 		}
 
-		invoiceURL := fmt.Sprintf("https://usestellance.com/client/%s", url.QueryEscape(invoice_url))
+		successCount := 0
+		failedEmails := []string{}
 
-		if err := is.mail.SendInvoiceUrlMail(mail.SendInvoiceEmailData{
-			PrimaryRecipient: primaryRecipient,
-			CCRecipients:     ccRecipients,
-			PayerName:        payer_name,
-			SenderName:       senderName,
-			InvoiceURL:       invoiceURL,
-		}); err != nil {
-			is.log.Error("failed to send invoice email",
-				"error", err,
-				"invoice_id", invoiceId,
-				"primary_recipient", primaryRecipient,
-				"cc_count", len(ccRecipients))
-		} else {
-			is.log.Info("invoice email sent successfully",
-				"invoice_id", invoiceId,
-				"primary_recipient", primaryRecipient,
-				"cc_recipients", ccRecipients,
-				"total_recipients", len(emails))
+		for _, emailData := range emailsToSend {
+			if err := is.mail.SendInvoiceUrlMail(mail.SendInvoiceEmailData{
+				PrimaryRecipient: emailData.Recipient,
+				PayerName:        payer_name,
+				SenderName:       senderName,
+				InvoiceURL:       emailData.URL,
+			}); err != nil {
+				is.log.Error("failed to send invoice email",
+					"error", err,
+					"invoice_id", invoiceId,
+					"recipient", emailData.Recipient)
+				failedEmails = append(failedEmails, emailData.Recipient)
+			} else {
+				successCount++
+			}
 		}
+
+		is.log.Info("invoice email campaign completed",
+			"invoice_id", invoiceId,
+			"total_sent", successCount,
+			"total_failed", len(failedEmails),
+			"failed_emails", failedEmails,
+			"total_recipients", len(emailsToSend))
 	}()
 
 	is.DeleteFromRedisCache(ctx, invoiceId)
 
-	responseMessage := fmt.Sprintf("Invoice sent successfully to %d recipient(s)", len(emails))
-	if len(ccRecipients) > 0 {
-		responseMessage = fmt.Sprintf("Invoice sent to %s with %d CC recipient(s)", primaryRecipient, len(ccRecipients))
-	}
+	responseMessage := fmt.Sprintf("Invoice is being sent to %d recipient(s)", len(allRecipients))
 
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
 		Message:    responseMessage,
 		Data: map[string]interface{}{
-			"primary_recipient": primaryRecipient,
-			"cc_recipients":     ccRecipients,
-			"total_sent":        len(emails) + len(ccRecipients),
+			"total_recipients": len(allRecipients),
+			"invoice_url":      invoice_url,
 		},
 	}
 }
@@ -2323,6 +2338,25 @@ func (is *InvoiceService) GetInvoicesByStatus(ctx context.Context, userID string
 	}
 }
 
+func (is *InvoiceService) GetNameFromEmail(email string) string {
+	parts := strings.Split(email, "@")
+	if len(parts) > 0 && parts[0] != "" {
+		username := parts[0]
+		sanitized := strings.Map(func(r rune) rune {
+			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
+				(r >= '0' && r <= '9') || r == '.' || r == '-' || r == '_' {
+				return r
+			}
+			return -1
+		}, username)
+
+		if sanitized != "" {
+			return sanitized
+		}
+	}
+	return fmt.Sprintf("user_%s", uuid.New().String()[:8])
+}
+
 func (is *InvoiceService) UpdateInvoice(ctx context.Context, invoiceID, userID string, dto UpdateInvoiceDTO, logoFile *logo.LogoFileData) *utils.ApiResponse {
 	if _, err := uuid.Parse(invoiceID); err != nil {
 		return &utils.ApiResponse{
@@ -2572,5 +2606,35 @@ func (is *InvoiceService) UpdateInvoice(ctx context.Context, invoiceID, userID s
 			"invoice_id": invoiceID,
 			"updated_at": updatedAt,
 		},
+	}
+}
+
+func (is *InvoiceService) handleInvoiceNotFound(ctx context.Context, invoiceId, userId string) *utils.ApiResponse {
+	var exists bool
+	var isOwner bool
+
+	err := is.postgres.QueryRow(ctx, `
+		SELECT 
+			EXISTS(SELECT 1 FROM invoice WHERE id = $1),
+			EXISTS(SELECT 1 FROM invoice WHERE id = $1 AND created_by_id = $2)
+	`, invoiceId, userId).Scan(&exists, &isOwner)
+
+	if err != nil || !exists {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusNotFound,
+			Message:    "Invoice not found",
+		}
+	}
+
+	if !isOwner {
+		return &utils.ApiResponse{
+			StatusCode: http.StatusForbidden,
+			Message:    "Access denied",
+		}
+	}
+
+	return &utils.ApiResponse{
+		StatusCode: http.StatusBadRequest,
+		Message:    "Invoice already sent or paid",
 	}
 }

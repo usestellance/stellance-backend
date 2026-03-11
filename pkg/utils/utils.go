@@ -2,11 +2,15 @@ package utils
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"math"
 	"math/big"
@@ -56,7 +60,12 @@ type ValidationError struct {
 type ErrorResponse struct {
 	Status  int    `json:"status"`
 	Message string `json:"message"`
-	// Errors  []ValidationError `json:"errors,omitempty"`
+}
+
+type InvoiceAccessData struct {
+	InvoiceURL string `json:"url"`
+	Email      string `json:"email"`
+	Name       string `json:"name"`
 }
 
 func GetEnvAsInt() int {
@@ -66,6 +75,88 @@ func GetEnvAsInt() int {
 		}
 	}
 	return 5433
+}
+
+func GenerateInvoiceAccessToken(invoiceURL, email, name, secret string) (string, error) {
+	payload := InvoiceAccessData{
+		InvoiceURL: invoiceURL,
+		Email:      strings.ToLower(strings.TrimSpace(email)),
+		Name:       name,
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	key := sha256.Sum256([]byte(secret))
+	block, err := aes.NewCipher(key[:])
+	if err != nil {
+		return "", fmt.Errorf("failed to create cipher: %w", err)
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", fmt.Errorf("failed to create GCM: %w", err)
+	}
+
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return "", fmt.Errorf("failed to generate nonce: %w", err)
+	}
+
+	ciphertext := gcm.Seal(nonce, nonce, jsonData, nil)
+	token := base64.URLEncoding.EncodeToString(ciphertext)
+	return token, nil
+}
+
+func DecryptInvoiceAccessToken(token, secret string) (*InvoiceAccessData, error) {
+	ciphertext, err := base64.URLEncoding.DecodeString(token)
+	if err != nil {
+		return nil, fmt.Errorf("invalid token format: %w", err)
+	}
+
+	key := sha256.Sum256([]byte(secret))
+	block, err := aes.NewCipher(key[:])
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cipher: %w", err)
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GCM: %w", err)
+	}
+
+	nonceSize := gcm.NonceSize()
+	if len(ciphertext) < nonceSize {
+		return nil, fmt.Errorf("invalid token: too short")
+	}
+
+	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return nil, fmt.Errorf("invalid token: decryption failed")
+	}
+
+	var payload InvoiceAccessData
+	if err := json.Unmarshal(plaintext, &payload); err != nil {
+		return nil, fmt.Errorf("invalid token data: %w", err)
+	}
+
+	return &payload, nil
+}
+
+func VerifyInvoiceAccessToken(invoiceURL, token, secret string) (*InvoiceAccessData, error) {
+	payload, err := DecryptInvoiceAccessToken(token, secret)
+	if err != nil {
+		return nil, err
+	}
+
+	if payload.InvoiceURL != invoiceURL {
+		return nil, fmt.Errorf("token not valid for this invoice")
+	}
+
+	return payload, nil
 }
 
 func HashString(data string) (string, error) {

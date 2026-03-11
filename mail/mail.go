@@ -16,7 +16,6 @@ import (
 
 type SendInvoiceEmailData struct {
 	PrimaryRecipient string
-	CCRecipients     []string
 	PayerName        string
 	SenderName       string
 	InvoiceURL       string
@@ -122,12 +121,12 @@ func (m *Mailer) SendResetEmail(email, url, otp string) error {
 
 func (m *Mailer) SendInvoiceUrlMail(data SendInvoiceEmailData) error {
 	subject := "Invoice Review"
-	
+
 	t, err := template.ParseFS(templateFs, "templates/send_invoice.html")
 	if err != nil {
 		return fmt.Errorf("failed to read invoice email template: %w", err)
 	}
-	
+
 	var body bytes.Buffer
 	if err := t.Execute(&body, map[string]interface{}{
 		"URL":        data.InvoiceURL,
@@ -145,24 +144,19 @@ func (m *Mailer) SendInvoiceUrlMail(data SendInvoiceEmailData) error {
 		ReplyTo: "support@usestellance.com",
 	}
 
-	if len(data.CCRecipients) > 0 {
-		params.Cc = data.CCRecipients
-	}
-
 	sent, err := m.client.Emails.Send(params)
 	if err != nil {
-		m.log.Error("error sending invoice email", 
+		m.log.Error("error sending invoice email",
 			"email_error", err,
 			"primary", data.PrimaryRecipient,
-			"cc_count", len(data.CCRecipients))
+		)
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 
 	m.log.Debug("email sent successfully",
 		"email_id", sent.Id,
 		"primary_recipient", data.PrimaryRecipient,
-		"cc_recipients", data.CCRecipients,
-		"total_recipients", 1+len(data.CCRecipients))
-		
+	)
+
 	return nil
 }
