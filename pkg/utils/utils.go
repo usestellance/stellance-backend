@@ -146,14 +146,10 @@ func DecryptInvoiceAccessToken(token, secret string) (*InvoiceAccessData, error)
 	return &payload, nil
 }
 
-func VerifyInvoiceAccessToken(invoiceURL, token, secret string) (*InvoiceAccessData, error) {
+func VerifyInvoiceAccessToken( token, secret string) (*InvoiceAccessData, error) {
 	payload, err := DecryptInvoiceAccessToken(token, secret)
 	if err != nil {
 		return nil, err
-	}
-
-	if payload.InvoiceURL != invoiceURL {
-		return nil, fmt.Errorf("token not valid for this invoice")
 	}
 
 	return payload, nil

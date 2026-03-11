@@ -2,6 +2,7 @@ package invoice_comments
 
 import (
 	"context"
+	"database/sql"
 
 	"fmt"
 	"log/slog"
@@ -12,7 +13,6 @@ import (
 	"github.com/The-True-Hooha/stellance-backend/pkg/config"
 	jwt_ "github.com/The-True-Hooha/stellance-backend/pkg/jwt"
 	"github.com/The-True-Hooha/stellance-backend/pkg/utils"
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
@@ -79,7 +79,7 @@ func (ic *InvoiceCommentsService) GetInvoiceByIDQuery(ctx context.Context, invoi
 
 }
 
-func (ins *InvoiceCommentsService) CreateCommentQuery(ctx context.Context, comment CreateCommentDTO) (*CreateCommentQueryResponse, error) {
+func (ins *InvoiceCommentsService) CreateCommentQuery(ctx context.Context, comment InvoiceComment) (*CreateCommentQueryResponse, error) {
 
 	email := strings.ToLower(comment.CommenterEmail)
 
@@ -101,24 +101,23 @@ func (ins *InvoiceCommentsService) CreateCommentQuery(ctx context.Context, comme
 		Guest      bool
 	)
 
-	
 	var userID interface{} = nil
-	if comment.UserID != "" {
-		userID = comment.UserID
+	if comment.UserID.Valid && comment.UserID.String != "" {
+		userID = comment.UserID.String
 	}
 
 	var parentID interface{} = nil
-	if comment.ParentID != "" {
+	if comment.ParentID.Valid && comment.ParentCommentID.String != "" {
 		parentID = comment.ParentID
 	}
 
 	const query = `
-	INSERT INTO invoice_comments (
+		INSERT INTO invoice_comments (
 		invoice_id, user_id, commenter_name, commenter_email, 
 		comment_text, parent_comment_id)
 		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, created_at, is_verified, is_guest
-		`
+	`
 	err = tx.QueryRow(ctx, query, comment.InvoiceID, userID, comment.CommenterName, email,
 		comment.CommentText, parentID).Scan(&ID, &Created_at, &Verified, &Guest)
 	if err != nil {
@@ -398,7 +397,7 @@ func (cr *InvoiceCommentsService) CheckGuestCommentOwnership(ctx context.Context
 	return exists, nil
 }
 
-func (cs *InvoiceCommentsService) CreateComment(ctx context.Context, dto CreateCommentDTO, userID *string) *utils.ApiResponse {
+func (cs *InvoiceCommentsService) CreateComment(ctx context.Context, dto CreateCommentDTO, userID *string, tokenData *utils.InvoiceAccessData) *utils.ApiResponse {
 	_, err := cs.GetInvoiceByIDQuery(ctx, dto.InvoiceID)
 	if err != nil {
 		cs.log.Error("invoice not found", "invoice_id", dto.InvoiceID, "error", err)
@@ -426,22 +425,17 @@ func (cs *InvoiceCommentsService) CreateComment(ctx context.Context, dto CreateC
 		}
 	}
 
-	comment := &CreateCommentDTO{
-		InvoiceID:     dto.InvoiceID,
-		CommenterName: dto.CommenterName,
-		CommentText:   dto.CommentText,
-		ParentID:      dto.ParentID,
+	comment := &InvoiceComment{
+		// ID:          uuid.New().String(),
+		InvoiceID:   dto.InvoiceID,
+		CommentText: dto.CommentText,
+	}
+
+	if dto.ParentID != "" {
+		comment.ParentID = sql.NullString{String: dto.ParentID, Valid: true}
 	}
 
 	if userID != nil && *userID != "" {
-		if _, err := uuid.Parse(*userID); err != nil {
-			cs.log.Error("invalid user ID format", "user_id", *userID, "error", err)
-			return &utils.ApiResponse{
-				StatusCode: http.StatusBadRequest,
-				Message:    "invalid user ID format",
-			}
-		}
-
 		user, err := cs.GetUserByIDQuery(ctx, *userID)
 		if err != nil {
 			cs.log.Error("failed to get user", "user_id", *userID, "error", err)
@@ -451,21 +445,17 @@ func (cs *InvoiceCommentsService) CreateComment(ctx context.Context, dto CreateC
 			}
 		}
 
-		comment.UserID = *userID
+		comment.UserID = sql.NullString{String: *userID, Valid: true}
 		comment.CommenterEmail = user.Email
 		if user.FirstName != "" && user.LastName != "" {
 			comment.CommenterName = fmt.Sprintf("%s %s", user.FirstName, user.LastName)
+		} else {
+			comment.CommenterName = tokenData.Name
 		}
 	} else {
-		// Guest commenter - leave UserID empty/default
-		if dto.CommenterEmail == "" {
-			return &utils.ApiResponse{
-				StatusCode: http.StatusBadRequest,
-				Message:    "email is required for guest commenters",
-			}
-		}
-		comment.CommenterEmail = dto.CommenterEmail
-		// Don't set UserID at all for guests
+		comment.UserID = sql.NullString{Valid: false}
+		comment.CommenterEmail = tokenData.Email
+		comment.CommenterName = tokenData.Name
 	}
 
 	createdComment, err := cs.CreateCommentQuery(ctx, *comment)
@@ -481,7 +471,6 @@ func (cs *InvoiceCommentsService) CreateComment(ctx context.Context, dto CreateC
 	cs.log.Info("comment created successfully",
 		"comment_id", createdComment.ID,
 		"invoice_id", dto.InvoiceID,
-		"is_guest", createdComment.Guest,
 	)
 
 	return &utils.ApiResponse{

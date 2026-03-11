@@ -3,6 +3,7 @@ package invoice_comments
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/The-True-Hooha/stellance-backend/pkg/utils"
@@ -47,7 +48,17 @@ func (ch *InvoiceCommentHandler) CreateComment(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	response := ch.service.CreateComment(r.Context(), dto, userIDPtr)
+	commentMeta, err := utils.VerifyInvoiceAccessToken(dto.Token, os.Getenv("INVOICE_ACCESS_SECRET"))
+	if err != nil {
+		utils.WriteToJson(w, http.StatusForbidden, utils.ApiResponse{
+			StatusCode: http.StatusForbidden,
+			Message:    "access failed, kindly contact support",
+			Error:      err.Error(),
+		})
+		return
+	}
+
+	response := ch.service.CreateComment(r.Context(), dto, userIDPtr, commentMeta)
 	utils.WriteToJson(w, response.StatusCode, response)
 }
 

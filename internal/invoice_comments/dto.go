@@ -19,6 +19,7 @@ type InvoiceComment struct {
 	EditedAt        sql.NullTime   `json:"edited_at,omitempty" db:"edited_at"`
 	CreatedAt       time.Time      `json:"created_at" db:"created_at"`
 	UpdatedAt       time.Time      `json:"updated_at" db:"updated_at"`
+	ParentID        sql.NullString `json:"parent_id,omitempty" db:"parent_comment_id"`
 }
 
 type InvoiceCommentStats struct {
@@ -32,12 +33,11 @@ type InvoiceCommentStats struct {
 }
 
 type CreateCommentDTO struct {
-	UserID         string `json:"user_id" validate:"required,uuid"`
+	Token          string `json:"token" validate:"required"`
 	InvoiceID      string `json:"invoice_id" validate:"required,uuid"`
-	CommenterName  string `json:"commenter_name" validate:"required,min=2,max=100"`
 	CommentText    string `json:"comment_text" validate:"required,min=1,max=2000"`
 	ParentID       string `json:"parent_id,omitempty" validate:"omitempty,uuid"`
-	CommenterEmail string `json:"commenter_email,omitempty" validate:"omitempty,email"`
+	// CommenterEmail string `json:"commenter_email,omitempty" validate:"omitempty,email"`
 }
 
 type UpdateCommentDTO struct {
