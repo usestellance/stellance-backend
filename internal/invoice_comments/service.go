@@ -398,7 +398,7 @@ func (cr *InvoiceCommentsService) CheckGuestCommentOwnership(ctx context.Context
 }
 
 func (cs *InvoiceCommentsService) CreateComment(ctx context.Context, dto CreateCommentDTO, userID *string, tokenData *utils.InvoiceAccessData) *utils.ApiResponse {
-	_, err := cs.GetInvoiceByIDQuery(ctx, dto.InvoiceID)
+	invoice, err := cs.GetInvoiceByIDQuery(ctx, dto.InvoiceID)
 	if err != nil {
 		cs.log.Error("invoice not found", "invoice_id", dto.InvoiceID, "error", err)
 		return &utils.ApiResponse{
@@ -426,7 +426,6 @@ func (cs *InvoiceCommentsService) CreateComment(ctx context.Context, dto CreateC
 	}
 
 	comment := &InvoiceComment{
-		// ID:          uuid.New().String(),
 		InvoiceID:   dto.InvoiceID,
 		CommentText: dto.CommentText,
 	}
@@ -435,7 +434,50 @@ func (cs *InvoiceCommentsService) CreateComment(ctx context.Context, dto CreateC
 		comment.ParentID = sql.NullString{String: dto.ParentID, Valid: true}
 	}
 
-	if userID != nil && *userID != "" {
+	if tokenData != nil {
+		if userID != nil && *userID != "" {
+			user, err := cs.GetUserByIDQuery(ctx, *userID)
+			if err != nil {
+				cs.log.Error("failed to get user", "user_id", *userID, "error", err)
+				return &utils.ApiResponse{
+					StatusCode: http.StatusInternalServerError,
+					Message:    "failed to retrieve user information",
+				}
+			}
+
+			comment.UserID = sql.NullString{String: *userID, Valid: true}
+			comment.CommenterEmail = user.Email
+
+			if user.FirstName != "" && user.LastName != "" {
+				comment.CommenterName = fmt.Sprintf("%s %s", user.FirstName, user.LastName)
+			} else {
+				comment.CommenterName = tokenData.Name
+			}
+		} else {
+			comment.UserID = sql.NullString{Valid: false}
+			comment.CommenterEmail = tokenData.Email
+			comment.CommenterName = tokenData.Name
+		}
+
+	} else {
+		if userID == nil || *userID == "" {
+			cs.log.Error("no token and no user ID provided")
+			return &utils.ApiResponse{
+				StatusCode: http.StatusUnauthorized,
+				Message:    "authentication required",
+			}
+		}
+
+		if invoice.UserID != *userID {
+			cs.log.Warn("user attempting to comment without token on invoice they don't own",
+				"user_id", *userID,
+				"invoice_owner", invoice.UserID)
+			return &utils.ApiResponse{
+				StatusCode: http.StatusForbidden,
+				Message:    "only invoice owner can comment without a token",
+			}
+		}
+
 		user, err := cs.GetUserByIDQuery(ctx, *userID)
 		if err != nil {
 			cs.log.Error("failed to get user", "user_id", *userID, "error", err)
@@ -447,15 +489,12 @@ func (cs *InvoiceCommentsService) CreateComment(ctx context.Context, dto CreateC
 
 		comment.UserID = sql.NullString{String: *userID, Valid: true}
 		comment.CommenterEmail = user.Email
+
 		if user.FirstName != "" && user.LastName != "" {
 			comment.CommenterName = fmt.Sprintf("%s %s", user.FirstName, user.LastName)
 		} else {
-			comment.CommenterName = tokenData.Name
+			comment.CommenterName = "Invoice Owner"
 		}
-	} else {
-		comment.UserID = sql.NullString{Valid: false}
-		comment.CommenterEmail = tokenData.Email
-		comment.CommenterName = tokenData.Name
 	}
 
 	createdComment, err := cs.CreateCommentQuery(ctx, *comment)
@@ -471,6 +510,8 @@ func (cs *InvoiceCommentsService) CreateComment(ctx context.Context, dto CreateC
 	cs.log.Info("comment created successfully",
 		"comment_id", createdComment.ID,
 		"invoice_id", dto.InvoiceID,
+		"is_guest", createdComment.Guest,
+		"has_token", tokenData != nil,
 	)
 
 	return &utils.ApiResponse{
