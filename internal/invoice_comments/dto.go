@@ -33,7 +33,7 @@ type InvoiceCommentStats struct {
 }
 
 type CreateCommentDTO struct {
-	Token          string `json:"token" validate:"required"`
+	Token          string `json:"token" validate:"omitempty"`
 	InvoiceID      string `json:"invoice_id" validate:"required,uuid"`
 	CommentText    string `json:"comment_text" validate:"required,min=1,max=2000"`
 	ParentID       string `json:"parent_id,omitempty" validate:"omitempty,uuid"`
