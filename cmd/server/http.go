@@ -14,11 +14,15 @@ import (
 	"syscall"
 	"time"
 
+	httpSwagger "github.com/swaggo/http-swagger/v2"
+
+	"github.com/The-True-Hooha/stellance-backend/internal/admin"
 	"github.com/The-True-Hooha/stellance-backend/internal/auth"
 	"github.com/The-True-Hooha/stellance-backend/internal/invoice"
 	"github.com/The-True-Hooha/stellance-backend/internal/invoice_comments"
 	"github.com/The-True-Hooha/stellance-backend/internal/middleware"
 	"github.com/The-True-Hooha/stellance-backend/internal/notifications"
+	"github.com/The-True-Hooha/stellance-backend/internal/recurring"
 	"github.com/The-True-Hooha/stellance-backend/internal/transactions"
 	"github.com/The-True-Hooha/stellance-backend/internal/user"
 	"github.com/The-True-Hooha/stellance-backend/internal/wallet"
@@ -84,6 +88,9 @@ func (server *Server) AddHttpRoutes() {
 	apiV1 := httpx.NewRouteGroup(server.router, "/api/v1")
 	apiV1.HandleFunc("GET /health", runHealthCheck)
 	apiV1.HandleFunc("GET /key", generateKey)
+	server.router.Handle("/docs/", httpSwagger.Handler(
+		httpSwagger.URL("/docs/doc.json"),
+	))
 
 	authService := auth.NewAuthService()
 	auth.RegisterAuthRoutes(apiV1, server.router, authService)
@@ -105,6 +112,11 @@ func (server *Server) AddHttpRoutes() {
 	ic := invoice_comments.NewInvoiceCommentService()
 	invoice_comments.RegisterInvoiceCommentRoutes(apiV1, server.router, ic)
 
+	recurringService := recurring.NewRecurringService()
+	recurring.RegisterRecurringRoutes(apiV1, server.router, recurringService)
+
+	adminService := admin.NewAdminService()
+	admin.RegisterAdminRoutes(apiV1, server.router, adminService)
 }
 
 func (server *Server) StartHttpServer(ctx context.Context) {

@@ -10,9 +10,14 @@ COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/api
 
-FROM alpine:latest
+FROM debian:bookworm-slim
 
-RUN apk --no-cache add ca-certificates
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    chromium \
+    ca-certificates \
+    fonts-liberation \
+    fonts-noto \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /root
 
@@ -20,6 +25,7 @@ COPY --from=builder /app/main .
 
 ENV STAGE=prod
 ENV APP_ENV=prod
+ENV CHROME_PATH=/usr/bin/chromium
 
 EXPOSE 4000
 

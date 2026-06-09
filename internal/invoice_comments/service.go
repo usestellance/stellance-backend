@@ -3,10 +3,10 @@ package invoice_comments
 import (
 	"context"
 	"database/sql"
-
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -182,7 +182,7 @@ func (ic *InvoiceCommentsService) GetCommentByInvoiceID(ctx context.Context, inv
 	var countQuery string
 	var args []interface{}
 
-	if sortOrder == "" {
+	if sortOrder != "ASC" && sortOrder != "DESC" {
 		sortOrder = "ASC"
 	}
 
@@ -628,6 +628,11 @@ func (cs *InvoiceCommentsService) buildCommentResponse(ctx context.Context, comm
 		}
 	}
 
+	reactions, err := cs.GetReactions(ctx, comment.ID, currentUserID, nil)
+	if err == nil && len(reactions) > 0 {
+		response.Reactions = reactions
+	}
+
 	return response
 }
 
@@ -711,6 +716,126 @@ func (cs *InvoiceCommentsService) UpdateComment(ctx context.Context, commentID s
 		Message:    "comment updated successfully",
 		Data:       response,
 	}
+}
+
+func (cs *InvoiceCommentsService) GetReactions(ctx context.Context, commentID string, currentUserID *string, currentGuestEmail *string) ([]ReactionCount, error) {
+	rows, err := cs.postgres.Query(ctx, `
+		SELECT emoji, COUNT(*) as count
+		FROM comment_reactions
+		WHERE comment_id = $1
+		GROUP BY emoji
+		ORDER BY count DESC
+	`, commentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get reactions: %w", err)
+	}
+	defer rows.Close()
+
+	var reactions []ReactionCount
+	for rows.Next() {
+		var r ReactionCount
+		if err := rows.Scan(&r.Emoji, &r.Count); err != nil {
+			return nil, fmt.Errorf("failed to scan reaction: %w", err)
+		}
+		reactions = append(reactions, r)
+	}
+
+	if currentUserID != nil {
+		userReactRows, err := cs.postgres.Query(ctx, `
+			SELECT emoji FROM comment_reactions WHERE comment_id = $1 AND user_id = $2
+		`, commentID, *currentUserID)
+		if err == nil {
+			defer userReactRows.Close()
+			userEmojis := map[string]bool{}
+			for userReactRows.Next() {
+				var e string
+				userReactRows.Scan(&e)
+				userEmojis[e] = true
+			}
+			for i := range reactions {
+				if userEmojis[reactions[i].Emoji] {
+					reactions[i].Reacted = true
+				}
+			}
+		}
+	} else if currentGuestEmail != nil {
+		guestReactRows, err := cs.postgres.Query(ctx, `
+			SELECT emoji FROM comment_reactions WHERE comment_id = $1 AND guest_email = $2
+		`, commentID, *currentGuestEmail)
+		if err == nil {
+			defer guestReactRows.Close()
+			guestEmojis := map[string]bool{}
+			for guestReactRows.Next() {
+				var e string
+				guestReactRows.Scan(&e)
+				guestEmojis[e] = true
+			}
+			for i := range reactions {
+				if guestEmojis[reactions[i].Emoji] {
+					reactions[i].Reacted = true
+				}
+			}
+		}
+	}
+
+	return reactions, nil
+}
+
+func (cs *InvoiceCommentsService) AddReaction(ctx context.Context, commentID string, dto ReactToCommentDTO, userID *string) *utils.ApiResponse {
+	if _, err := cs.GetCommentByIDQuery(ctx, commentID); err != nil {
+		return &utils.ApiResponse{StatusCode: http.StatusNotFound, Message: "comment not found"}
+	}
+
+	var guestEmail *string
+	if dto.Token != "" {
+		tokenData, err := utils.VerifyInvoiceAccessToken(dto.Token, os.Getenv("INVOICE_ACCESS_SECRET"))
+		if err != nil {
+			return &utils.ApiResponse{StatusCode: http.StatusForbidden, Message: "invalid access token"}
+		}
+		guestEmail = &tokenData.Email
+	} else if userID == nil || *userID == "" {
+		return &utils.ApiResponse{StatusCode: http.StatusUnauthorized, Message: "authentication required"}
+	}
+
+	if userID != nil && *userID != "" {
+		_, err := cs.postgres.Exec(ctx, `
+			INSERT INTO comment_reactions (comment_id, user_id, emoji)
+			VALUES ($1, $2, $3)
+			ON CONFLICT (comment_id, user_id, emoji) DO NOTHING
+		`, commentID, *userID, dto.Emoji)
+		if err != nil {
+			return &utils.ApiResponse{StatusCode: http.StatusInternalServerError, Message: "failed to add reaction"}
+		}
+	} else if guestEmail != nil {
+		_, err := cs.postgres.Exec(ctx, `
+			INSERT INTO comment_reactions (comment_id, guest_email, emoji)
+			VALUES ($1, $2, $3)
+			ON CONFLICT (comment_id, guest_email, emoji) DO NOTHING
+		`, commentID, *guestEmail, dto.Emoji)
+		if err != nil {
+			return &utils.ApiResponse{StatusCode: http.StatusInternalServerError, Message: "failed to add reaction"}
+		}
+	}
+
+	reactions, _ := cs.GetReactions(ctx, commentID, userID, guestEmail)
+	return &utils.ApiResponse{StatusCode: http.StatusOK, Message: "reaction added", Data: reactions}
+}
+
+func (cs *InvoiceCommentsService) RemoveReaction(ctx context.Context, commentID, emoji string, userID *string, guestEmail *string) *utils.ApiResponse {
+	if userID != nil && *userID != "" {
+		cs.postgres.Exec(ctx, `
+			DELETE FROM comment_reactions WHERE comment_id = $1 AND user_id = $2 AND emoji = $3
+		`, commentID, *userID, emoji)
+	} else if guestEmail != nil {
+		cs.postgres.Exec(ctx, `
+			DELETE FROM comment_reactions WHERE comment_id = $1 AND guest_email = $2 AND emoji = $3
+		`, commentID, *guestEmail, emoji)
+	} else {
+		return &utils.ApiResponse{StatusCode: http.StatusUnauthorized, Message: "authentication required"}
+	}
+
+	reactions, _ := cs.GetReactions(ctx, commentID, userID, guestEmail)
+	return &utils.ApiResponse{StatusCode: http.StatusOK, Message: "reaction removed", Data: reactions}
 }
 
 func (cs *InvoiceCommentsService) DeleteComment(ctx context.Context, commentID string, userID *string, guestEmail *string, isAdmin bool) *utils.ApiResponse {

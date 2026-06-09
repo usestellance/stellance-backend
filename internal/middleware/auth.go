@@ -57,6 +57,17 @@ func (authM *AuthMiddleware) Authenticate(h http.Handler) http.Handler {
 	})
 }
 
+func (authM *AuthMiddleware) RequireAdmin(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		role, ok := r.Context().Value(RoleKey).(string)
+		if !ok || role != "admin" {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		h.ServeHTTP(w, r)
+	})
+}
+
 func (authM *AuthMiddleware) IsPublicAccess(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log := logger.Logger()

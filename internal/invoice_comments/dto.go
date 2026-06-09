@@ -43,6 +43,7 @@ type CreateCommentDTO struct {
 type UpdateCommentDTO struct {
 	CommentText string `json:"comment_text" validate:"required,min=1,max=2000"`
 	Email       string `json:"email,omitempty" validate:"omitempty,email"`
+	Token       string `json:"token,omitempty" validate:"omitempty"`
 }
 
 type GetCommentsQuery struct {
@@ -56,9 +57,10 @@ type GetCommentsQuery struct {
 
 type CommentResponse struct {
 	InvoiceComment
-	Replies   []CommentResponse `json:"replies,omitempty"` // Nested replies
+	Replies   []CommentResponse `json:"replies,omitempty"`
 	CanEdit   bool              `json:"can_edit"`
 	CanDelete bool              `json:"can_delete"`
+	Reactions []ReactionCount   `json:"reactions,omitempty"`
 }
 
 type GetCommentsResponse struct {
@@ -90,4 +92,17 @@ type GetUserDto struct {
 	FirstName string
 	LastName  string
 	Email     string
+}
+
+type ReactToCommentDTO struct {
+	Emoji string `json:"emoji" validate:"required,min=1,max=10"`
+	Email string `json:"email,omitempty" validate:"omitempty,email"`
+	Token string `json:"token,omitempty"`
+}
+
+type ReactionCount struct {
+	Emoji string `json:"emoji"`
+	Count int    `json:"count"`
+	// Reacted is true if the current viewer has reacted with this emoji
+	Reacted bool `json:"reacted"`
 }

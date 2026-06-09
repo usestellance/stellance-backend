@@ -1,3 +1,21 @@
+// @title Stellance API
+// @version 1.0
+// @description Invoice management and payment platform API
+// @termsOfService http://swagger.io/terms/
+
+// @contact.name API Support
+// @contact.email davidhero125@gmail.com
+
+// @license.name MIT
+
+// @host localhost:4000
+// @BasePath /api/v1
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Enter "Bearer {token}"
+
 package main
 
 import (
@@ -6,6 +24,7 @@ import (
 	"log/slog"
 	"os"
 
+	_ "github.com/The-True-Hooha/stellance-backend/docs"
 	"github.com/The-True-Hooha/stellance-backend/cmd/server"
 	database "github.com/The-True-Hooha/stellance-backend/internal/db"
 	"github.com/The-True-Hooha/stellance-backend/internal/middleware"
@@ -88,6 +107,7 @@ func startBackgroundWorkers(ctx context.Context, redisOpt asynq.RedisClientOpt, 
 
 	mux := asynq.NewServeMux()
 	mux.HandleFunc(tasks.TypeUpdateOverdueInvoices, tasks.HandleUpdateOverdueInvoices)
+	mux.HandleFunc(tasks.TypeGenerateRecurringInvoices, tasks.HandleGenerateRecurringInvoices)
 	go func() {
 		if err := worker.Run(mux); err != nil {
 			log.Error("asynq worker stopped running", "error", err)
@@ -101,6 +121,15 @@ func startBackgroundWorkers(ctx context.Context, redisOpt asynq.RedisClientOpt, 
 	} else {
 		if _, err := scheduler.Register("0 0 * * *", task); err != nil {
 			log.Error("failed to register scheduled task", "error", err)
+		}
+	}
+
+	recurringTask, err := tasks.NewGenerateRecurringInvoicesTask()
+	if err != nil {
+		log.Error("failed to create recurring invoice task", "error", err)
+	} else {
+		if _, err := scheduler.Register("0 1 * * *", recurringTask); err != nil {
+			log.Error("failed to register recurring invoice task", "error", err)
 		}
 	}
 

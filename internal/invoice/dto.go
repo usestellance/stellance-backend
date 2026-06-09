@@ -148,6 +148,36 @@ type SendInvoiceDto struct {
 	Emails []string `json:"emails" validate:"required,min=1,max=10,dive,email"`
 }
 
+type MarkInvoicePaidDTO struct {
+	TransactionHash string  `json:"transaction_hash" validate:"required"`
+	Amount          float64 `json:"amount" validate:"required,gt=0"`
+	NetworkFee      float64 `json:"network_fee" validate:"omitempty,gte=0"`
+	WalletID        string  `json:"wallet_id" validate:"omitempty,uuid"`
+}
+
+type PDFInvoiceData struct {
+	InvoiceNumber   string
+	Status          string
+	StatusClass     string
+	CreatorName     string
+	CreatorEmail    string
+	CreatorBusiness string
+	CreatorPhone    string
+	CreatorCountry  string
+	PayerName       string
+	PayerEmail      string
+	PayerCountry    string
+	Currency        string
+	SubTotal        float64
+	ServiceFee      float64
+	Total           float64
+	CreatedAt       string
+	DueDate         string
+	GeneratedAt     string
+	Note            string
+	Items           []InvoiceItems
+}
+
 type UpdateInvoiceDTO struct {
 	Title         string         `json:"title" validate:"omitempty,min=3"`
 	RecipientName string         `json:"payer_name" validate:"omitempty"`

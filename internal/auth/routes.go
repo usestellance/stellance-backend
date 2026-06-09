@@ -14,7 +14,7 @@ func RegisterAuthRoutes(apiV1 *httpx.RouteGroup, router *http.ServeMux, authServ
 	authGroup := apiV1.AddGroup("/auth")
 	authGroup.HandleFunc("POST /signup", authHandler.SignUpHandler)
 	authGroup.HandleFunc("POST /social", authHandler.SocialSignUpHandler)
-	authGroup.HandleFunc("POST /clear", authHandler.ClearRedisHandler)
+	authGroup.HandleFunc("POST /clear", authMiddleware.Authenticate(authMiddleware.RequireAdmin(http.HandlerFunc(authHandler.ClearRedisHandler))).ServeHTTP)
 	authGroup.HandleFunc("GET /resend-email", authHandler.ResendEmailVerification)
 	authGroup.HandleFunc("POST /login", authHandler.LoginHandler)
 	authGroup.HandleFunc("GET /validate", authHandler.ValidateEmailHandler)

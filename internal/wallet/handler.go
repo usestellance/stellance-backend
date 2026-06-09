@@ -21,6 +21,14 @@ func NewWalletHandler(service *WalletService) *WalletHandler {
 	}
 }
 
+// CreateWalletHandler godoc
+// @Summary      Create a Stellar wallet
+// @Tags         wallet
+// @Produce      json
+// @Success      201  {object}  utils.ApiResponse
+// @Failure      401  {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /wallet [post]
 func (h *WalletHandler) CreateWalletHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -33,6 +41,15 @@ func (h *WalletHandler) CreateWalletHandler(w http.ResponseWriter, r *http.Reque
 	utils.WriteToJson(w, wallet.StatusCode, wallet)
 }
 
+// GetWalletHandler godoc
+// @Summary      Get wallet by ID
+// @Tags         wallet
+// @Produce      json
+// @Param        id  path  string  true  "Wallet ID"
+// @Success      200  {object}  utils.ApiResponse
+// @Failure      401  {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /wallet/{id} [get]
 func (h *WalletHandler) GetWalletHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id, ok := utils.GetUserIDFromContext(ctx)
@@ -51,6 +68,15 @@ func (h *WalletHandler) GetWalletHandler(w http.ResponseWriter, r *http.Request)
 	utils.WriteToJson(w, wallet.StatusCode, wallet)
 }
 
+// ExportWalletHandler godoc
+// @Summary      Export wallet keys
+// @Tags         wallet
+// @Produce      json
+// @Param        id  path  string  true  "Wallet ID"
+// @Success      200  {object}  utils.ApiResponse
+// @Failure      401  {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /wallet/{id}/export [get]
 func (h *WalletHandler) ExportWalletHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id, ok := utils.GetUserIDFromContext(ctx)

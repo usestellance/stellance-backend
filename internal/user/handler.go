@@ -20,6 +20,16 @@ func NewUserHandler(h *UserService) *UserHandler {
 	}
 }
 
+// CompleteProfileHandler godoc
+// @Summary      Complete user profile
+// @Tags         user
+// @Accept       json
+// @Produce      json
+// @Param        body  body      CompleteProfileRequestDto  true  "Profile data"
+// @Success      200   {object}  utils.ApiResponse
+// @Failure      400   {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /users [post]
 func (h *UserHandler) CompleteProfileHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	email, ok := utils.GetUserEmailFromContext(ctx)
@@ -41,6 +51,16 @@ func (h *UserHandler) CompleteProfileHandler(w http.ResponseWriter, r *http.Requ
 	utils.WriteToJson(w, response.StatusCode, response)
 }
 
+// GetProfile godoc
+// @Summary      Get user profile by ID
+// @Tags         user
+// @Produce      json
+// @Param        id   path  string  true  "User ID"
+// @Success      200  {object}  utils.ApiResponse
+// @Failure      401  {object}  utils.ApiResponse
+// @Failure      403  {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /users/{id} [get]
 func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	userID := r.PathValue("id")
@@ -62,6 +82,16 @@ func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	utils.WriteToJson(w, response.StatusCode, response)
 }
 
+// UpdateProfile godoc
+// @Summary      Update user profile
+// @Tags         user
+// @Accept       json
+// @Produce      json
+// @Param        body  body      UpdateProfileDto  true  "Fields to update"
+// @Success      200   {object}  utils.ApiResponse
+// @Failure      400   {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /users [put]
 func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := h.service.log
@@ -89,7 +119,15 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	utils.WriteToJson(w, response.StatusCode, response)
 }
 
-func(h *UserHandler)GetMe(w http.ResponseWriter, r *http.Request){
+// GetMe godoc
+// @Summary      Get current authenticated user
+// @Tags         user
+// @Produce      json
+// @Success      200  {object}  utils.ApiResponse
+// @Failure      401  {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /users/me [get]
+func (h *UserHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	requestingUserID, ok := utils.GetUserIDFromContext(ctx)
 	if !ok {

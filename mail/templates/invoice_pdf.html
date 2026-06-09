@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Invoice #{{.InvoiceNumber}}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: #fff; color: #1e1e1e; font-size: 14px; }
+    .page { max-width: 800px; margin: 0 auto; padding: 48px 40px; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 48px; }
+    .logo { font-size: 24px; font-weight: 700; color: #18234f; }
+    .invoice-meta { text-align: right; }
+    .invoice-title { font-size: 28px; font-weight: 700; color: #18234f; margin-bottom: 4px; }
+    .invoice-number { font-size: 14px; color: #6b7280; }
+    .badge { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+    .badge-paid { background: #dcfce7; color: #16a34a; }
+    .badge-pending { background: #fef9c3; color: #ca8a04; }
+    .badge-overdue { background: #fee2e2; color: #dc2626; }
+    .badge-cancelled { background: #f3f4f6; color: #6b7280; }
+    .badge-draft { background: #eff6ff; color: #2563eb; }
+    .section { margin-bottom: 32px; }
+    .section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #9ca3af; margin-bottom: 8px; }
+    .party-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-bottom: 40px; }
+    .party-name { font-weight: 600; font-size: 15px; margin-bottom: 2px; }
+    .party-detail { color: #6b7280; font-size: 13px; }
+    .divider { border: none; border-top: 1px solid #e5e7eb; margin: 24px 0; }
+    table { width: 100%; border-collapse: collapse; }
+    thead tr { border-bottom: 2px solid #e5e7eb; }
+    thead th { text-align: left; padding: 10px 12px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; }
+    thead th:last-child { text-align: right; }
+    tbody tr { border-bottom: 1px solid #f3f4f6; }
+    tbody td { padding: 14px 12px; font-size: 14px; }
+    tbody td:last-child { text-align: right; font-weight: 500; }
+    .totals { margin-top: 24px; display: flex; justify-content: flex-end; }
+    .totals-box { width: 280px; }
+    .totals-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; color: #6b7280; }
+    .totals-row.total { border-top: 2px solid #e5e7eb; margin-top: 8px; padding-top: 12px; font-size: 16px; font-weight: 700; color: #18234f; }
+    .dates-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .date-item { }
+    .date-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #9ca3af; margin-bottom: 4px; }
+    .date-value { font-size: 14px; font-weight: 500; }
+    .note-box { background: #f9fafb; border-left: 3px solid #18234f; padding: 16px; border-radius: 0 6px 6px 0; margin-top: 32px; }
+    .note-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #9ca3af; margin-bottom: 6px; }
+    .footer { margin-top: 48px; text-align: center; font-size: 12px; color: #9ca3af; }
+    @media print {
+      body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .page { padding: 24px; }
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="logo">Stellance</div>
+    <div class="invoice-meta">
+      <div class="invoice-title">INVOICE</div>
+      <div class="invoice-number">#{{.InvoiceNumber}}</div>
+      <div style="margin-top:8px;">
+        <span class="badge badge-{{.StatusClass}}">{{.Status}}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="party-grid">
+    <div>
+      <div class="section-title">From</div>
+      <div class="party-name">{{.CreatorName}}</div>
+      {{if .CreatorBusiness}}<div class="party-detail">{{.CreatorBusiness}}</div>{{end}}
+      <div class="party-detail">{{.CreatorEmail}}</div>
+      {{if .CreatorPhone}}<div class="party-detail">{{.CreatorPhone}}</div>{{end}}
+      {{if .CreatorCountry}}<div class="party-detail">{{.CreatorCountry}}</div>{{end}}
+    </div>
+    <div>
+      <div class="section-title">To</div>
+      <div class="party-name">{{.PayerName}}</div>
+      <div class="party-detail">{{.PayerEmail}}</div>
+      {{if .PayerCountry}}<div class="party-detail">{{.PayerCountry}}</div>{{end}}
+    </div>
+  </div>
+
+  <div class="dates-grid" style="margin-bottom:40px;">
+    <div class="date-item">
+      <div class="date-label">Issue Date</div>
+      <div class="date-value">{{.CreatedAt}}</div>
+    </div>
+    <div class="date-item">
+      <div class="date-label">Due Date</div>
+      <div class="date-value">{{.DueDate}}</div>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:45%">Description</th>
+        <th>Type</th>
+        <th style="text-align:right;">Qty</th>
+        <th style="text-align:right;">Unit Price</th>
+        <th>Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Items}}
+      <tr>
+        <td>{{.Description}}</td>
+        <td style="color:#6b7280;">{{.InvoiceType}}</td>
+        <td style="text-align:right;">{{.Quantity}}</td>
+        <td style="text-align:right;">{{$.Currency}} {{printf "%.2f" .UnitPrice}}</td>
+        <td>{{$.Currency}} {{printf "%.2f" .Amount}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+
+  <div class="totals">
+    <div class="totals-box">
+      <div class="totals-row">
+        <span>Subtotal</span>
+        <span>{{.Currency}} {{printf "%.2f" .SubTotal}}</span>
+      </div>
+      {{if gt .ServiceFee 0.0}}
+      <div class="totals-row">
+        <span>Service Fee</span>
+        <span>{{.Currency}} {{printf "%.2f" .ServiceFee}}</span>
+      </div>
+      {{end}}
+      <div class="totals-row total">
+        <span>Total</span>
+        <span>{{.Currency}} {{printf "%.2f" .Total}}</span>
+      </div>
+    </div>
+  </div>
+
+  {{if .Note}}
+  <div class="note-box">
+    <div class="note-label">Note</div>
+    <div>{{.Note}}</div>
+  </div>
+  {{end}}
+
+  <div class="footer">
+    <p>Generated by Stellance · {{.GeneratedAt}}</p>
+  </div>
+</div>
+</body>
+</html>

@@ -15,13 +15,24 @@ type NotificationHandler struct {
 
 func NewNotificationHandler(ns *NotificationService) *NotificationHandler {
 	v := validator.New()
-
 	return &NotificationHandler{
 		service:   ns,
 		validator: v,
 	}
 }
 
+// GetNotifications godoc
+// @Summary      Get user notifications
+// @Tags         notifications
+// @Produce      json
+// @Param        page     query  int     false  "Page number"
+// @Param        count    query  int     false  "Items per page"
+// @Param        order_by query  string  false  "ASC or DESC"
+// @Param        viewed   query  bool    false  "Filter by viewed status"
+// @Success      200  {object}  utils.ApiResponse
+// @Failure      401  {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /notifications [get]
 func (h *NotificationHandler) GetNotifications(w http.ResponseWriter, r *http.Request) {
 	log := h.service.log
 	ctx := r.Context()
@@ -76,6 +87,16 @@ func (h *NotificationHandler) GetNotifications(w http.ResponseWriter, r *http.Re
 	utils.WriteToJson(w, response.StatusCode, response)
 }
 
+// EditNotificationViewStatus godoc
+// @Summary      Mark notification as viewed/unviewed
+// @Tags         notifications
+// @Produce      json
+// @Param        id      path   string  true  "Notification ID"
+// @Param        viewed  query  bool    true  "Viewed status"
+// @Success      200  {object}  utils.ApiResponse
+// @Failure      401  {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /notifications/{id} [patch]
 func (h *NotificationHandler) EditNotificationViewStatus(w http.ResponseWriter, r *http.Request) {
 	log := h.service.log
 	ctx := r.Context()
@@ -100,6 +121,15 @@ func (h *NotificationHandler) EditNotificationViewStatus(w http.ResponseWriter, 
 	utils.WriteToJson(w, response.StatusCode, response)
 }
 
+// DeleteNotificationById godoc
+// @Summary      Delete a notification
+// @Tags         notifications
+// @Produce      json
+// @Param        id  path  string  true  "Notification ID"
+// @Success      200  {object}  utils.ApiResponse
+// @Failure      401  {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /notifications/{id} [delete]
 func (h *NotificationHandler) DeleteNotificationById(w http.ResponseWriter, r *http.Request) {
 	log := h.service.log
 	ctx := r.Context()
@@ -115,6 +145,15 @@ func (h *NotificationHandler) DeleteNotificationById(w http.ResponseWriter, r *h
 	utils.WriteToJson(w, response.StatusCode, response)
 }
 
+// GetNotificationById godoc
+// @Summary      Get notification by ID
+// @Tags         notifications
+// @Produce      json
+// @Param        id  path  string  true  "Notification ID"
+// @Success      200  {object}  utils.ApiResponse
+// @Failure      401  {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /notifications/{id} [get]
 func (h *NotificationHandler) GetNotificationById(w http.ResponseWriter, r *http.Request) {
 	log := h.service.log
 	ctx := r.Context()

@@ -12,6 +12,8 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+const minSecretLen = 32
+
 type JwtTokenServiceConfig struct {
 	log                *slog.Logger
 	postgres           *pgxpool.Pool
@@ -28,12 +30,20 @@ type Claims struct {
 }
 
 func JwtTokenService() *JwtTokenServiceConfig {
+	secret := os.Getenv("JWT_SECRET")
+	refreshSecret := os.Getenv("REFRESH_TOKEN_SECRET")
+	if len(secret) < minSecretLen {
+		panic("JWT_SECRET must be at least 32 characters")
+	}
+	if len(refreshSecret) < minSecretLen {
+		panic("REFRESH_TOKEN_SECRET must be at least 32 characters")
+	}
 	return &JwtTokenServiceConfig{
 		log:                config.GetAppContainer().Log,
 		postgres:           config.GetAppContainer().Postgres,
 		redis:              config.GetAppContainer().Redis,
-		secret:             os.Getenv("JWT_SECRET"),
-		refreshTokenSecret: os.Getenv("REFRESH_TOKEN_SECRET"),
+		secret:             secret,
+		refreshTokenSecret: refreshSecret,
 	}
 }
 

@@ -7,7 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"math/rand"
+	"crypto/rand"
+	"math/big"
 	"net/http"
 	"net/url"
 	"strings"
@@ -482,10 +483,13 @@ func (as *AuthServiceConfig) RequestPasswordReset(ctx context.Context, email str
 }
 
 func (m *AuthServiceConfig) GenerateOTP() string {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	otp := ""
 	for i := 0; i < 6; i++ {
-		otp += fmt.Sprintf("%d", r.Intn(10))
+		n, err := rand.Int(rand.Reader, big.NewInt(10))
+		if err != nil {
+			panic("failed to generate secure random number for OTP")
+		}
+		otp += n.String()
 	}
 	return otp
 }

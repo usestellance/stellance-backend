@@ -16,4 +16,6 @@ func RegisterInvoiceCommentRoutes(apiV1 *httpx.RouteGroup, router *http.ServeMux
 	commentGroup.HandleFunc("GET /", authMiddleware.IsPublicAccess(http.HandlerFunc(ch.GetComments)).ServeHTTP)
 	commentGroup.HandleFunc("GET /{id}", authMiddleware.IsPublicAccess(http.HandlerFunc(ch.GetCommentByID)).ServeHTTP)
 	commentGroup.HandleFunc("PATCH /{id}", authMiddleware.IsPublicAccess(http.HandlerFunc(ch.UpdateComment)).ServeHTTP)
+	commentGroup.HandleFunc("POST /{id}/react", authMiddleware.IsPublicAccess(http.HandlerFunc(ch.AddReaction)).ServeHTTP)
+	commentGroup.HandleFunc("DELETE /{id}/react", authMiddleware.IsPublicAccess(http.HandlerFunc(ch.RemoveReaction)).ServeHTTP)
 }

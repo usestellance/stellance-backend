@@ -22,16 +22,33 @@ func NewTransactionHandler(ts *TransactionService) *TransactionHandler {
 	}
 }
 
-func(h *TransactionHandler)GetTransactionOverviewCard(w http.ResponseWriter, r *http.Request){
+// GetTransactionOverviewCard godoc
+// @Summary      Get transaction overview stats
+// @Tags         transactions
+// @Produce      json
+// @Success      200  {object}  utils.ApiResponse
+// @Failure      401  {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /transactions/stats [get]
+func (h *TransactionHandler) GetTransactionOverviewCard(w http.ResponseWriter, r *http.Request) {
 	userId, ok := utils.GetUserIDFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Unauthorized request", http.StatusUnauthorized)
-		return 
+		return
 	}
 	res := h.service.GetTransactionCardForUser(r.Context(), userId)
 	utils.WriteToJson(w, res.StatusCode, res)
 }
 
+// GetTransactionByIdHandler godoc
+// @Summary      Get transaction by ID
+// @Tags         transactions
+// @Produce      json
+// @Param        id  path  string  true  "Transaction ID"
+// @Success      200  {object}  utils.ApiResponse
+// @Failure      401  {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /transactions/id/{id} [get]
 func (h *TransactionHandler) GetTransactionByIdHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := r.PathValue("id")
@@ -44,6 +61,15 @@ func (h *TransactionHandler) GetTransactionByIdHandler(w http.ResponseWriter, r 
 	utils.WriteToJson(w, response.StatusCode, response)
 }
 
+// DeleteTransactionByIdHandler godoc
+// @Summary      Delete a transaction
+// @Tags         transactions
+// @Produce      json
+// @Param        id  path  string  true  "Transaction ID"
+// @Success      200  {object}  utils.ApiResponse
+// @Failure      401  {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /transactions/{id} [delete]
 func (h *TransactionHandler) DeleteTransactionByIdHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := r.PathValue("id")
@@ -56,8 +82,18 @@ func (h *TransactionHandler) DeleteTransactionByIdHandler(w http.ResponseWriter,
 	utils.WriteToJson(w, response.StatusCode, response)
 }
 
+// GetManyTransactionHandler godoc
+// @Summary      List transactions
+// @Tags         transactions
+// @Produce      json
+// @Param        user_id     query  string  false  "Filter by user ID (admin only)"
+// @Param        page        query  int     false  "Page number"
+// @Param        page_count  query  int     false  "Items per page"
+// @Success      200  {object}  utils.ApiResponse
+// @Failure      401  {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /transactions [get]
 func (handler *TransactionHandler) GetManyTransactionHandler(w http.ResponseWriter, r *http.Request) {
-
 	log := handler.service.log
 	ctx := r.Context()
 
@@ -121,23 +157,31 @@ func (handler *TransactionHandler) GetManyTransactionHandler(w http.ResponseWrit
 	utils.WriteToJson(w, response.StatusCode, response)
 }
 
+// GetTransactionCashFlow godoc
+// @Summary      Get cash flow over a date range
+// @Tags         transactions
+// @Produce      json
+// @Param        from  query  string  false  "Start date (YYYY-MM-DD)"
+// @Param        to    query  string  false  "End date (YYYY-MM-DD)"
+// @Success      200   {object}  utils.ApiResponse
+// @Failure      401   {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /transactions/inflow [get]
 func (th *TransactionHandler) GetTransactionCashFlow(w http.ResponseWriter, r *http.Request) {
-    userID, ok := utils.GetUserIDFromContext(r.Context())
-    if !ok {
-        utils.WriteToJson(w, http.StatusUnauthorized, utils.ApiResponse{
-            StatusCode: http.StatusUnauthorized,
-            Message:    "unauthorized",
-        })
-        return
-    }
-    
-    var query TransactionCashFlowQuery
-	query = TransactionCashFlowQuery{
-		From: r.URL.Query().Get("from"),
-		To: r.URL.Query().Get("to"),
+	userID, ok := utils.GetUserIDFromContext(r.Context())
+	if !ok {
+		utils.WriteToJson(w, http.StatusUnauthorized, utils.ApiResponse{
+			StatusCode: http.StatusUnauthorized,
+			Message:    "unauthorized",
+		})
+		return
 	}
-    
-    response := th.service.GetTransactionCashFlow(r.Context(), userID, query)
-    
-    utils.WriteToJson(w, response.StatusCode, response)
+
+	query := TransactionCashFlowQuery{
+		From: r.URL.Query().Get("from"),
+		To:   r.URL.Query().Get("to"),
+	}
+
+	response := th.service.GetTransactionCashFlow(r.Context(), userID, query)
+	utils.WriteToJson(w, response.StatusCode, response)
 }

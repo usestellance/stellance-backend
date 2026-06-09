@@ -1,0 +1,1996 @@
+basePath: /api/v1
+definitions:
+  admin.AdminInvoiceRow:
+    properties:
+      created_at:
+        type: string
+      creator_email:
+        type: string
+      currency:
+        type: string
+      id:
+        type: string
+      invoice_number:
+        type: string
+      payer_email:
+        type: string
+      status:
+        type: string
+      total:
+        type: number
+    type: object
+  admin.AdminStats:
+    properties:
+      active_users:
+        type: integer
+      overdue_count:
+        type: integer
+      paid_invoices:
+        type: integer
+      total_invoices:
+        type: integer
+      total_revenue:
+        type: number
+      total_users:
+        type: integer
+    type: object
+  admin.AdminUserRow:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      email_verified:
+        type: boolean
+      first_name:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      last_name:
+        type: string
+      role:
+        type: string
+    type: object
+  auth.AuthRequestDto:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  auth.ChangePasswordDTO:
+    properties:
+      new_password:
+        maxLength: 100
+        minLength: 8
+        type: string
+      old_password:
+        type: string
+    required:
+    - new_password
+    - old_password
+    type: object
+  auth.ProviderLogin:
+    properties:
+      email:
+        type: string
+      provider_id:
+        type: string
+    required:
+    - email
+    - provider_id
+    type: object
+  auth.ResetPasswordDto:
+    properties:
+      confirm_password:
+        type: string
+      email:
+        type: string
+      otp:
+        maxLength: 6
+        minLength: 2
+        type: string
+      password:
+        type: string
+    required:
+    - confirm_password
+    - email
+    - otp
+    - password
+    type: object
+  invoice.CreateInvoiceDTO:
+    properties:
+      country:
+        type: string
+      due_date:
+        type: string
+      invoice_items:
+        items:
+          $ref: '#/definitions/invoice.InvoiceItems'
+        minItems: 1
+        type: array
+      make_default:
+        type: boolean
+      note:
+        type: string
+      payer_email:
+        type: string
+      payer_name:
+        type: string
+      service_fee:
+        minimum: 0
+        type: number
+      template_id:
+        $ref: '#/definitions/invoice.TemplateIDType'
+      title:
+        minLength: 3
+        type: string
+    required:
+    - country
+    - due_date
+    - invoice_items
+    - payer_email
+    - payer_name
+    - template_id
+    - title
+    type: object
+  invoice.InvoiceItems:
+    properties:
+      amount:
+        type: number
+      created_at:
+        type: string
+      description:
+        type: string
+      discount:
+        type: integer
+      invoice_type:
+        allOf:
+        - $ref: '#/definitions/invoice.InvoiceType'
+        enum:
+        - per_hour
+        - per_unit
+      item_id:
+        type: string
+      quantity:
+        type: integer
+      unit_price:
+        type: number
+    required:
+    - amount
+    - description
+    - invoice_type
+    - quantity
+    - unit_price
+    type: object
+  invoice.InvoiceType:
+    enum:
+    - per_unit
+    - per_hour
+    type: string
+    x-enum-varnames:
+    - PerUnit
+    - PerHour
+  invoice.MarkInvoicePaidDTO:
+    properties:
+      amount:
+        type: number
+      network_fee:
+        minimum: 0
+        type: number
+      transaction_hash:
+        type: string
+      wallet_id:
+        type: string
+    required:
+    - amount
+    - transaction_hash
+    type: object
+  invoice.SendInvoiceDto:
+    properties:
+      emails:
+        items:
+          type: string
+        maxItems: 10
+        minItems: 1
+        type: array
+    required:
+    - emails
+    type: object
+  invoice.TemplateIDType:
+    enum:
+    - template_001
+    - template_002
+    - template_003
+    - template_004
+    - template_005
+    type: string
+    x-enum-varnames:
+    - TemplateID1
+    - TemplateID2
+    - TemplateID3
+    - TemplateID4
+    - TemplateID5
+  invoice_comments.CreateCommentDTO:
+    properties:
+      comment_text:
+        maxLength: 2000
+        minLength: 1
+        type: string
+      invoice_id:
+        type: string
+      parent_id:
+        type: string
+      token:
+        type: string
+    required:
+    - comment_text
+    - invoice_id
+    type: object
+  invoice_comments.ReactToCommentDTO:
+    properties:
+      email:
+        type: string
+      emoji:
+        maxLength: 10
+        minLength: 1
+        type: string
+      token:
+        type: string
+    required:
+    - emoji
+    type: object
+  invoice_comments.UpdateCommentDTO:
+    properties:
+      comment_text:
+        maxLength: 2000
+        minLength: 1
+        type: string
+      email:
+        type: string
+      token:
+        type: string
+    required:
+    - comment_text
+    type: object
+  recurring.CreateRecurringDTO:
+    properties:
+      country:
+        type: string
+      interval:
+        allOf:
+        - $ref: '#/definitions/recurring.RecurringInterval'
+        enum:
+        - weekly
+        - biweekly
+        - monthly
+        - quarterly
+        - yearly
+      invoice_items:
+        items:
+          $ref: '#/definitions/invoice.InvoiceItems'
+        minItems: 1
+        type: array
+      note:
+        type: string
+      payer_email:
+        type: string
+      payer_name:
+        type: string
+      service_fee:
+        minimum: 0
+        type: number
+      start_date:
+        type: string
+      template_id:
+        type: string
+      title:
+        minLength: 3
+        type: string
+    required:
+    - country
+    - interval
+    - invoice_items
+    - payer_email
+    - payer_name
+    - start_date
+    - template_id
+    - title
+    type: object
+  recurring.RecurringInterval:
+    enum:
+    - weekly
+    - biweekly
+    - monthly
+    - quarterly
+    - yearly
+    type: string
+    x-enum-varnames:
+    - IntervalWeekly
+    - IntervalBiweekly
+    - IntervalMonthly
+    - IntervalQuarterly
+    - IntervalYearly
+  recurring.UpdateRecurringDTO:
+    properties:
+      interval:
+        allOf:
+        - $ref: '#/definitions/recurring.RecurringInterval'
+        enum:
+        - weekly
+        - biweekly
+        - monthly
+        - quarterly
+        - yearly
+      is_active:
+        type: boolean
+      start_date:
+        type: string
+    type: object
+  user.CompleteProfileRequestDto:
+    properties:
+      business_name:
+        maxLength: 50
+        type: string
+      country:
+        maxLength: 25
+        type: string
+      first_name:
+        maxLength: 15
+        minLength: 2
+        type: string
+      last_name:
+        maxLength: 15
+        minLength: 2
+        type: string
+      phone_number:
+        maxLength: 15
+        type: string
+    required:
+    - first_name
+    - last_name
+    type: object
+  user.UpdateProfileDto:
+    properties:
+      business_name:
+        maxLength: 50
+        type: string
+      country:
+        maxLength: 25
+        type: string
+      first_name:
+        maxLength: 15
+        minLength: 2
+        type: string
+      last_name:
+        maxLength: 15
+        minLength: 2
+        type: string
+      phone_number:
+        maxLength: 15
+        type: string
+    type: object
+  utils.ApiResponse:
+    properties:
+      data: {}
+      error:
+        type: string
+      message:
+        type: string
+      status_code:
+        type: integer
+    type: object
+host: localhost:4000
+info:
+  contact:
+    email: davidhero125@gmail.com
+    name: API Support
+  description: Invoice management and payment platform API
+  license:
+    name: MIT
+  termsOfService: http://swagger.io/terms/
+  title: Stellance API
+  version: "1.0"
+paths:
+  /admin/invoices:
+    get:
+      description: Paginated list of invoices with optional status and search filters
+      parameters:
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Items per page
+        in: query
+        name: limit
+        type: integer
+      - description: Filter by status (draft, paid, overdue, cancelled)
+        in: query
+        name: status
+        type: string
+      - description: Search by invoice number or email
+        in: query
+        name: search
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: List all invoices
+      tags:
+      - admin
+  /admin/invoices/{id}:
+    get:
+      description: Returns invoice details for admin view
+      parameters:
+      - description: Invoice ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/admin.AdminInvoiceRow'
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Get invoice by ID (admin)
+      tags:
+      - admin
+  /admin/stats:
+    get:
+      description: Returns total users, invoices, revenue, and overdue counts
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/admin.AdminStats'
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Get platform statistics
+      tags:
+      - admin
+  /admin/transactions:
+    get:
+      description: Paginated list of all platform transactions
+      parameters:
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Items per page
+        in: query
+        name: limit
+        type: integer
+      - description: Search by user email or invoice number
+        in: query
+        name: search
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: List all transactions
+      tags:
+      - admin
+  /admin/users:
+    get:
+      description: Paginated list of users with optional search
+      parameters:
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Items per page
+        in: query
+        name: limit
+        type: integer
+      - description: Search by email or name
+        in: query
+        name: search
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: List all users
+      tags:
+      - admin
+  /admin/users/{id}:
+    delete:
+      description: Permanently deletes a user account
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete user
+      tags:
+      - admin
+    get:
+      description: Returns full user details for admin view
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/admin.AdminUserRow'
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Get user by ID
+      tags:
+      - admin
+  /admin/users/{id}/activate:
+    patch:
+      description: Sets user is_active = true
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Activate user account
+      tags:
+      - admin
+  /admin/users/{id}/deactivate:
+    patch:
+      description: Sets user is_active = false
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Deactivate user account
+      tags:
+      - admin
+  /auth/admin/signup:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Admin credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.AuthRequestDto'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      summary: Register a new admin user
+      tags:
+      - auth
+  /auth/change-password:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Old and new passwords
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.ChangePasswordDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Change password (authenticated)
+      tags:
+      - auth
+  /auth/clear:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Clear Redis cache (admin only)
+      tags:
+      - auth
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Login credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.AuthRequestDto'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      summary: Login
+      tags:
+      - auth
+  /auth/resend-email:
+    get:
+      parameters:
+      - description: Email address
+        in: query
+        name: email
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      summary: Resend email verification
+      tags:
+      - auth
+  /auth/reset:
+    get:
+      parameters:
+      - description: Email address
+        in: query
+        name: email
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      summary: Request password reset email
+      tags:
+      - auth
+  /auth/reset-password:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Reset token and new password
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.ResetPasswordDto'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      summary: Reset password via token
+      tags:
+      - auth
+  /auth/signup:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Sign up credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.AuthRequestDto'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      summary: Register a new user
+      tags:
+      - auth
+  /auth/social:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Provider token payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.ProviderLogin'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      summary: Social auth (Google / GitHub)
+      tags:
+      - auth
+  /auth/token:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Refresh access token
+      tags:
+      - auth
+  /auth/validate:
+    get:
+      parameters:
+      - description: Verification token
+        in: query
+        name: token
+        required: true
+        type: string
+      - description: Email address
+        in: query
+        name: email
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      summary: Validate email address
+      tags:
+      - auth
+  /comments:
+    get:
+      parameters:
+      - description: Invoice ID
+        in: query
+        name: invoice_id
+        required: true
+        type: string
+      - description: Parent comment ID (for replies)
+        in: query
+        name: parent_id
+        type: string
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Items per page
+        in: query
+        name: limit
+        type: integer
+      - description: ASC or DESC
+        in: query
+        name: sort_order
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      summary: List comments for an invoice
+      tags:
+      - comments
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Comment data (include token for guest access)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/invoice_comments.CreateCommentDTO'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      summary: Post a comment on an invoice
+      tags:
+      - comments
+  /comments/{id}:
+    get:
+      parameters:
+      - description: Comment ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      summary: Get comment by ID
+      tags:
+      - comments
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Comment ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated comment text
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/invoice_comments.UpdateCommentDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      summary: Edit a comment
+      tags:
+      - comments
+  /comments/{id}/react:
+    delete:
+      parameters:
+      - description: Comment ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Emoji to remove
+        in: query
+        name: emoji
+        required: true
+        type: string
+      - description: Guest email
+        in: query
+        name: email
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      summary: Remove emoji reaction from a comment
+      tags:
+      - comments
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Comment ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Emoji and optional guest token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/invoice_comments.ReactToCommentDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      summary: Add emoji reaction to a comment
+      tags:
+      - comments
+  /invoices:
+    get:
+      parameters:
+      - description: Filter by status
+        in: query
+        name: status
+        type: string
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Items per page
+        in: query
+        name: page_count
+        type: integer
+      - description: ASC or DESC
+        in: query
+        name: order_by
+        type: string
+      - description: Search term
+        in: query
+        name: search
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: List invoices
+      tags:
+      - invoices
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: Invoice title
+        in: formData
+        name: title
+        required: true
+        type: string
+      - description: Payer name
+        in: formData
+        name: payer_name
+        required: true
+        type: string
+      - description: Payer email
+        in: formData
+        name: payer_email
+        required: true
+        type: string
+      - description: Due date (YYYY-MM-DD)
+        in: formData
+        name: due_date
+        required: true
+        type: string
+      - description: JSON array of invoice items
+        in: formData
+        name: invoice_items
+        required: true
+        type: string
+      - description: Logo image (PNG/JPEG, max 2MB)
+        in: formData
+        name: logo
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a new invoice
+      tags:
+      - invoices
+  /invoices/{id}:
+    delete:
+      parameters:
+      - description: Invoice ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete invoice
+      tags:
+      - invoices
+    get:
+      parameters:
+      - description: Invoice ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Get invoice by ID
+      tags:
+      - invoices
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Invoice ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Invoice data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/invoice.CreateInvoiceDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Edit invoice (JSON body)
+      tags:
+      - invoices
+    put:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: Invoice ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: JSON array of invoice items
+        in: formData
+        name: invoice_items
+        type: string
+      - description: Logo image
+        in: formData
+        name: logo
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Update invoice (multipart form)
+      tags:
+      - invoices
+  /invoices/{id}/mark-paid:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Invoice ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Payment details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/invoice.MarkInvoicePaidDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Mark invoice as paid
+      tags:
+      - invoices
+  /invoices/{id}/pdf:
+    get:
+      parameters:
+      - description: Invoice ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/pdf
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Download invoice as PDF
+      tags:
+      - invoices
+  /invoices/overview:
+    get:
+      parameters:
+      - description: Month filter (YYYY-MM)
+        in: query
+        name: month
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Get invoice breakdown by status (pie chart data)
+      tags:
+      - invoices
+  /invoices/query:
+    get:
+      parameters:
+      - description: Search term
+        in: query
+        name: search
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Full-text search invoices for current user
+      tags:
+      - invoices
+  /invoices/review/{id}:
+    get:
+      parameters:
+      - description: Invoice ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: true to approve, false to reject
+        in: query
+        name: approve
+        required: true
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      summary: Approve or reject invoice (payer action)
+      tags:
+      - invoices
+  /invoices/search:
+    get:
+      parameters:
+      - description: Invoice ID
+        in: query
+        name: id
+        type: string
+      - description: Invoice URL
+        in: query
+        name: url
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      summary: Search invoice by ID or URL (public)
+      tags:
+      - invoices
+  /invoices/send/{id}:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Invoice ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Recipient emails
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/invoice.SendInvoiceDto'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Send invoice via email
+      tags:
+      - invoices
+  /invoices/stats:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Get invoice statistics for current user
+      tags:
+      - invoices
+  /notifications:
+    get:
+      parameters:
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Items per page
+        in: query
+        name: count
+        type: integer
+      - description: ASC or DESC
+        in: query
+        name: order_by
+        type: string
+      - description: Filter by viewed status
+        in: query
+        name: viewed
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Get user notifications
+      tags:
+      - notifications
+  /notifications/{id}:
+    delete:
+      parameters:
+      - description: Notification ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a notification
+      tags:
+      - notifications
+    get:
+      parameters:
+      - description: Notification ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Get notification by ID
+      tags:
+      - notifications
+    patch:
+      parameters:
+      - description: Notification ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Viewed status
+        in: query
+        name: viewed
+        required: true
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Mark notification as viewed/unviewed
+      tags:
+      - notifications
+  /recurring:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: List recurring invoice schedules
+      tags:
+      - recurring
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Recurring invoice config
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/recurring.CreateRecurringDTO'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Create recurring invoice schedule
+      tags:
+      - recurring
+  /recurring/{id}:
+    delete:
+      parameters:
+      - description: Recurring ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete recurring schedule
+      tags:
+      - recurring
+    get:
+      parameters:
+      - description: Recurring ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Get recurring schedule by ID
+      tags:
+      - recurring
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Recurring ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/recurring.UpdateRecurringDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Update recurring schedule
+      tags:
+      - recurring
+  /transactions:
+    get:
+      parameters:
+      - description: Filter by user ID (admin only)
+        in: query
+        name: user_id
+        type: string
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Items per page
+        in: query
+        name: page_count
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: List transactions
+      tags:
+      - transactions
+  /transactions/{id}:
+    delete:
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a transaction
+      tags:
+      - transactions
+  /transactions/id/{id}:
+    get:
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Get transaction by ID
+      tags:
+      - transactions
+  /transactions/inflow:
+    get:
+      parameters:
+      - description: Start date (YYYY-MM-DD)
+        in: query
+        name: from
+        type: string
+      - description: End date (YYYY-MM-DD)
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Get cash flow over a date range
+      tags:
+      - transactions
+  /transactions/stats:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Get transaction overview stats
+      tags:
+      - transactions
+  /users:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Profile data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/user.CompleteProfileRequestDto'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Complete user profile
+      tags:
+      - user
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/user.UpdateProfileDto'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Update user profile
+      tags:
+      - user
+  /users/{id}:
+    get:
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Get user profile by ID
+      tags:
+      - user
+  /users/me:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Get current authenticated user
+      tags:
+      - user
+  /wallet:
+    post:
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a Stellar wallet
+      tags:
+      - wallet
+  /wallet/{id}:
+    get:
+      parameters:
+      - description: Wallet ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Get wallet by ID
+      tags:
+      - wallet
+  /wallet/{id}/export:
+    get:
+      parameters:
+      - description: Wallet ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Export wallet keys
+      tags:
+      - wallet
+securityDefinitions:
+  BearerAuth:
+    description: Enter "Bearer {token}"
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
