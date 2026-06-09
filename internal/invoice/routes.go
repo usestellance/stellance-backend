@@ -25,6 +25,6 @@ func RegisterInvoiceRoutes(apiV1 *httpx.RouteGroup, router *http.ServeMux, invoi
 	invoiceGroup.HandleFunc("GET /stats", authMiddleware.Authenticate(http.HandlerFunc(invoiceHandler.GetInvoiceStatsHandler)).ServeHTTP)
 	invoiceGroup.HandleFunc("GET /overview", authMiddleware.Authenticate(http.HandlerFunc(invoiceHandler.GetInvoicesByStatus)).ServeHTTP)
 	invoiceGroup.HandleFunc("PUT /{id}", authMiddleware.Authenticate(http.HandlerFunc(invoiceHandler.UpdateInvoiceHandler)).ServeHTTP)
-	invoiceGroup.HandleFunc("GET /{id}/pdf", authMiddleware.Authenticate(http.HandlerFunc(invoiceHandler.GetInvoicePDFHandler)).ServeHTTP)
+	invoiceGroup.HandleFunc("GET /download/{id}/pdf", authMiddleware.Authenticate(http.HandlerFunc(invoiceHandler.GetInvoicePDFHandler)).ServeHTTP)
 	invoiceGroup.HandleFunc("PATCH /{id}/mark-paid", authMiddleware.Authenticate(http.HandlerFunc(invoiceHandler.MarkInvoicePaidHandler)).ServeHTTP)
 }

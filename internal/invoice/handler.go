@@ -697,7 +697,7 @@ func (handler *InvoiceHandler) UpdateInvoiceHandler(w http.ResponseWriter, r *ht
 // @Success      200  {file}    binary
 // @Failure      404  {object}  utils.ApiResponse
 // @Security     BearerAuth
-// @Router       /invoices/{id}/pdf [get]
+// @Router       /invoices/download/{id}/pdf [get]
 func (h *InvoiceHandler) GetInvoicePDFHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	invoiceID := r.PathValue("id")
