@@ -1235,6 +1235,45 @@ const docTemplate = `{
                 }
             }
         },
+        "/invoices/download/{id}/pdf": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/pdf"
+                ],
+                "tags": [
+                    "invoices"
+                ],
+                "summary": "Download invoice as PDF",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Invoice ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/invoices/overview": {
             "get": {
                 "security": [
@@ -1676,45 +1715,6 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/utils.ApiResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/invoices/{id}/pdf": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "produces": [
-                    "application/pdf"
-                ],
-                "tags": [
-                    "invoices"
-                ],
-                "summary": "Download invoice as PDF",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Invoice ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "file"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }

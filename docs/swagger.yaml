@@ -1305,7 +1305,7 @@ paths:
       summary: Mark invoice as paid
       tags:
       - invoices
-  /invoices/{id}/pdf:
+  /invoices/download/{id}/pdf:
     get:
       parameters:
       - description: Invoice ID
