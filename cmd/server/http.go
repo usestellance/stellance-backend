@@ -117,6 +117,18 @@ func (server *Server) AddHttpRoutes() {
 
 	adminService := admin.NewAdminService()
 	admin.RegisterAdminRoutes(apiV1, server.router, adminService)
+
+	seedStellarNetworkConfig(adminService)
+}
+
+func seedStellarNetworkConfig(adminService *admin.AdminService) {
+	ctx := context.Background()
+	var exists int
+	db := config.GetAppContainer().Postgres
+	db.QueryRow(ctx, `SELECT COUNT(*) FROM system_config WHERE key = 'stellar_network'`).Scan(&exists)
+	if exists == 0 {
+		adminService.SetStellarNetwork(ctx, "testnet", "")
+	}
 }
 
 func (server *Server) StartHttpServer(ctx context.Context) {

@@ -508,6 +508,46 @@ func generateOTP() string {
 	return otp
 }
 
+func (as *AdminService) SetStellarNetwork(ctx context.Context, stage, adminID string) *utils.ApiResponse {
+	if stage != "testnet" && stage != "mainnet" {
+		return &utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "stage must be testnet or mainnet"}
+	}
+	encrypted, err := utils.EncryptValue(stage)
+	if err != nil {
+		return &utils.ApiResponse{StatusCode: http.StatusInternalServerError, Message: "failed to encrypt config value"}
+	}
+	_, err = as.postgres.Exec(ctx,
+		`INSERT INTO system_config (key, value, updated_at, updated_by)
+		 VALUES ('stellar_network', $1, NOW(), $2)
+		 ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW(), updated_by = $2`,
+		encrypted, adminID,
+	)
+	if err != nil {
+		return &utils.ApiResponse{StatusCode: http.StatusInternalServerError, Message: "failed to update network config"}
+	}
+	return &utils.ApiResponse{StatusCode: http.StatusOK, Message: "stellar network updated to " + stage}
+}
+
+func (as *AdminService) GetStellarNetwork(ctx context.Context) *utils.ApiResponse {
+	var encrypted string
+	var updatedAt time.Time
+	err := as.postgres.QueryRow(ctx,
+		`SELECT value, updated_at FROM system_config WHERE key = 'stellar_network'`,
+	).Scan(&encrypted, &updatedAt)
+	if err != nil {
+		return &utils.ApiResponse{StatusCode: http.StatusNotFound, Message: "network config not set"}
+	}
+	stage, err := utils.DecryptValue(encrypted)
+	if err != nil {
+		return &utils.ApiResponse{StatusCode: http.StatusInternalServerError, Message: "failed to read network config"}
+	}
+	return &utils.ApiResponse{
+		StatusCode: http.StatusOK,
+		Message:    "successful",
+		Data:       map[string]any{"stage": stage, "updated_at": updatedAt},
+	}
+}
+
 func (as *AdminService) ListInvoices(ctx context.Context, page, limit int, status, search string) *utils.ApiResponse {
 	if page < 1 {
 		page = 1

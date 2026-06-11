@@ -385,6 +385,73 @@ definitions:
       status_code:
         type: integer
     type: object
+  wallet.PathPaymentResult:
+    properties:
+      dest_amount:
+        type: string
+      dest_asset:
+        type: string
+      destination:
+        type: string
+      fee_xlm:
+        type: number
+      source_amount:
+        type: string
+      source_asset:
+        type: string
+      transaction_hash:
+        type: string
+    type: object
+  wallet.PayInvoiceDTO:
+    properties:
+      invoice_id:
+        type: string
+      pin:
+        type: string
+      source_asset:
+        enum:
+        - XLM
+        - USDC
+        type: string
+    required:
+    - invoice_id
+    - pin
+    - source_asset
+    type: object
+  wallet.SetPinDTO:
+    properties:
+      pin:
+        maxLength: 8
+        minLength: 4
+        type: string
+    required:
+    - pin
+    type: object
+  wallet.TransferDTO:
+    properties:
+      amount:
+        type: string
+      dest_asset:
+        enum:
+        - XLM
+        - USDC
+        type: string
+      destination_address:
+        type: string
+      pin:
+        type: string
+      source_asset:
+        enum:
+        - XLM
+        - USDC
+        type: string
+    required:
+    - amount
+    - dest_asset
+    - destination_address
+    - pin
+    - source_asset
+    type: object
 host: localhost:4000
 info:
   contact:
@@ -397,6 +464,48 @@ info:
   title: Stellance API
   version: "1.0"
 paths:
+  /admin/config/network:
+    get:
+      description: Returns whether the platform is running on testnet or mainnet
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Get current Stellar network stage
+      tags:
+      - admin
+    patch:
+      consumes:
+      - application/json
+      description: Switches platform between testnet and mainnet. Value stored encrypted.
+      parameters:
+      - description: 'stage: testnet or mainnet'
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Switch Stellar network stage
+      tags:
+      - admin
   /admin/invoices:
     get:
       description: Paginated list of invoices with optional status and search filters
@@ -2135,6 +2244,151 @@ paths:
       security:
       - BearerAuth: []
       summary: Export wallet keys
+      tags:
+      - wallet
+  /wallet/{id}/pay/invoice:
+    post:
+      consumes:
+      - application/json
+      description: Pays invoice using PathPaymentStrictReceive — payer sends source
+        asset, vendor receives exact USDC
+      parameters:
+      - description: Wallet ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Payment details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/wallet.PayInvoiceDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/wallet.PathPaymentResult'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Pay an invoice via path payment
+      tags:
+      - wallet
+  /wallet/{id}/pay/transfer:
+    post:
+      consumes:
+      - application/json
+      description: Sends assets to any Stellar address. Uses path payment if source
+        and dest assets differ
+      parameters:
+      - description: Wallet ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Transfer details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/wallet.TransferDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/wallet.PathPaymentResult'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Transfer funds to another wallet
+      tags:
+      - wallet
+  /wallet/{id}/pin:
+    post:
+      consumes:
+      - application/json
+      description: Sets a 4-8 digit numeric PIN required for all payment operations
+      parameters:
+      - description: Wallet ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: PIN
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/wallet.SetPinDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Set or update transaction PIN
+      tags:
+      - wallet
+  /wallet/lookup:
+    get:
+      description: Returns the primary wallet address for a given user email. Used
+        to resolve a recipient before sending payment.
+      parameters:
+      - description: Recipient email address
+        in: query
+        name: email
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Lookup wallet address by email
       tags:
       - wallet
 securityDefinitions:

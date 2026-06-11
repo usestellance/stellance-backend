@@ -31,4 +31,6 @@ func RegisterAdminRoutes(apiV1 *httpx.RouteGroup, router *http.ServeMux, service
 	group.HandleFunc("GET /invoices", admin(h.ListInvoices))
 	group.HandleFunc("GET /invoices/{id}", admin(h.GetInvoice))
 	group.HandleFunc("GET /transactions", admin(h.ListTransactions))
+	group.HandleFunc("GET /config/network", admin(h.GetStellarNetwork))
+	group.HandleFunc("PATCH /config/network", admin(h.SetStellarNetwork))
 }

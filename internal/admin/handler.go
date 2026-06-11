@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -312,5 +313,41 @@ func (h *AdminHandler) AdminResetUserPassword(w http.ResponseWriter, r *http.Req
 		return
 	}
 	resp := h.service.AdminResetUserPassword(r.Context(), id, adminID(r), clientIP(r))
+	utils.WriteToJson(w, resp.StatusCode, resp)
+}
+
+// GetStellarNetwork godoc
+// @Summary      Get current Stellar network stage
+// @Description  Returns whether the platform is running on testnet or mainnet
+// @Tags         admin
+// @Produce      json
+// @Success      200  {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /admin/config/network [get]
+func (h *AdminHandler) GetStellarNetwork(w http.ResponseWriter, r *http.Request) {
+	resp := h.service.GetStellarNetwork(r.Context())
+	utils.WriteToJson(w, resp.StatusCode, resp)
+}
+
+// SetStellarNetwork godoc
+// @Summary      Switch Stellar network stage
+// @Description  Switches platform between testnet and mainnet. Value stored encrypted.
+// @Tags         admin
+// @Accept       json
+// @Produce      json
+// @Param        body  body  object  true  "stage: testnet or mainnet"
+// @Success      200  {object}  utils.ApiResponse
+// @Failure      400  {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /admin/config/network [patch]
+func (h *AdminHandler) SetStellarNetwork(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Stage string `json:"stage"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Stage == "" {
+		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "stage is required"})
+		return
+	}
+	resp := h.service.SetStellarNetwork(r.Context(), body.Stage, adminID(r))
 	utils.WriteToJson(w, resp.StatusCode, resp)
 }

@@ -26,6 +26,7 @@ import (
 	"github.com/fernet/fernet-go"
 	"github.com/go-playground/validator/v10"
 	gonanoid "github.com/matoous/go-nanoid/v2"
+	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -494,4 +495,94 @@ func CapitalizeStatus(status string) string {
 		return status
 	}
 	return strings.ToUpper(status[:1]) + strings.ToLower(status[1:])
+}
+
+// EncryptValue / DecryptValue — AES-GCM using ENCRYPTION_KEY_BASE64 env var.
+// Use for sensitive config values that must be stored encrypted and read back.
+func EncryptValue(plaintext string) (string, error) {
+	keyB64 := os.Getenv("ENCRYPTION_KEY_BASE64")
+	keyBytes, err := base64.StdEncoding.DecodeString(keyB64)
+	if err != nil || (len(keyBytes) != 16 && len(keyBytes) != 24 && len(keyBytes) != 32) {
+		return "", fmt.Errorf("invalid encryption key")
+	}
+	block, err := aes.NewCipher(keyBytes)
+	if err != nil {
+		return "", err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
+		return "", err
+	}
+	ciphertext := gcm.Seal(nonce, nonce, []byte(plaintext), nil)
+	return base64.StdEncoding.EncodeToString(ciphertext), nil
+}
+
+func DecryptValue(encoded string) (string, error) {
+	keyB64 := os.Getenv("ENCRYPTION_KEY_BASE64")
+	keyBytes, err := base64.StdEncoding.DecodeString(keyB64)
+	if err != nil || (len(keyBytes) != 16 && len(keyBytes) != 24 && len(keyBytes) != 32) {
+		return "", fmt.Errorf("invalid encryption key")
+	}
+	data, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return "", err
+	}
+	block, err := aes.NewCipher(keyBytes)
+	if err != nil {
+		return "", err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+	if len(data) < gcm.NonceSize() {
+		return "", fmt.Errorf("ciphertext too short")
+	}
+	nonce, ciphertext := data[:gcm.NonceSize()], data[gcm.NonceSize():]
+	plain, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return "", fmt.Errorf("decryption failed")
+	}
+	return string(plain), nil
+}
+
+// PIN hashing using argon2id — suitable for low-entropy secrets like 4-6 digit PINs.
+// Format stored: base64(salt) + "$" + base64(hash)
+func HashPin(pin string) (string, error) {
+	salt := make([]byte, 16)
+	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
+		return "", fmt.Errorf("failed to generate salt: %w", err)
+	}
+	hash := argon2.IDKey([]byte(pin), salt, 2, 64*1024, 2, 32)
+	encoded := base64.StdEncoding.EncodeToString(salt) + "$" + base64.StdEncoding.EncodeToString(hash)
+	return encoded, nil
+}
+
+func VerifyPin(pin, encoded string) bool {
+	parts := strings.SplitN(encoded, "$", 2)
+	if len(parts) != 2 {
+		return false
+	}
+	salt, err := base64.StdEncoding.DecodeString(parts[0])
+	if err != nil {
+		return false
+	}
+	expected, err := base64.StdEncoding.DecodeString(parts[1])
+	if err != nil {
+		return false
+	}
+	hash := argon2.IDKey([]byte(pin), salt, 2, 64*1024, 2, 32)
+	if len(hash) != len(expected) {
+		return false
+	}
+	// constant-time compare
+	diff := byte(0)
+	for i := range hash {
+		diff |= hash[i] ^ expected[i]
+	}
+	return diff == 0
 }
