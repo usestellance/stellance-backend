@@ -16,11 +16,11 @@ go.work.sum
 /go/pkg/
 
 .idea/
-.vscode/
 *.swp
 *.swo
 *.sublime-workspace
 *.sublime-project
+temp_auto_push.bat
 
 .env
 .env.local
@@ -43,4 +43,5 @@ profile.out
 /generated/
 
 tmp
-tasks.txt
+tasks.txt.gitignore
+branch_structure.json
