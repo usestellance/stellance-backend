@@ -7,6 +7,18 @@ import (
 	"github.com/The-True-Hooha/stellance-backend/pkg/utils"
 )
 
+func adminID(r *http.Request) string {
+	id, _ := utils.GetUserIDFromContext(r.Context())
+	return id
+}
+
+func clientIP(r *http.Request) string {
+	if ip := r.Header.Get("X-Forwarded-For"); ip != "" {
+		return ip
+	}
+	return r.RemoteAddr
+}
+
 type AdminHandler struct {
 	service *AdminService
 }
@@ -85,7 +97,7 @@ func (h *AdminHandler) ActivateUser(w http.ResponseWriter, r *http.Request) {
 		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "user id required"})
 		return
 	}
-	resp := h.service.SetUserActive(r.Context(), id, true)
+	resp := h.service.SetUserActive(r.Context(), id, true, adminID(r), clientIP(r))
 	utils.WriteToJson(w, resp.StatusCode, resp)
 }
 
@@ -105,7 +117,7 @@ func (h *AdminHandler) DeactivateUser(w http.ResponseWriter, r *http.Request) {
 		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "user id required"})
 		return
 	}
-	resp := h.service.SetUserActive(r.Context(), id, false)
+	resp := h.service.SetUserActive(r.Context(), id, false, adminID(r), clientIP(r))
 	utils.WriteToJson(w, resp.StatusCode, resp)
 }
 
@@ -125,7 +137,7 @@ func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "user id required"})
 		return
 	}
-	resp := h.service.DeleteUser(r.Context(), id)
+	resp := h.service.DeleteUser(r.Context(), id, adminID(r), clientIP(r))
 	utils.WriteToJson(w, resp.StatusCode, resp)
 }
 
@@ -188,5 +200,117 @@ func (h *AdminHandler) ListTransactions(w http.ResponseWriter, r *http.Request) 
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	search := r.URL.Query().Get("search")
 	resp := h.service.ListTransactions(r.Context(), page, limit, search)
+	utils.WriteToJson(w, resp.StatusCode, resp)
+}
+
+// GetUserInvoices godoc
+// @Summary      Get invoices for a user
+// @Description  Returns paginated invoices created by a specific user
+// @Tags         admin
+// @Produce      json
+// @Param        id     path   string  true   "User ID"
+// @Param        page   query  int     false  "Page number"
+// @Param        limit  query  int     false  "Items per page"
+// @Success      200  {object}  utils.ApiResponse
+// @Failure      404  {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /admin/users/{id}/invoices [get]
+func (h *AdminHandler) GetUserInvoices(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "user id required"})
+		return
+	}
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	resp := h.service.GetUserInvoices(r.Context(), id, page, limit)
+	utils.WriteToJson(w, resp.StatusCode, resp)
+}
+
+// GetUserTransactions godoc
+// @Summary      Get transactions for a user
+// @Description  Returns paginated transactions belonging to a specific user
+// @Tags         admin
+// @Produce      json
+// @Param        id     path   string  true   "User ID"
+// @Param        page   query  int     false  "Page number"
+// @Param        limit  query  int     false  "Items per page"
+// @Success      200  {object}  utils.ApiResponse
+// @Failure      404  {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /admin/users/{id}/transactions [get]
+func (h *AdminHandler) GetUserTransactions(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "user id required"})
+		return
+	}
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	resp := h.service.GetUserTransactions(r.Context(), id, page, limit)
+	utils.WriteToJson(w, resp.StatusCode, resp)
+}
+
+// SuspendUser godoc
+// @Summary      Toggle user suspension
+// @Description  Toggles user is_active — suspends active users, unsuspends suspended ones
+// @Tags         admin
+// @Produce      json
+// @Param        id  path  string  true  "User ID"
+// @Success      200  {object}  utils.ApiResponse
+// @Failure      404  {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /admin/users/{id}/suspend [patch]
+func (h *AdminHandler) SuspendUser(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "user id required"})
+		return
+	}
+	resp := h.service.SuspendUser(r.Context(), id, adminID(r), clientIP(r))
+	utils.WriteToJson(w, resp.StatusCode, resp)
+}
+
+// GetUserActivity godoc
+// @Summary      Get user activity log
+// @Description  Returns paginated activity log entries for a specific user
+// @Tags         admin
+// @Produce      json
+// @Param        id     path   string  true   "User ID"
+// @Param        page   query  int     false  "Page number"
+// @Param        limit  query  int     false  "Items per page"
+// @Success      200  {object}  utils.ApiResponse
+// @Failure      404  {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /admin/users/{id}/activity [get]
+func (h *AdminHandler) GetUserActivity(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "user id required"})
+		return
+	}
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	resp := h.service.GetUserActivity(r.Context(), id, page, limit)
+	utils.WriteToJson(w, resp.StatusCode, resp)
+}
+
+// AdminResetUserPassword godoc
+// @Summary      Admin-triggered password reset
+// @Description  Generates OTP and sends password reset email to the user
+// @Tags         admin
+// @Produce      json
+// @Param        id  path  string  true  "User ID"
+// @Success      200  {object}  utils.ApiResponse
+// @Failure      404  {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /admin/users/{id}/reset-password [post]
+func (h *AdminHandler) AdminResetUserPassword(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "user id required"})
+		return
+	}
+	resp := h.service.AdminResetUserPassword(r.Context(), id, adminID(r), clientIP(r))
 	utils.WriteToJson(w, resp.StatusCode, resp)
 }
