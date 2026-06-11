@@ -469,22 +469,6 @@ func (as *AdminService) GetUserTransactions(ctx context.Context, userID string, 
 	}
 }
 
-func (as *AdminService) SuspendUser(ctx context.Context, userID, adminID, ip string) *utils.ApiResponse {
-	var current bool
-	if err := as.postgres.QueryRow(ctx, `SELECT is_active FROM users WHERE id = $1`, userID).Scan(&current); err != nil {
-		return &utils.ApiResponse{StatusCode: http.StatusNotFound, Message: "user not found"}
-	}
-	newState := !current
-	as.postgres.Exec(ctx, `UPDATE users SET is_active = $1, updated_at = NOW() WHERE id = $2`, newState, userID)
-	action := activitylog.ActionAdminSuspend
-	msg := "user suspended"
-	if newState {
-		action = activitylog.ActionAdminActivate
-		msg = "user unsuspended"
-	}
-	as.log_(ctx, adminID, action, activitylog.EntityUser, userID, ip)
-	return &utils.ApiResponse{StatusCode: http.StatusOK, Message: msg, Data: map[string]any{"is_active": newState}}
-}
 
 func (as *AdminService) GetUserActivity(ctx context.Context, userID string, page, limit int) *utils.ApiResponse {
 	if page < 1 {
