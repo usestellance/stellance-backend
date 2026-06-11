@@ -128,6 +128,10 @@ func (handler *TransactionHandler) GetManyTransactionHandler(w http.ResponseWrit
 
 	dto := TransactionFiltersDto{
 		UserId: queryUserId,
+		Type:   r.URL.Query().Get("type"),
+		Status: r.URL.Query().Get("status"),
+		From:   r.URL.Query().Get("from"),
+		To:     r.URL.Query().Get("to"),
 	}
 
 	page := r.URL.Query().Get("page")
@@ -148,13 +152,34 @@ func (handler *TransactionHandler) GetManyTransactionHandler(w http.ResponseWrit
 		dto.Count = 10
 	}
 
-	log.Info("fetching invoices",
+	log.Info("fetching transactions",
 		"user_id", userID,
 		"filters", dto,
 	)
 
-	response := handler.service.GetTransactionsPaginated(ctx, dto.Page, dto.Count, dto.UserId)
+	response := handler.service.GetTransactionsPaginated(ctx, dto.Page, dto.Count, dto)
 	utils.WriteToJson(w, response.StatusCode, response)
+}
+
+// CheckPaymentStatus godoc
+// @Summary      Check payment status
+// @Description  Returns the current status of a transaction and a Stellar explorer link for the on-chain record
+// @Tags         transactions
+// @Produce      json
+// @Param        id  path  string  true  "Transaction ID"
+// @Success      200  {object}  utils.ApiResponse
+// @Failure      404  {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /transaction/status/{id} [get]
+func (h *TransactionHandler) CheckPaymentStatus(w http.ResponseWriter, r *http.Request) {
+	userID, ok := utils.GetUserIDFromContext(r.Context())
+	if !ok {
+		utils.WriteToJson(w, http.StatusUnauthorized, utils.ApiResponse{StatusCode: http.StatusUnauthorized, Message: "unauthorized"})
+		return
+	}
+	id := r.PathValue("id")
+	resp := h.service.CheckPaymentStatus(r.Context(), id, userID)
+	utils.WriteToJson(w, resp.StatusCode, resp)
 }
 
 // GetTransactionCashFlow godoc

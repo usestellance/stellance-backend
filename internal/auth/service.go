@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/The-True-Hooha/stellance-backend/internal/activitylog"
 	"github.com/The-True-Hooha/stellance-backend/internal/user"
 	"github.com/The-True-Hooha/stellance-backend/internal/wallet"
 	"github.com/The-True-Hooha/stellance-backend/mail"
@@ -235,6 +236,8 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 		}
 
 		profileComplete := existingUser.FirstName != nil && existingUser.LastName != nil
+
+		activitylog.Log(ctx, config.postgres, config.log, existingUser.ID, activitylog.ActionLogin, "", "", "")
 
 		return &utils.ApiResponse{
 			StatusCode: http.StatusOK,

@@ -40,6 +40,8 @@ type GetTransactionDto struct {
 	ConfirmedAt     *time.Time `json:"confirmed_at,omitempty"`
 	TokenType       string     `json:"token_type"`
 	TransactionType string     `json:"transaction_type"`
+	SourceAsset     *string    `json:"source_asset,omitempty"`
+	SourceAmount    *string    `json:"source_amount,omitempty"`
 }
 
 type PaginatedTransactions struct {
@@ -53,6 +55,10 @@ type TransactionFiltersDto struct {
 	UserId string `json:"user_id,omitempty"`
 	Page   int    `json:"page" validate:"required,min=1"`
 	Count  int    `json:"count" validate:"required,min=1,max=15"`
+	Type   string `json:"type,omitempty"`
+	Status string `json:"status,omitempty"`
+	From   string `json:"from,omitempty"`
+	To     string `json:"to,omitempty"`
 }
 
 type TransactionCard struct {

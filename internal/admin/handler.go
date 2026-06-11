@@ -1,11 +1,24 @@
 package admin
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 
 	"github.com/The-True-Hooha/stellance-backend/pkg/utils"
 )
+
+func adminID(r *http.Request) string {
+	id, _ := utils.GetUserIDFromContext(r.Context())
+	return id
+}
+
+func clientIP(r *http.Request) string {
+	if ip := r.Header.Get("X-Forwarded-For"); ip != "" {
+		return ip
+	}
+	return r.RemoteAddr
+}
 
 type AdminHandler struct {
 	service *AdminService
@@ -69,43 +82,35 @@ func (h *AdminHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 	utils.WriteToJson(w, resp.StatusCode, resp)
 }
 
-// ActivateUser godoc
-// @Summary      Activate user account
-// @Description  Sets user is_active = true
+// SetUserStatus godoc
+// @Summary      Set user active status
+// @Description  Activates or deactivates a user account. Pass ?active=true to activate, ?active=false to deactivate/suspend.
 // @Tags         admin
 // @Produce      json
-// @Param        id   path  string  true  "User ID"
+// @Param        id      path   string  true  "User ID"
+// @Param        active  query  bool    true  "true = activate, false = deactivate"
 // @Success      200  {object}  utils.ApiResponse
+// @Failure      400  {object}  utils.ApiResponse
 // @Failure      404  {object}  utils.ApiResponse
 // @Security     BearerAuth
-// @Router       /admin/users/{id}/activate [patch]
-func (h *AdminHandler) ActivateUser(w http.ResponseWriter, r *http.Request) {
+// @Router       /admin/users/{id}/status [patch]
+func (h *AdminHandler) SetUserStatus(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
 		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "user id required"})
 		return
 	}
-	resp := h.service.SetUserActive(r.Context(), id, true)
-	utils.WriteToJson(w, resp.StatusCode, resp)
-}
-
-// DeactivateUser godoc
-// @Summary      Deactivate user account
-// @Description  Sets user is_active = false
-// @Tags         admin
-// @Produce      json
-// @Param        id   path  string  true  "User ID"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      404  {object}  utils.ApiResponse
-// @Security     BearerAuth
-// @Router       /admin/users/{id}/deactivate [patch]
-func (h *AdminHandler) DeactivateUser(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	if id == "" {
-		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "user id required"})
+	activeParam := r.URL.Query().Get("active")
+	if activeParam == "" {
+		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "active query param required (true or false)"})
 		return
 	}
-	resp := h.service.SetUserActive(r.Context(), id, false)
+	active, err := strconv.ParseBool(activeParam)
+	if err != nil {
+		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "active must be true or false"})
+		return
+	}
+	resp := h.service.SetUserActive(r.Context(), id, active, adminID(r), clientIP(r))
 	utils.WriteToJson(w, resp.StatusCode, resp)
 }
 
@@ -125,7 +130,7 @@ func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "user id required"})
 		return
 	}
-	resp := h.service.DeleteUser(r.Context(), id)
+	resp := h.service.DeleteUser(r.Context(), id, adminID(r), clientIP(r))
 	utils.WriteToJson(w, resp.StatusCode, resp)
 }
 
@@ -188,5 +193,133 @@ func (h *AdminHandler) ListTransactions(w http.ResponseWriter, r *http.Request) 
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	search := r.URL.Query().Get("search")
 	resp := h.service.ListTransactions(r.Context(), page, limit, search)
+	utils.WriteToJson(w, resp.StatusCode, resp)
+}
+
+// GetUserInvoices godoc
+// @Summary      Get invoices for a user
+// @Description  Returns paginated invoices created by a specific user
+// @Tags         admin
+// @Produce      json
+// @Param        id     path   string  true   "User ID"
+// @Param        page   query  int     false  "Page number"
+// @Param        limit  query  int     false  "Items per page"
+// @Success      200  {object}  utils.ApiResponse
+// @Failure      404  {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /admin/users/{id}/invoices [get]
+func (h *AdminHandler) GetUserInvoices(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "user id required"})
+		return
+	}
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	resp := h.service.GetUserInvoices(r.Context(), id, page, limit)
+	utils.WriteToJson(w, resp.StatusCode, resp)
+}
+
+// GetUserTransactions godoc
+// @Summary      Get transactions for a user
+// @Description  Returns paginated transactions belonging to a specific user
+// @Tags         admin
+// @Produce      json
+// @Param        id     path   string  true   "User ID"
+// @Param        page   query  int     false  "Page number"
+// @Param        limit  query  int     false  "Items per page"
+// @Success      200  {object}  utils.ApiResponse
+// @Failure      404  {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /admin/users/{id}/transactions [get]
+func (h *AdminHandler) GetUserTransactions(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "user id required"})
+		return
+	}
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	resp := h.service.GetUserTransactions(r.Context(), id, page, limit)
+	utils.WriteToJson(w, resp.StatusCode, resp)
+}
+
+// GetUserActivity godoc
+// @Summary      Get user activity log
+// @Description  Returns paginated activity log entries for a specific user
+// @Tags         admin
+// @Produce      json
+// @Param        id     path   string  true   "User ID"
+// @Param        page   query  int     false  "Page number"
+// @Param        limit  query  int     false  "Items per page"
+// @Success      200  {object}  utils.ApiResponse
+// @Failure      404  {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /admin/users/{id}/activity [get]
+func (h *AdminHandler) GetUserActivity(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "user id required"})
+		return
+	}
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	resp := h.service.GetUserActivity(r.Context(), id, page, limit)
+	utils.WriteToJson(w, resp.StatusCode, resp)
+}
+
+// AdminResetUserPassword godoc
+// @Summary      Admin-triggered password reset
+// @Description  Generates OTP and sends password reset email to the user
+// @Tags         admin
+// @Produce      json
+// @Param        id  path  string  true  "User ID"
+// @Success      200  {object}  utils.ApiResponse
+// @Failure      404  {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /admin/users/{id}/reset-password [post]
+func (h *AdminHandler) AdminResetUserPassword(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "user id required"})
+		return
+	}
+	resp := h.service.AdminResetUserPassword(r.Context(), id, adminID(r), clientIP(r))
+	utils.WriteToJson(w, resp.StatusCode, resp)
+}
+
+// GetStellarNetwork godoc
+// @Summary      Get current Stellar network stage
+// @Description  Returns whether the platform is running on testnet or mainnet
+// @Tags         admin
+// @Produce      json
+// @Success      200  {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /admin/config/network [get]
+func (h *AdminHandler) GetStellarNetwork(w http.ResponseWriter, r *http.Request) {
+	resp := h.service.GetStellarNetwork(r.Context())
+	utils.WriteToJson(w, resp.StatusCode, resp)
+}
+
+// SetStellarNetwork godoc
+// @Summary      Switch Stellar network stage
+// @Description  Switches platform between testnet and mainnet. Value stored encrypted.
+// @Tags         admin
+// @Accept       json
+// @Produce      json
+// @Param        body  body  object  true  "stage: testnet or mainnet"
+// @Success      200  {object}  utils.ApiResponse
+// @Failure      400  {object}  utils.ApiResponse
+// @Security     BearerAuth
+// @Router       /admin/config/network [patch]
+func (h *AdminHandler) SetStellarNetwork(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Stage string `json:"stage"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Stage == "" {
+		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "stage is required"})
+		return
+	}
+	resp := h.service.SetStellarNetwork(r.Context(), body.Stage, adminID(r))
 	utils.WriteToJson(w, resp.StatusCode, resp)
 }

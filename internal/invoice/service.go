@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/The-True-Hooha/stellance-backend/internal/activitylog"
 	"github.com/The-True-Hooha/stellance-backend/internal/logo"
 	"github.com/The-True-Hooha/stellance-backend/internal/notifications"
 	"github.com/The-True-Hooha/stellance-backend/internal/user"
@@ -253,6 +254,7 @@ func (is *InvoiceService) GenerateNewInvoice(ctx context.Context, dto CreateInvo
 		"invoice_number", invoiceNumber,
 		"user_id", userId,
 	)
+	activitylog.Log(ctx, is.postgres, is.log, userId, activitylog.ActionInvoiceCreated, activitylog.EntityInvoice, invoiceId, "")
 
 	return &utils.ApiResponse{
 		StatusCode: http.StatusCreated,
@@ -1970,6 +1972,7 @@ func (is *InvoiceService) SendInvoice(ctx context.Context, userId, invoiceId str
 	}()
 
 	is.DeleteFromRedisCache(ctx, invoiceId)
+	activitylog.Log(ctx, is.postgres, is.log, userId, activitylog.ActionInvoiceSent, activitylog.EntityInvoice, invoiceId, "")
 
 	responseMessage := fmt.Sprintf("Invoice is being sent to %d recipient(s)", len(allRecipients))
 
@@ -2860,6 +2863,8 @@ func (is *InvoiceService) MarkInvoicePaid(ctx context.Context, invoiceID, userID
 			Body:   notifBody,
 		})
 	}()
+
+	activitylog.Log(ctx, is.postgres, is.log, userID, activitylog.ActionInvoicePaid, activitylog.EntityInvoice, invoiceID, "")
 
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,

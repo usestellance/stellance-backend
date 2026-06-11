@@ -16,9 +16,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/The-True-Hooha/stellance-backend/internal/activitylog"
 	"github.com/The-True-Hooha/stellance-backend/internal/notifications"
 	"github.com/The-True-Hooha/stellance-backend/internal/transactions"
 	"github.com/The-True-Hooha/stellance-backend/internal/user"
+	"github.com/The-True-Hooha/stellance-backend/mail"
 	"github.com/The-True-Hooha/stellance-backend/pkg/config"
 	jwt_ "github.com/The-True-Hooha/stellance-backend/pkg/jwt"
 	"github.com/The-True-Hooha/stellance-backend/pkg/utils"
@@ -28,6 +30,7 @@ import (
 	"github.com/stellar/go/clients/horizonclient"
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/network"
+	hProtocol "github.com/stellar/go/protocols/horizon"
 	"github.com/stellar/go/support/log"
 	"github.com/stellar/go/txnbuild"
 )
@@ -83,7 +86,6 @@ func (ws *WalletService) encryptPrivateKey(seed string) (string, error) {
 		return "", err
 	}
 
-	fmt.Println("checking....")
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
 		return "", nil
@@ -241,6 +243,7 @@ func (ws *WalletService) CreateWallet(ctx context.Context, userId string) *utils
 		}
 	}
 
+	activitylog.Log(ctx, ws.postgres, ws.log, userId, activitylog.ActionWalletCreated, activitylog.EntityWallet, wallet.ID, "")
 	log.Info("wallet created successfully",
 		"user_id", userId,
 		"wallet_id", wallet.ID,
@@ -457,7 +460,12 @@ func (ws *WalletService) GetWalletCacheKey(walletId string) string {
 	return fmt.Sprintf("wallet:%s", walletId)
 }
 
-func (ws *WalletService) ExportWalletKeys(ctx context.Context, walletID, userID string, role user.UserRole) *utils.ApiResponse {
+func (ws *WalletService) ExportWalletKeys(ctx context.Context, walletID, userID, pin string, role user.UserRole) *utils.ApiResponse {
+	if role != user.RoleAdmin {
+		if err := ws.verifyPin(ctx, walletID, pin); err != nil {
+			return &utils.ApiResponse{StatusCode: http.StatusForbidden, Message: err.Error()}
+		}
+	}
 	var encryptedSeed string
 	var walletAddress string
 	var dbUserID string
@@ -506,6 +514,7 @@ func (ws *WalletService) ExportWalletKeys(ctx context.Context, walletID, userID 
 		"role", role,
 		"walletOwner", dbUserID,
 	)
+	activitylog.Log(ctx, ws.postgres, ws.log, userID, activitylog.ActionWalletExport, activitylog.EntityWallet, walletID, "")
 
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
@@ -517,7 +526,7 @@ func (ws *WalletService) ExportWalletKeys(ctx context.Context, walletID, userID 
 	}
 }
 
-func (ws *WalletService) setupUSDCTrustline(ctx context.Context, userKeypair *keypair.Full) error {
+func (ws *WalletService) setupUSDCTrustline(_ context.Context, userKeypair *keypair.Full) error {
 	ws.log.Info("Setting up USDC trustline",
 		"stage", ws.stage,
 		"issuer", ws.getUSDCIssuer(),
@@ -618,4 +627,448 @@ func (ws *WalletService) getKeyPairForWallet(ctx context.Context, walletId strin
 	}
 
 	return keypair.ParseFull(seed)
+}
+
+// ── PIN management ────────────────────────────────────────────────────────────
+
+func (ws *WalletService) SetPin(ctx context.Context, walletID, userID, pin string) *utils.ApiResponse {
+	var ownerID string
+	if err := ws.postgres.QueryRow(ctx,
+		`SELECT user_id FROM wallets WHERE id = $1 AND is_active = TRUE`, walletID,
+	).Scan(&ownerID); err != nil {
+		return &utils.ApiResponse{StatusCode: http.StatusNotFound, Message: "wallet not found"}
+	}
+	if ownerID != userID {
+		return &utils.ApiResponse{StatusCode: http.StatusForbidden, Message: "access denied"}
+	}
+	hash, err := utils.HashPin(pin)
+	if err != nil {
+		return &utils.ApiResponse{StatusCode: http.StatusInternalServerError, Message: "failed to set pin"}
+	}
+	ws.postgres.Exec(ctx,
+		`UPDATE wallets SET pin_hash = $1, pin_set_at = NOW(), updated_at = NOW() WHERE id = $2`,
+		hash, walletID,
+	)
+	activitylog.Log(ctx, ws.postgres, ws.log, userID, activitylog.ActionWalletPinSet, activitylog.EntityWallet, walletID, "")
+	return &utils.ApiResponse{StatusCode: http.StatusOK, Message: "transaction pin set successfully"}
+}
+
+func (ws *WalletService) LookupWalletByEmail(ctx context.Context, email string) *utils.ApiResponse {
+	var address, userID string
+	err := ws.postgres.QueryRow(ctx, `
+		SELECT w.address, w.user_id
+		FROM wallets w
+		JOIN users u ON u.id = w.user_id
+		WHERE u.email = $1 AND w.is_primary = TRUE AND w.is_active = TRUE
+	`, email).Scan(&address, &userID)
+	if err != nil {
+		return &utils.ApiResponse{StatusCode: http.StatusNotFound, Message: "no wallet found for that email"}
+	}
+	return &utils.ApiResponse{
+		StatusCode: http.StatusOK,
+		Message:    "successful",
+		Data:       map[string]any{"wallet_address": address, "user_id": userID},
+	}
+}
+
+const (
+	pinMaxAttempts  = 5
+	pinLockDuration = 15 * time.Minute
+)
+
+func pinLockKey(walletID string) string { return "pin:attempts:" + walletID }
+
+func (ws *WalletService) verifyPin(ctx context.Context, walletID, pin string) error {
+	lockKey := pinLockKey(walletID)
+
+	attempts, _ := ws.redis.Get(ctx, lockKey).Int()
+	if attempts >= pinMaxAttempts {
+		ttl, _ := ws.redis.TTL(ctx, lockKey).Result()
+		return fmt.Errorf("too many incorrect attempts — try again in %.0f minutes", ttl.Minutes())
+	}
+
+	var pinHash *string
+	if err := ws.postgres.QueryRow(ctx,
+		`SELECT pin_hash FROM wallets WHERE id = $1`, walletID,
+	).Scan(&pinHash); err != nil {
+		return fmt.Errorf("wallet not found")
+	}
+	if pinHash == nil {
+		return fmt.Errorf("transaction pin not set — please set a pin first")
+	}
+	if !utils.VerifyPin(pin, *pinHash) {
+		pipe := ws.redis.Pipeline()
+		pipe.Incr(ctx, lockKey)
+		pipe.Expire(ctx, lockKey, pinLockDuration)
+		pipe.Exec(ctx)
+		remaining := pinMaxAttempts - attempts - 1
+		if remaining <= 0 {
+			return fmt.Errorf("too many incorrect attempts — wallet locked for 15 minutes")
+		}
+		return fmt.Errorf("invalid transaction pin — %d attempt(s) remaining", remaining)
+	}
+
+	ws.redis.Del(ctx, lockKey)
+	return nil
+}
+
+// ── Path payment helpers ──────────────────────────────────────────────────────
+
+func (ws *WalletService) assetFromCode(code string) txnbuild.Asset {
+	if code == "XLM" || code == "native" {
+		return txnbuild.NativeAsset{}
+	}
+	return txnbuild.CreditAsset{Code: code, Issuer: ws.getUSDCIssuer()}
+}
+
+func (ws *WalletService) findPaths(ctx context.Context, sourceAddress, destAddress, destAssetCode, destAmount string) ([]txnbuild.Asset, string, error) {
+	destAsset := ws.assetFromCode(destAssetCode)
+	var destAssetType, destAssetCode_, destAssetIssuer string
+	switch a := destAsset.(type) {
+	case txnbuild.NativeAsset:
+		destAssetType = "native"
+	case txnbuild.CreditAsset:
+		if len(a.Code) <= 4 {
+			destAssetType = "credit_alphanum4"
+		} else {
+			destAssetType = "credit_alphanum12"
+		}
+		destAssetCode_ = a.Code
+		destAssetIssuer = a.Issuer
+	}
+	_ = destAssetCode_
+
+	_, _, client := ws.networkConfig(ctx)
+	req := horizonclient.PathsRequest{
+		DestinationAccount:     destAddress,
+		DestinationAssetType:   horizonclient.AssetType(destAssetType),
+		DestinationAssetCode:   destAssetCode_,
+		DestinationAssetIssuer: destAssetIssuer,
+		DestinationAmount:      destAmount,
+		SourceAccount:          sourceAddress,
+	}
+	page, err := client.Paths(req)
+	if err != nil {
+		return nil, "", fmt.Errorf("no payment path found: %w", err)
+	}
+	if len(page.Embedded.Records) == 0 {
+		return nil, "", fmt.Errorf("no payment path found between these assets")
+	}
+
+	best := page.Embedded.Records[0]
+	var path []txnbuild.Asset
+	for _, p := range best.Path {
+		path = append(path, ws.hAssetToTxn(p))
+	}
+	return path, best.SourceAmount, nil
+}
+
+// networkConfig reads the current Stellar stage from DB (encrypted) and returns
+// the appropriate Horizon URL and network passphrase. Falls back to startup config.
+func (ws *WalletService) networkConfig(ctx context.Context) (string, string, *horizonclient.Client) {
+	var encrypted string
+	err := ws.postgres.QueryRow(ctx,
+		`SELECT value FROM system_config WHERE key = 'stellar_network'`,
+	).Scan(&encrypted)
+	if err != nil {
+		return ws.networkURL, ws.networkPass, ws.horizonClient
+	}
+	stage, err := utils.DecryptValue(encrypted)
+	if err != nil {
+		return ws.networkURL, ws.networkPass, ws.horizonClient
+	}
+	if stage == "mainnet" {
+		url := os.Getenv("MAINNET_NETWORK_URL")
+		return url, network.PublicNetworkPassphrase, &horizonclient.Client{HorizonURL: url}
+	}
+	url := os.Getenv("TESTNET_NETWORK_URL")
+	return url, network.TestNetworkPassphrase, &horizonclient.Client{HorizonURL: url}
+}
+
+func (ws *WalletService) hAssetToTxn(a hProtocol.Asset) txnbuild.Asset {
+	if a.Type == "native" {
+		return txnbuild.NativeAsset{}
+	}
+	return txnbuild.CreditAsset{Code: a.Code, Issuer: a.Issuer}
+}
+
+func (ws *WalletService) applySlippage(amount string, pct float64) string {
+	f, err := strconv.ParseFloat(amount, 64)
+	if err != nil {
+		return amount
+	}
+	return strconv.FormatFloat(f*(1+pct), 'f', 7, 64)
+}
+
+func (ws *WalletService) buildAndSubmit(ctx context.Context, kp *keypair.Full, op txnbuild.Operation, memo string) (string, float64, error) {
+	_, netPass, client := ws.networkConfig(ctx)
+	account, err := client.AccountDetail(horizonclient.AccountRequest{AccountID: kp.Address()})
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to fetch account: %w", err)
+	}
+	sourceAccount := txnbuild.SimpleAccount{AccountID: kp.Address(), Sequence: account.Sequence}
+
+	var txMemo txnbuild.Memo
+	if memo != "" {
+		// Stellar memo text max 28 bytes — truncate safely
+		b := []byte(memo)
+		if len(b) > 28 {
+			b = b[:28]
+		}
+		txMemo = txnbuild.MemoText(string(b))
+	}
+
+	tx, err := txnbuild.NewTransaction(txnbuild.TransactionParams{
+		SourceAccount:        &sourceAccount,
+		IncrementSequenceNum: true,
+		Operations:           []txnbuild.Operation{op},
+		BaseFee:              txnbuild.MinBaseFee,
+		Memo:                 txMemo,
+		Preconditions:        txnbuild.Preconditions{TimeBounds: txnbuild.NewInfiniteTimeout()},
+	})
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to build transaction: %w", err)
+	}
+	tx, err = tx.Sign(netPass, kp)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to sign transaction: %w", err)
+	}
+	txe, err := tx.Base64()
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to encode transaction: %w", err)
+	}
+	resp, err := client.SubmitTransactionXDR(txe)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to submit transaction: %w", err)
+	}
+	feeXLM := float64(resp.FeeCharged) / 1e7
+	return resp.Hash, feeXLM, nil
+}
+
+// ── PayInvoice ────────────────────────────────────────────────────────────────
+
+func (ws *WalletService) PayInvoice(ctx context.Context, walletID, userID string, dto PayInvoiceDTO) *utils.ApiResponse {
+	if err := ws.verifyPin(ctx, walletID, dto.Pin); err != nil {
+		return &utils.ApiResponse{StatusCode: http.StatusForbidden, Message: err.Error()}
+	}
+
+	// fetch payer wallet address
+	var payerAddress string
+	if err := ws.postgres.QueryRow(ctx,
+		`SELECT address FROM wallets WHERE id = $1 AND user_id = $2 AND is_active = TRUE`,
+		walletID, userID,
+	).Scan(&payerAddress); err != nil {
+		return &utils.ApiResponse{StatusCode: http.StatusNotFound, Message: "wallet not found"}
+	}
+
+	// fetch invoice amount + vendor wallet address
+	var invoiceTotal float64
+	var vendorAddress string
+	var invoiceStatus string
+	err := ws.postgres.QueryRow(ctx, `
+		SELECT i.total, i.status::text, w.address
+		FROM invoice i
+		JOIN wallets w ON w.user_id = i.created_by_id AND w.is_primary = TRUE AND w.is_active = TRUE
+		WHERE i.id = $1
+	`, dto.InvoiceID).Scan(&invoiceTotal, &invoiceStatus, &vendorAddress)
+	if err != nil {
+		return &utils.ApiResponse{StatusCode: http.StatusNotFound, Message: "invoice not found or vendor has no wallet"}
+	}
+	if invoiceStatus == "paid" {
+		return &utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "invoice is already paid"}
+	}
+	if invoiceStatus == "cancelled" {
+		return &utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "invoice is cancelled"}
+	}
+
+	destAmount := strconv.FormatFloat(invoiceTotal, 'f', 7, 64)
+	destAssetCode := "USDC"
+
+	kp, err := ws.getKeyPairForWallet(ctx, walletID)
+	if err != nil {
+		return &utils.ApiResponse{StatusCode: http.StatusInternalServerError, Message: "failed to load wallet keys"}
+	}
+
+	sourceAsset := ws.assetFromCode(dto.SourceAsset)
+	var txHash string
+	var feeXLM float64
+	var sourceAmount string
+
+	if dto.SourceAsset == destAssetCode {
+		// direct USDC → USDC payment, no path needed
+		op := txnbuild.Payment{
+			Destination: vendorAddress,
+			Amount:      destAmount,
+			Asset:       ws.assetFromCode(destAssetCode),
+		}
+		txHash, feeXLM, err = ws.buildAndSubmit(ctx, kp, &op, dto.InvoiceID)
+		sourceAmount = destAmount
+	} else {
+		path, srcAmt, findErr := ws.findPaths(ctx, payerAddress, vendorAddress, destAssetCode, destAmount)
+		if findErr != nil {
+			return &utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: findErr.Error()}
+		}
+		sourceAmount = srcAmt
+		sendMax := ws.applySlippage(srcAmt, 0.02) // 2% slippage buffer
+		op := txnbuild.PathPaymentStrictReceive{
+			SendAsset:   sourceAsset,
+			SendMax:     sendMax,
+			Destination: vendorAddress,
+			DestAsset:   ws.assetFromCode(destAssetCode),
+			DestAmount:  destAmount,
+			Path:        path,
+		}
+		txHash, feeXLM, err = ws.buildAndSubmit(ctx, kp, &op, dto.InvoiceID)
+	}
+	if err != nil {
+		return &utils.ApiResponse{StatusCode: http.StatusBadGateway, Message: "payment failed: " + err.Error()}
+	}
+
+	// record transaction
+	ws.postgres.Exec(ctx, `
+		INSERT INTO transactions (invoice_id, wallet_id, transaction_hash, amount, currency, status, token_type, transaction_type, user_id, confirmed_at, source_asset, source_amount)
+		VALUES ($1, $2, $3, $4, 'usdc', 'confirmed', 'usdc', 'path_payment', $5, NOW(), $6, $7)`,
+		dto.InvoiceID, walletID, txHash, invoiceTotal, userID, dto.SourceAsset, sourceAmount,
+	)
+
+	// mark invoice paid
+	ws.postgres.Exec(ctx, `
+		UPDATE invoice SET status = 'paid', paid_at = NOW(), updated_at = NOW() WHERE id = $1`,
+		dto.InvoiceID,
+	)
+	activitylog.Log(ctx, ws.postgres, ws.log, userID, activitylog.ActionWalletPayment, activitylog.EntityWallet, walletID, "")
+	ws.redis.Del(ctx, ws.GetWalletCacheKey(walletID))
+	go notifications.NewNotificationService().CreateNewNotification(context.Background(), notifications.CreateNotificationDto{
+		Title:  "Payment Sent",
+		UserId: userID,
+		Body:   fmt.Sprintf("Your payment of %.2f USDC for invoice %s was successful. Tx: %s", invoiceTotal, dto.InvoiceID, txHash),
+	})
+
+	// notify invoice creator
+	go func() {
+		var creatorEmail, creatorName, invoiceNumber string
+		var total float64
+		err := ws.postgres.QueryRow(context.Background(), `
+			SELECT u.email, COALESCE(u.first_name,''), i.invoice_number, i.total
+			FROM invoice i JOIN users u ON u.id = i.created_by_id WHERE i.id = $1`,
+			dto.InvoiceID,
+		).Scan(&creatorEmail, &creatorName, &invoiceNumber, &total)
+		if err != nil {
+			ws.log.Warn("failed to fetch creator info for payment email", "error", err)
+			return
+		}
+		var payerEmail string
+		ws.postgres.QueryRow(context.Background(),
+			`SELECT email FROM users WHERE id = $1`, userID,
+		).Scan(&payerEmail)
+		mail.NewMailer().SendPaymentConfirmedEmail(mail.PaymentConfirmedEmailData{
+			CreatorEmail:  creatorEmail,
+			CreatorName:   creatorName,
+			PayerEmail:    payerEmail,
+			InvoiceNumber: invoiceNumber,
+			Total:         fmt.Sprintf("%.2f", total),
+			Currency:      "USDC",
+			TxHash:        txHash,
+			DashboardURL:  "https://usestellance.com/dashboard",
+		})
+	}()
+
+	return &utils.ApiResponse{
+		StatusCode: http.StatusOK,
+		Message:    "invoice paid successfully",
+		Data: PathPaymentResult{
+			TransactionHash: txHash,
+			SourceAsset:     dto.SourceAsset,
+			SourceAmount:    sourceAmount,
+			DestAsset:       destAssetCode,
+			DestAmount:      destAmount,
+			Destination:     vendorAddress,
+			Fee:             feeXLM,
+		},
+	}
+}
+
+// ── Transfer ──────────────────────────────────────────────────────────────────
+
+func (ws *WalletService) Transfer(ctx context.Context, walletID, userID string, dto TransferDTO) *utils.ApiResponse {
+	if err := ws.verifyPin(ctx, walletID, dto.Pin); err != nil {
+		return &utils.ApiResponse{StatusCode: http.StatusForbidden, Message: err.Error()}
+	}
+
+	var payerAddress string
+	if err := ws.postgres.QueryRow(ctx,
+		`SELECT address FROM wallets WHERE id = $1 AND user_id = $2 AND is_active = TRUE`,
+		walletID, userID,
+	).Scan(&payerAddress); err != nil {
+		return &utils.ApiResponse{StatusCode: http.StatusNotFound, Message: "wallet not found"}
+	}
+
+	kp, err := ws.getKeyPairForWallet(ctx, walletID)
+	if err != nil {
+		return &utils.ApiResponse{StatusCode: http.StatusInternalServerError, Message: "failed to load wallet keys"}
+	}
+
+	var txHash string
+	var feeXLM float64
+	var sourceAmount string
+
+	if dto.SourceAsset == dto.DestAsset {
+		op := txnbuild.Payment{
+			Destination: dto.DestinationAddress,
+			Amount:      dto.Amount,
+			Asset:       ws.assetFromCode(dto.DestAsset),
+		}
+		txHash, feeXLM, err = ws.buildAndSubmit(ctx, kp, &op, "")
+		sourceAmount = dto.Amount
+	} else {
+		path, srcAmt, findErr := ws.findPaths(ctx, payerAddress, dto.DestinationAddress, dto.DestAsset, dto.Amount)
+		if findErr != nil {
+			return &utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: findErr.Error()}
+		}
+		sourceAmount = srcAmt
+		sendMax := ws.applySlippage(srcAmt, 0.02)
+		op := txnbuild.PathPaymentStrictReceive{
+			SendAsset:   ws.assetFromCode(dto.SourceAsset),
+			SendMax:     sendMax,
+			Destination: dto.DestinationAddress,
+			DestAsset:   ws.assetFromCode(dto.DestAsset),
+			DestAmount:  dto.Amount,
+			Path:        path,
+		}
+		txHash, feeXLM, err = ws.buildAndSubmit(ctx, kp, &op, "")
+	}
+	if err != nil {
+		return &utils.ApiResponse{StatusCode: http.StatusBadGateway, Message: "transfer failed: " + err.Error()}
+	}
+
+	currency := "usdc"
+	if dto.DestAsset == "XLM" {
+		currency = "xlm"
+	}
+	ws.postgres.Exec(ctx, `
+		INSERT INTO transactions (wallet_id, transaction_hash, amount, currency, status, token_type, transaction_type, user_id, confirmed_at, source_asset, source_amount)
+		VALUES ($1, $2, $3, $4, 'confirmed', $4, 'path_payment', $5, NOW(), $6, $7)`,
+		walletID, txHash, dto.Amount, currency, userID, dto.SourceAsset, sourceAmount,
+	)
+	activitylog.Log(ctx, ws.postgres, ws.log, userID, activitylog.ActionWalletTransfer, activitylog.EntityWallet, walletID, "")
+	ws.redis.Del(ctx, ws.GetWalletCacheKey(walletID))
+	go notifications.NewNotificationService().CreateNewNotification(context.Background(), notifications.CreateNotificationDto{
+		Title:  "Transfer Sent",
+		UserId: userID,
+		Body:   fmt.Sprintf("Your transfer of %s %s to %s was successful. Tx: %s", dto.Amount, dto.DestAsset, dto.DestinationAddress, txHash),
+	})
+
+	return &utils.ApiResponse{
+		StatusCode: http.StatusOK,
+		Message:    "transfer successful",
+		Data: PathPaymentResult{
+			TransactionHash: txHash,
+			SourceAsset:     dto.SourceAsset,
+			SourceAmount:    sourceAmount,
+			DestAsset:       dto.DestAsset,
+			DestAmount:      dto.Amount,
+			Destination:     dto.DestinationAddress,
+			Fee:             feeXLM,
+		},
+	}
 }
