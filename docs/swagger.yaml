@@ -714,31 +714,6 @@ paths:
       summary: Get user by ID
       tags:
       - admin
-  /admin/users/{id}/activate:
-    patch:
-      description: Sets user is_active = true
-      parameters:
-      - description: User ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/utils.ApiResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/utils.ApiResponse'
-      security:
-      - BearerAuth: []
-      summary: Activate user account
-      tags:
-      - admin
   /admin/users/{id}/activity:
     get:
       description: Returns paginated activity log entries for a specific user
@@ -770,31 +745,6 @@ paths:
       security:
       - BearerAuth: []
       summary: Get user activity log
-      tags:
-      - admin
-  /admin/users/{id}/deactivate:
-    patch:
-      description: Sets user is_active = false
-      parameters:
-      - description: User ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/utils.ApiResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/utils.ApiResponse'
-      security:
-      - BearerAuth: []
-      summary: Deactivate user account
       tags:
       - admin
   /admin/users/{id}/invoices:
@@ -855,21 +805,30 @@ paths:
       summary: Admin-triggered password reset
       tags:
       - admin
-  /admin/users/{id}/suspend:
+  /admin/users/{id}/status:
     patch:
-      description: Toggles user is_active — suspends active users, unsuspends suspended
-        ones
+      description: Activates or deactivates a user account. Pass ?active=true to activate,
+        ?active=false to deactivate/suspend.
       parameters:
       - description: User ID
         in: path
         name: id
         required: true
         type: string
+      - description: true = activate, false = deactivate
+        in: query
+        name: active
+        required: true
+        type: boolean
       produces:
       - application/json
       responses:
         "200":
           description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Bad Request
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "404":
@@ -878,7 +837,7 @@ paths:
             $ref: '#/definitions/utils.ApiResponse'
       security:
       - BearerAuth: []
-      summary: Toggle user suspension
+      summary: Set user active status
       tags:
       - admin
   /admin/users/{id}/transactions:
@@ -1957,6 +1916,32 @@ paths:
       summary: Update recurring schedule
       tags:
       - recurring
+  /transaction/status/{id}:
+    get:
+      description: Returns the current status of a transaction and a Stellar explorer
+        link for the on-chain record
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Check payment status
+      tags:
+      - transactions
   /transactions:
     get:
       parameters:

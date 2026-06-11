@@ -17,9 +17,15 @@ const (
 	ActionAdminDeactivate = "admin.deactivate"
 	ActionAdminDelete    = "admin.delete"
 	ActionPasswordReset  = "admin.password_reset"
+	ActionWalletCreated  = "wallet.created"
+	ActionWalletPinSet   = "wallet.pin_set"
+	ActionWalletExport   = "wallet.export"
+	ActionWalletPayment  = "wallet.payment"
+	ActionWalletTransfer = "wallet.transfer"
 
 	EntityInvoice = "invoice"
 	EntityUser    = "user"
+	EntityWallet  = "wallet"
 )
 
 func Log(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger, userID, action, entityType, entityID, ipAddress string) {

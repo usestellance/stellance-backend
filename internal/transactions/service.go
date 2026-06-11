@@ -88,7 +88,8 @@ func (ts *TransactionService) CreateNewTransaction(ctx context.Context, userId s
 func (s *TransactionService) GetTransactionByID(ctx context.Context, id, user_id string) *utils.ApiResponse {
 	const query = `
 		SELECT id, invoice_id, wallet_id, transaction_hash, amount, currency,
-			   status, network_fee, created_at, confirmed_at, token_type, transaction_type
+			   status, network_fee, created_at, confirmed_at, token_type, transaction_type,
+			   source_asset, source_amount
 		FROM transactions WHERE id = $1 AND user_id = $2
 	`
 
@@ -106,6 +107,8 @@ func (s *TransactionService) GetTransactionByID(ctx context.Context, id, user_id
 		&t.ConfirmedAt,
 		&t.TokenType,
 		&t.TransactionType,
+		&t.SourceAsset,
+		&t.SourceAmount,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -153,32 +156,57 @@ func (s *TransactionService) DeleteTransactionByID(ctx context.Context, id, user
 	}
 }
 
-func (s *TransactionService) GetTransactionsPaginated(ctx context.Context, page, limit int, user_id string) *utils.ApiResponse {
+func (s *TransactionService) GetTransactionsPaginated(ctx context.Context, page, limit int, filters TransactionFiltersDto) *utils.ApiResponse {
 	offset := (page - 1) * limit
 
-	const query = `
-		SELECT id, invoice_id, wallet_id, transaction_hash, amount, currency,
-	   	status, network_fee, created_at, confirmed_at, token_type, transaction_type
-		FROM transactions
-		WHERE user_id = $3
-		ORDER BY created_at DESC
-		LIMIT $1 OFFSET $2
-	`
+	base := `SELECT id, invoice_id, wallet_id, transaction_hash, amount, currency,
+			 status, network_fee, created_at, confirmed_at, token_type, transaction_type,
+			 source_asset, source_amount
+			 FROM transactions`
+	countBase := `SELECT COUNT(*) FROM transactions`
 
-	rows, err := s.postgres.Query(ctx, query, limit, offset, user_id)
+	args := []any{filters.UserId}
+	where := ` WHERE user_id = $1`
+	argN := 1
+
+	if filters.Type != "" {
+		argN++
+		where += fmt.Sprintf(` AND transaction_type = $%d`, argN)
+		args = append(args, filters.Type)
+	}
+	if filters.Status != "" {
+		argN++
+		where += fmt.Sprintf(` AND status = $%d`, argN)
+		args = append(args, filters.Status)
+	}
+	if filters.From != "" {
+		argN++
+		where += fmt.Sprintf(` AND created_at >= $%d`, argN)
+		args = append(args, filters.From)
+	}
+	if filters.To != "" {
+		argN++
+		where += fmt.Sprintf(` AND created_at <= $%d`, argN)
+		args = append(args, filters.To)
+	}
+
+	var totalCount int
+	if err := s.postgres.QueryRow(ctx, countBase+where, args...).Scan(&totalCount); err != nil {
+		s.log.Error("failed to count transactions", "error", err)
+		return &utils.ApiResponse{StatusCode: http.StatusInternalServerError, Message: "Failed to process request. Please try again."}
+	}
+
+	argN++
+	limitArg := argN
+	argN++
+	offsetArg := argN
+	query := fmt.Sprintf("%s%s ORDER BY created_at DESC LIMIT $%d OFFSET $%d", base, where, limitArg, offsetArg)
+	args = append(args, limit, offset)
+
+	rows, err := s.postgres.Query(ctx, query, args...)
 	if err != nil {
 		s.log.Error("failed to fetch transactions", "error", err)
-		if err == pgx.ErrNoRows {
-			return &utils.ApiResponse{
-				StatusCode: http.StatusNotFound,
-				Message:    "User does not seem to have any transaction",
-			}
-		}
-		s.log.Error("failed to fetch user", "error", err, "user_id", user_id)
-		return &utils.ApiResponse{
-			StatusCode: http.StatusInternalServerError,
-			Message:    "Failed to process request. Please try again.",
-		}
+		return &utils.ApiResponse{StatusCode: http.StatusInternalServerError, Message: "Failed to process request. Please try again."}
 	}
 	defer rows.Close()
 
@@ -186,33 +214,15 @@ func (s *TransactionService) GetTransactionsPaginated(ctx context.Context, page,
 	for rows.Next() {
 		var t GetTransactionDto
 		if err := rows.Scan(
-			&t.ID,
-			&t.InvoiceID,
-			&t.WalletID,
-			&t.TransactionHash,
-			&t.Amount,
-			&t.Currency,
-			&t.Status,
-			&t.NetworkFee,
-			&t.CreatedAt,
-			&t.ConfirmedAt,
-			&t.TokenType,
-			&t.TransactionType,
+			&t.ID, &t.InvoiceID, &t.WalletID, &t.TransactionHash,
+			&t.Amount, &t.Currency, &t.Status, &t.NetworkFee,
+			&t.CreatedAt, &t.ConfirmedAt, &t.TokenType, &t.TransactionType,
+			&t.SourceAsset, &t.SourceAmount,
 		); err != nil {
 			s.log.Error("failed to scan transaction", "error", err)
 			continue
 		}
 		transactions = append(transactions, t)
-	}
-
-	var totalCount int
-	err = s.postgres.QueryRow(ctx, `SELECT COUNT(*) FROM transactions`).Scan(&totalCount)
-	if err != nil {
-		s.log.Error("failed to count transactions", "error", err)
-		return &utils.ApiResponse{
-			StatusCode: http.StatusInternalServerError,
-			Message:    "sever is currently available",
-		}
 	}
 
 	return &utils.ApiResponse{
@@ -223,6 +233,38 @@ func (s *TransactionService) GetTransactionsPaginated(ctx context.Context, page,
 			Page:       page,
 			Limit:      limit,
 			TotalCount: totalCount,
+		},
+	}
+}
+
+func (s *TransactionService) CheckPaymentStatus(ctx context.Context, txID, userID string) *utils.ApiResponse {
+	var txHash, status string
+	err := s.postgres.QueryRow(ctx,
+		`SELECT transaction_hash, status FROM transactions WHERE id = $1 AND user_id = $2`,
+		txID, userID,
+	).Scan(&txHash, &status)
+	if err != nil {
+		return &utils.ApiResponse{StatusCode: http.StatusNotFound, Message: "transaction not found"}
+	}
+
+	var stage string
+	var encrypted string
+	if err := s.postgres.QueryRow(ctx, `SELECT value FROM system_config WHERE key = 'stellar_network'`).Scan(&encrypted); err == nil {
+		stage, _ = utils.DecryptValue(encrypted)
+	}
+	network := "testnet"
+	if stage == "mainnet" {
+		network = "public"
+	}
+
+	return &utils.ApiResponse{
+		StatusCode: http.StatusOK,
+		Message:    "successful",
+		Data: map[string]any{
+			"transaction_id":   txID,
+			"transaction_hash": txHash,
+			"status":           status,
+			"stellar_url":      fmt.Sprintf("https://stellar.expert/explorer/%s/tx/%s", network, txHash),
 		},
 	}
 }

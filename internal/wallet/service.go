@@ -16,9 +16,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/The-True-Hooha/stellance-backend/internal/activitylog"
 	"github.com/The-True-Hooha/stellance-backend/internal/notifications"
 	"github.com/The-True-Hooha/stellance-backend/internal/transactions"
 	"github.com/The-True-Hooha/stellance-backend/internal/user"
+	"github.com/The-True-Hooha/stellance-backend/mail"
 	"github.com/The-True-Hooha/stellance-backend/pkg/config"
 	jwt_ "github.com/The-True-Hooha/stellance-backend/pkg/jwt"
 	"github.com/The-True-Hooha/stellance-backend/pkg/utils"
@@ -242,6 +244,7 @@ func (ws *WalletService) CreateWallet(ctx context.Context, userId string) *utils
 		}
 	}
 
+	activitylog.Log(ctx, ws.postgres, ws.log, userId, activitylog.ActionWalletCreated, activitylog.EntityWallet, wallet.ID, "")
 	log.Info("wallet created successfully",
 		"user_id", userId,
 		"wallet_id", wallet.ID,
@@ -458,7 +461,12 @@ func (ws *WalletService) GetWalletCacheKey(walletId string) string {
 	return fmt.Sprintf("wallet:%s", walletId)
 }
 
-func (ws *WalletService) ExportWalletKeys(ctx context.Context, walletID, userID string, role user.UserRole) *utils.ApiResponse {
+func (ws *WalletService) ExportWalletKeys(ctx context.Context, walletID, userID, pin string, role user.UserRole) *utils.ApiResponse {
+	if role != user.RoleAdmin {
+		if err := ws.verifyPin(ctx, walletID, pin); err != nil {
+			return &utils.ApiResponse{StatusCode: http.StatusForbidden, Message: err.Error()}
+		}
+	}
 	var encryptedSeed string
 	var walletAddress string
 	var dbUserID string
@@ -507,6 +515,7 @@ func (ws *WalletService) ExportWalletKeys(ctx context.Context, walletID, userID 
 		"role", role,
 		"walletOwner", dbUserID,
 	)
+	activitylog.Log(ctx, ws.postgres, ws.log, userID, activitylog.ActionWalletExport, activitylog.EntityWallet, walletID, "")
 
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
@@ -641,6 +650,7 @@ func (ws *WalletService) SetPin(ctx context.Context, walletID, userID, pin strin
 		`UPDATE wallets SET pin_hash = $1, pin_set_at = NOW(), updated_at = NOW() WHERE id = $2`,
 		hash, walletID,
 	)
+	activitylog.Log(ctx, ws.postgres, ws.log, userID, activitylog.ActionWalletPinSet, activitylog.EntityWallet, walletID, "")
 	return &utils.ApiResponse{StatusCode: http.StatusOK, Message: "transaction pin set successfully"}
 }
 
@@ -927,6 +937,42 @@ func (ws *WalletService) PayInvoice(ctx context.Context, walletID, userID string
 		UPDATE invoice SET status = 'paid', paid_at = NOW(), updated_at = NOW() WHERE id = $1`,
 		dto.InvoiceID,
 	)
+	activitylog.Log(ctx, ws.postgres, ws.log, userID, activitylog.ActionWalletPayment, activitylog.EntityWallet, walletID, "")
+	ws.redis.Del(ctx, ws.GetWalletCacheKey(walletID))
+	go notifications.NewNotificationService().CreateNewNotification(context.Background(), notifications.CreateNotificationDto{
+		Title:  "Payment Sent",
+		UserId: userID,
+		Body:   fmt.Sprintf("Your payment of %.2f USDC for invoice %s was successful. Tx: %s", invoiceTotal, dto.InvoiceID, txHash),
+	})
+
+	// notify invoice creator
+	go func() {
+		var creatorEmail, creatorName, invoiceNumber string
+		var total float64
+		err := ws.postgres.QueryRow(context.Background(), `
+			SELECT u.email, COALESCE(u.first_name,''), i.invoice_number, i.total
+			FROM invoice i JOIN users u ON u.id = i.created_by_id WHERE i.id = $1`,
+			dto.InvoiceID,
+		).Scan(&creatorEmail, &creatorName, &invoiceNumber, &total)
+		if err != nil {
+			ws.log.Warn("failed to fetch creator info for payment email", "error", err)
+			return
+		}
+		var payerEmail string
+		ws.postgres.QueryRow(context.Background(),
+			`SELECT email FROM users WHERE id = $1`, userID,
+		).Scan(&payerEmail)
+		mail.NewMailer().SendPaymentConfirmedEmail(mail.PaymentConfirmedEmailData{
+			CreatorEmail:  creatorEmail,
+			CreatorName:   creatorName,
+			PayerEmail:    payerEmail,
+			InvoiceNumber: invoiceNumber,
+			Total:         fmt.Sprintf("%.2f", total),
+			Currency:      "USDC",
+			TxHash:        txHash,
+			DashboardURL:  "https://usestellance.com/dashboard",
+		})
+	}()
 
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
@@ -1005,6 +1051,13 @@ func (ws *WalletService) Transfer(ctx context.Context, walletID, userID string, 
 		VALUES ($1, $2, $3, $4, 'confirmed', $4, 'path_payment', $5, NOW(), $6, $7)`,
 		walletID, txHash, dto.Amount, currency, userID, dto.SourceAsset, sourceAmount,
 	)
+	activitylog.Log(ctx, ws.postgres, ws.log, userID, activitylog.ActionWalletTransfer, activitylog.EntityWallet, walletID, "")
+	ws.redis.Del(ctx, ws.GetWalletCacheKey(walletID))
+	go notifications.NewNotificationService().CreateNewNotification(context.Background(), notifications.CreateNotificationDto{
+		Title:  "Transfer Sent",
+		UserId: userID,
+		Body:   fmt.Sprintf("Your transfer of %s %s to %s was successful. Tx: %s", dto.Amount, dto.DestAsset, dto.DestinationAddress, txHash),
+	})
 
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,

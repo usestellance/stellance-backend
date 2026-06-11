@@ -14,6 +14,7 @@ func RegisterTransactionRoutes(apiV1 *httpx.RouteGroup, router *http.ServeMux, t
 
 	transactionGroup := apiV1.AddGroup("/transaction")
 
+	transactionGroup.HandleFunc("GET /status/{id}", authMiddleware.Authenticate(http.HandlerFunc(t.CheckPaymentStatus)).ServeHTTP)
 	transactionGroup.HandleFunc("GET /inflow", authMiddleware.Authenticate(http.HandlerFunc(t.GetTransactionCashFlow)).ServeHTTP)
 	transactionGroup.HandleFunc("GET /stats", authMiddleware.Authenticate(http.HandlerFunc(t.GetTransactionOverviewCard)).ServeHTTP)
 	transactionGroup.HandleFunc("GET /id/{id}", authMiddleware.Authenticate(http.HandlerFunc(t.GetTransactionByIdHandler)).ServeHTTP)

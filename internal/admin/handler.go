@@ -82,43 +82,35 @@ func (h *AdminHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 	utils.WriteToJson(w, resp.StatusCode, resp)
 }
 
-// ActivateUser godoc
-// @Summary      Activate user account
-// @Description  Sets user is_active = true
+// SetUserStatus godoc
+// @Summary      Set user active status
+// @Description  Activates or deactivates a user account. Pass ?active=true to activate, ?active=false to deactivate/suspend.
 // @Tags         admin
 // @Produce      json
-// @Param        id   path  string  true  "User ID"
+// @Param        id      path   string  true  "User ID"
+// @Param        active  query  bool    true  "true = activate, false = deactivate"
 // @Success      200  {object}  utils.ApiResponse
+// @Failure      400  {object}  utils.ApiResponse
 // @Failure      404  {object}  utils.ApiResponse
 // @Security     BearerAuth
-// @Router       /admin/users/{id}/activate [patch]
-func (h *AdminHandler) ActivateUser(w http.ResponseWriter, r *http.Request) {
+// @Router       /admin/users/{id}/status [patch]
+func (h *AdminHandler) SetUserStatus(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
 		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "user id required"})
 		return
 	}
-	resp := h.service.SetUserActive(r.Context(), id, true, adminID(r), clientIP(r))
-	utils.WriteToJson(w, resp.StatusCode, resp)
-}
-
-// DeactivateUser godoc
-// @Summary      Deactivate user account
-// @Description  Sets user is_active = false
-// @Tags         admin
-// @Produce      json
-// @Param        id   path  string  true  "User ID"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      404  {object}  utils.ApiResponse
-// @Security     BearerAuth
-// @Router       /admin/users/{id}/deactivate [patch]
-func (h *AdminHandler) DeactivateUser(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	if id == "" {
-		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "user id required"})
+	activeParam := r.URL.Query().Get("active")
+	if activeParam == "" {
+		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "active query param required (true or false)"})
 		return
 	}
-	resp := h.service.SetUserActive(r.Context(), id, false, adminID(r), clientIP(r))
+	active, err := strconv.ParseBool(activeParam)
+	if err != nil {
+		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "active must be true or false"})
+		return
+	}
+	resp := h.service.SetUserActive(r.Context(), id, active, adminID(r), clientIP(r))
 	utils.WriteToJson(w, resp.StatusCode, resp)
 }
 
@@ -249,26 +241,6 @@ func (h *AdminHandler) GetUserTransactions(w http.ResponseWriter, r *http.Reques
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	resp := h.service.GetUserTransactions(r.Context(), id, page, limit)
-	utils.WriteToJson(w, resp.StatusCode, resp)
-}
-
-// SuspendUser godoc
-// @Summary      Toggle user suspension
-// @Description  Toggles user is_active — suspends active users, unsuspends suspended ones
-// @Tags         admin
-// @Produce      json
-// @Param        id  path  string  true  "User ID"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      404  {object}  utils.ApiResponse
-// @Security     BearerAuth
-// @Router       /admin/users/{id}/suspend [patch]
-func (h *AdminHandler) SuspendUser(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	if id == "" {
-		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "user id required"})
-		return
-	}
-	resp := h.service.SuspendUser(r.Context(), id, adminID(r), clientIP(r))
 	utils.WriteToJson(w, resp.StatusCode, resp)
 }
 

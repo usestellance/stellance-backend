@@ -114,11 +114,25 @@ func (server *Server) AddHttpRoutes() {
 
 	recurringService := recurring.NewRecurringService()
 	recurring.RegisterRecurringRoutes(apiV1, server.router, recurringService)
+	go startRecurringScheduler(recurringService)
 
 	adminService := admin.NewAdminService()
 	admin.RegisterAdminRoutes(apiV1, server.router, adminService)
 
 	seedStellarNetworkConfig(adminService)
+}
+
+func startRecurringScheduler(svc *recurring.RecurringService) {
+	ticker := time.NewTicker(1 * time.Hour)
+	defer ticker.Stop()
+	for range ticker.C {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		if err := svc.GenerateDue(ctx); err != nil {
+			cancel()
+			continue
+		}
+		cancel()
+	}
 }
 
 func seedStellarNetworkConfig(adminService *admin.AdminService) {

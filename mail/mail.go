@@ -21,6 +21,17 @@ type SendInvoiceEmailData struct {
 	InvoiceURL       string
 }
 
+type PaymentConfirmedEmailData struct {
+	CreatorEmail   string
+	CreatorName    string
+	PayerEmail     string
+	InvoiceNumber  string
+	Total          string
+	Currency       string
+	TxHash         string
+	DashboardURL   string
+}
+
 type InvoiceReviewNotificationData struct {
 	CreatorEmail   string
 	CreatorName    string
@@ -180,6 +191,38 @@ func (m *Mailer) SendInvoiceReviewNotification(data InvoiceReviewNotificationDat
 		return err
 	}
 	m.log.Debug(fmt.Sprintf("invoice review notification sent to %s", data.CreatorEmail))
+	return nil
+}
+
+func (m *Mailer) SendPaymentConfirmedEmail(data PaymentConfirmedEmailData) error {
+	t, err := template.ParseFS(templateFs, "templates/payment_confirmed.html")
+	if err != nil {
+		return fmt.Errorf("failed to read payment confirmed template: %w", err)
+	}
+	var body bytes.Buffer
+	if err := t.Execute(&body, map[string]interface{}{
+		"CREATOR_NAME":    data.CreatorName,
+		"INVOICE_NUMBER":  data.InvoiceNumber,
+		"PAYER_EMAIL":     data.PayerEmail,
+		"TOTAL":           data.Total,
+		"CURRENCY":        data.Currency,
+		"TX_HASH":         data.TxHash,
+		"DASHBOARD_URL":   data.DashboardURL,
+	}); err != nil {
+		return fmt.Errorf("failed to execute payment confirmed template: %w", err)
+	}
+	params := &resend.SendEmailRequest{
+		From:    verification_Email_Sender,
+		To:      []string{data.CreatorEmail},
+		Html:    body.String(),
+		Subject: fmt.Sprintf("Payment received for invoice #%s", data.InvoiceNumber),
+		ReplyTo: "support@usestellance.com",
+	}
+	_, err = m.client.Emails.Send(params)
+	if err != nil {
+		m.log.Error("error sending payment confirmed email", "email_error", err, "recipient", data.CreatorEmail)
+		return err
+	}
 	return nil
 }
 

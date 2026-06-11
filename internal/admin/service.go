@@ -173,7 +173,49 @@ func (as *AdminService) GetUser(ctx context.Context, userID string) *utils.ApiRe
 	if err != nil {
 		return &utils.ApiResponse{StatusCode: http.StatusNotFound, Message: "user not found"}
 	}
-	return &utils.ApiResponse{StatusCode: http.StatusOK, Message: "successful", Data: u}
+
+	txRows, _ := as.postgres.Query(ctx,
+		`SELECT t.id, COALESCE(i.invoice_number,''), u.email, t.amount, t.transaction_type::text, t.status::text, t.created_at
+		 FROM transactions t
+		 JOIN users u ON u.id = t.user_id
+		 LEFT JOIN invoice i ON i.id = t.invoice_id
+		 WHERE t.user_id = $1 ORDER BY t.created_at DESC LIMIT 10`, userID,
+	)
+	var recentTx []AdminTransactionRow
+	if txRows != nil {
+		defer txRows.Close()
+		for txRows.Next() {
+			var tx AdminTransactionRow
+			if err := txRows.Scan(&tx.ID, &tx.InvoiceNumber, &tx.UserEmail, &tx.Amount, &tx.Type, &tx.Status, &tx.CreatedAt); err == nil {
+				recentTx = append(recentTx, tx)
+			}
+		}
+	}
+
+	logRows, _ := as.postgres.Query(ctx,
+		`SELECT id, user_id, action, COALESCE(entity_type,''), COALESCE(entity_id::text,''), COALESCE(ip_address,''), created_at
+		 FROM user_activity_logs WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`, userID,
+	)
+	var recentActivity []ActivityLog
+	if logRows != nil {
+		defer logRows.Close()
+		for logRows.Next() {
+			var l ActivityLog
+			if err := logRows.Scan(&l.ID, &l.UserID, &l.Action, &l.EntityType, &l.EntityID, &l.IPAddress, &l.CreatedAt); err == nil {
+				recentActivity = append(recentActivity, l)
+			}
+		}
+	}
+
+	return &utils.ApiResponse{
+		StatusCode: http.StatusOK,
+		Message:    "successful",
+		Data: map[string]any{
+			"user":            u,
+			"recent_transactions": recentTx,
+			"recent_activity":     recentActivity,
+		},
+	}
 }
 
 func (as *AdminService) SetUserActive(ctx context.Context, userID string, active bool, adminID, ip string) *utils.ApiResponse {

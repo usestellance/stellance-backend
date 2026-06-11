@@ -2,7 +2,6 @@ package wallet
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/The-True-Hooha/stellance-backend/internal/user"
@@ -83,17 +82,22 @@ func (h *WalletHandler) ExportWalletHandler(w http.ResponseWriter, r *http.Reque
 	id, ok := utils.GetUserIDFromContext(ctx)
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
 	}
 	walletID := r.PathValue("id")
 
 	role, ok := utils.GetRoleFromContext(ctx)
 	if !ok {
-		http.Error(w, "Unauthorized: missing role", http.StatusUnauthorized)
+		utils.WriteToJson(w, http.StatusUnauthorized, utils.ApiResponse{StatusCode: http.StatusUnauthorized, Message: "Unauthorized: missing role"})
 		return
 	}
-	fmt.Println(walletID, "checking the wallet ID")
 
-	wallet := h.service.ExportWalletKeys(ctx, walletID, id, user.UserRole(role))
+	var body struct {
+		Pin string `json:"pin"`
+	}
+	json.NewDecoder(r.Body).Decode(&body)
+
+	wallet := h.service.ExportWalletKeys(ctx, walletID, id, body.Pin, user.UserRole(role))
 	utils.WriteToJson(w, wallet.StatusCode, wallet)
 }
 

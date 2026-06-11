@@ -1,6 +1,6 @@
 @baseUrl = http://localhost:4000/api/v1
 
-@jwt = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMTg0MjI3YTUtNTQyZi00YTUwLTk5YTgtZGFiZjAyMTdiN2ZmIiwiZW1haWwiOiJkYXZpZGhlcm8xMjVAZ21haWwuY29tIiwicm9sZSI6InVzZXIiLCJpc3MiOiJzdGVsbGFuY2UiLCJzdWIiOiIxODQyMjdhNS01NDJmLTRhNTAtOTlhOC1kYWJmMDIxN2I3ZmYiLCJhdWQiOlsic3RlbGxhbmNlOndlYiJdLCJleHAiOjE3NzIxMjQ1MjgsIm5iZiI6MTc3MjAzODEyOCwiaWF0IjoxNzcyMDM4MTI4fQ.w76C_WcFqyZDFtStrn8SrA354FjmPBbVuk52iumGHeI
+@jwt = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMTg0MjI3YTUtNTQyZi00YTUwLTk5YTgtZGFiZjAyMTdiN2ZmIiwiZW1haWwiOiJkYXZpZGhlcm8xMjVAZ21haWwuY29tIiwicm9sZSI6InVzZXIiLCJpc3MiOiJzdGVsbGFuY2UiLCJzdWIiOiIxODQyMjdhNS01NDJmLTRhNTAtOTlhOC1kYWJmMDIxN2I3ZmYiLCJhdWQiOlsic3RlbGxhbmNlOndlYiJdLCJleHAiOjE3NzMzMjkwNzQsIm5iZiI6MTc3MzI0MjY3NCwiaWF0IjoxNzczMjQyNjc0fQ.PivoIN79CP8F6WrJX70M78UFPeen1VrsivCLXXfTEug
 @name = mike base
 @userId = 184227a5-542f-4a50-99a8-dabf0217b7ff
 @invoiceId = 23ae52b9-d39a-4c53-9867-ff4125a54a82
@@ -72,6 +72,12 @@ Authorization: Bearer {{jwt}}
 GET {{baseUrl}}/invoice?search=0011
 Accept: application/json
 Authorization: Bearer {{jwt}}
+
+####
+# search invoice
+GET {{baseUrl}}/invoice/review/23ae52b9-d39a-4c53-9867-ff4125a54a82?approve=true
+Accept: application/json
+# Authorization: Bearer {{jwt}}
 
 ####
 # get all the notifications: the query you can send (viewed:boolean, count:number, page:number, order_by: DESC or ASC)
