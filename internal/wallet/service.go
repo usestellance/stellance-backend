@@ -86,7 +86,6 @@ func (ws *WalletService) encryptPrivateKey(seed string) (string, error) {
 		return "", err
 	}
 
-	fmt.Println("checking....")
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
 		return "", nil
@@ -527,7 +526,7 @@ func (ws *WalletService) ExportWalletKeys(ctx context.Context, walletID, userID,
 	}
 }
 
-func (ws *WalletService) setupUSDCTrustline(ctx context.Context, userKeypair *keypair.Full) error {
+func (ws *WalletService) setupUSDCTrustline(_ context.Context, userKeypair *keypair.Full) error {
 	ws.log.Info("Setting up USDC trustline",
 		"stage", ws.stage,
 		"issuer", ws.getUSDCIssuer(),

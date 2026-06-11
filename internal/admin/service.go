@@ -175,7 +175,7 @@ func (as *AdminService) GetUser(ctx context.Context, userID string) *utils.ApiRe
 	}
 
 	txRows, _ := as.postgres.Query(ctx,
-		`SELECT t.id, COALESCE(i.invoice_number,''), u.email, t.amount, t.transaction_type::text, t.status::text, t.created_at
+		`SELECT t.id, COALESCE(i.invoice_number,''), u.email, t.amount, t.transaction_type::text, t.status::text, t.source_asset, t.source_amount, t.created_at
 		 FROM transactions t
 		 JOIN users u ON u.id = t.user_id
 		 LEFT JOIN invoice i ON i.id = t.invoice_id
@@ -186,7 +186,7 @@ func (as *AdminService) GetUser(ctx context.Context, userID string) *utils.ApiRe
 		defer txRows.Close()
 		for txRows.Next() {
 			var tx AdminTransactionRow
-			if err := txRows.Scan(&tx.ID, &tx.InvoiceNumber, &tx.UserEmail, &tx.Amount, &tx.Type, &tx.Status, &tx.CreatedAt); err == nil {
+			if err := txRows.Scan(&tx.ID, &tx.InvoiceNumber, &tx.UserEmail, &tx.Amount, &tx.Type, &tx.Status, &tx.SourceAsset, &tx.SourceAmount, &tx.CreatedAt); err == nil {
 				recentTx = append(recentTx, tx)
 			}
 		}
@@ -207,11 +207,35 @@ func (as *AdminService) GetUser(ctx context.Context, userID string) *utils.ApiRe
 		}
 	}
 
+	type AdminWalletRow struct {
+		ID      string  `json:"id"`
+		Address string  `json:"address"`
+		Tag     string  `json:"tag"`
+		USDC    float64 `json:"usdc_balance"`
+		XLM     float64 `json:"xlm_balance"`
+		Primary bool    `json:"is_primary"`
+	}
+	wRows, _ := as.postgres.Query(ctx,
+		`SELECT id, address, COALESCE(tag,''), COALESCE(usdc_balance,0), COALESCE(xlm_balance,0), is_primary
+		 FROM wallets WHERE user_id = $1 ORDER BY is_primary DESC`, userID,
+	)
+	var wallets []AdminWalletRow
+	if wRows != nil {
+		defer wRows.Close()
+		for wRows.Next() {
+			var w AdminWalletRow
+			if err := wRows.Scan(&w.ID, &w.Address, &w.Tag, &w.USDC, &w.XLM, &w.Primary); err == nil {
+				wallets = append(wallets, w)
+			}
+		}
+	}
+
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
 		Message:    "successful",
 		Data: map[string]any{
-			"user":            u,
+			"user":                u,
+			"wallets":             wallets,
 			"recent_transactions": recentTx,
 			"recent_activity":     recentActivity,
 		},
@@ -261,6 +285,8 @@ type AdminTransactionRow struct {
 	Amount        float64   `json:"amount"`
 	Type          string    `json:"type"`
 	Status        string    `json:"status"`
+	SourceAsset   *string   `json:"source_asset,omitempty"`
+	SourceAmount  *string   `json:"source_amount,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
 }
 
@@ -273,7 +299,7 @@ func (as *AdminService) ListTransactions(ctx context.Context, page, limit int, s
 	}
 	offset := (page - 1) * limit
 
-	base := `SELECT t.id, COALESCE(i.invoice_number,''), u.email, t.amount, t.transaction_type::text, t.status::text, t.created_at
+	base := `SELECT t.id, COALESCE(i.invoice_number,''), u.email, t.amount, t.transaction_type::text, t.status::text, t.source_asset, t.source_amount, t.created_at
 			 FROM transactions t
 			 JOIN users u ON u.id = t.user_id
 			 LEFT JOIN invoice i ON i.id = t.invoice_id`
@@ -305,7 +331,7 @@ func (as *AdminService) ListTransactions(ctx context.Context, page, limit int, s
 	var txs []AdminTransactionRow
 	for rows.Next() {
 		var tx AdminTransactionRow
-		if err := rows.Scan(&tx.ID, &tx.InvoiceNumber, &tx.UserEmail, &tx.Amount, &tx.Type, &tx.Status, &tx.CreatedAt); err != nil {
+		if err := rows.Scan(&tx.ID, &tx.InvoiceNumber, &tx.UserEmail, &tx.Amount, &tx.Type, &tx.Status, &tx.SourceAsset, &tx.SourceAmount, &tx.CreatedAt); err != nil {
 			continue
 		}
 		txs = append(txs, tx)
@@ -406,7 +432,7 @@ func (as *AdminService) GetUserTransactions(ctx context.Context, userID string, 
 	}
 
 	rows, err := as.postgres.Query(ctx,
-		`SELECT t.id, COALESCE(i.invoice_number,''), u.email, t.amount, t.transaction_type::text, t.status::text, t.created_at
+		`SELECT t.id, COALESCE(i.invoice_number,''), u.email, t.amount, t.transaction_type::text, t.status::text, t.source_asset, t.source_amount, t.created_at
 		 FROM transactions t
 		 JOIN users u ON u.id = t.user_id
 		 LEFT JOIN invoice i ON i.id = t.invoice_id
@@ -422,7 +448,7 @@ func (as *AdminService) GetUserTransactions(ctx context.Context, userID string, 
 	var txs []AdminTransactionRow
 	for rows.Next() {
 		var tx AdminTransactionRow
-		if err := rows.Scan(&tx.ID, &tx.InvoiceNumber, &tx.UserEmail, &tx.Amount, &tx.Type, &tx.Status, &tx.CreatedAt); err != nil {
+		if err := rows.Scan(&tx.ID, &tx.InvoiceNumber, &tx.UserEmail, &tx.Amount, &tx.Type, &tx.Status, &tx.SourceAsset, &tx.SourceAmount, &tx.CreatedAt); err != nil {
 			continue
 		}
 		txs = append(txs, tx)

@@ -30,6 +30,7 @@ import (
 	"github.com/The-True-Hooha/stellance-backend/pkg/config/cors_config"
 	"github.com/The-True-Hooha/stellance-backend/pkg/httpx"
 	"github.com/The-True-Hooha/stellance-backend/pkg/logger"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Server struct {
@@ -115,6 +116,7 @@ func (server *Server) AddHttpRoutes() {
 	recurringService := recurring.NewRecurringService()
 	recurring.RegisterRecurringRoutes(apiV1, server.router, recurringService)
 	go startRecurringScheduler(recurringService)
+	go startOverdueCron(config.GetAppContainer().Postgres, server.logger)
 
 	adminService := admin.NewAdminService()
 	admin.RegisterAdminRoutes(apiV1, server.router, adminService)
@@ -130,6 +132,24 @@ func startRecurringScheduler(svc *recurring.RecurringService) {
 		if err := svc.GenerateDue(ctx); err != nil {
 			cancel()
 			continue
+		}
+		cancel()
+	}
+}
+
+func startOverdueCron(db *pgxpool.Pool, log *slog.Logger) {
+	ticker := time.NewTicker(1 * time.Hour)
+	defer ticker.Stop()
+	for range ticker.C {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		tag, err := db.Exec(ctx,
+			`UPDATE invoice SET status = 'overdue', updated_at = NOW()
+			 WHERE status NOT IN ('paid','cancelled','overdue')
+			 AND due_date < NOW()`)
+		if err != nil {
+			log.Error("failed to mark overdue invoices", "error", err)
+		} else if tag.RowsAffected() > 0 {
+			log.Info("marked invoices as overdue", "count", tag.RowsAffected())
 		}
 		cancel()
 	}
