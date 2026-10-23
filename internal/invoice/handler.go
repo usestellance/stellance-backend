@@ -346,24 +346,31 @@ func (h *InvoiceHandler) GetInvoiceSearchHandler(w http.ResponseWriter, r *http.
 // @Tags         invoices
 // @Produce      json
 // @Param        search  query  string  true  "Search term"
+// @Param        page    query  int     false "Page number, from 1"
+// @Param        limit   query  int     false "Page size, default 10, max 50"
 // @Success      200  {object}  utils.ApiResponse
+// @Failure      401  {object}  utils.ApiResponse
 // @Security     BearerAuth
 // @Router       /invoice/query [get]
 func (h *InvoiceHandler) QueryInvoiceBySearch(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	userID, ok := utils.GetUserIDFromContext(ctx)
 	if !ok {
-		h.service.log.Warn("public access to invoice")
+		utils.WriteToJson(w, http.StatusUnauthorized, utils.ApiResponse{StatusCode: http.StatusUnauthorized, Message: "unauthorized"})
+		return
 	}
 
-	// role, ok := utils.GetRoleFromContext(ctx)
-	// if !ok {
-	// 	h.service.log.Warn("public access to invoice")
-	// }
-
 	search := r.URL.Query().Get("search")
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if page < 1 {
+		page = 1
+	}
+	if limit <= 0 || limit > 50 {
+		limit = 10
+	}
 
-	response := h.service.GetInvoiceBySearchOnUser(ctx, search, userID, 0, 0)
+	response := h.service.GetInvoiceBySearchOnUser(ctx, search, userID, limit, (page-1)*limit)
 	utils.WriteToJson(w, response.StatusCode, response)
 
 }

@@ -225,6 +225,14 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 			}
 		}
 
+		if !existingUser.EmailVerified {
+			return &utils.ApiResponse{
+				StatusCode: http.StatusForbidden,
+				Message:    "email not verified, a new verification email has been sent",
+				Data:       map[string]any{"email_verified": false},
+			}
+		}
+
 		accessToken, err := config.jwt.GenerateNewAccessToken(existingUser.ID, existingUser.Email, string(existingUser.Role))
 		if err != nil {
 			config.log.Error(fmt.Sprintf("error generating access token for user with Id =>> %s", existingUser.ID), "error", err)

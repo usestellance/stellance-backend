@@ -1729,11 +1729,23 @@ paths:
         name: search
         required: true
         type: string
+      - description: Page number, from 1
+        in: query
+        name: page
+        type: integer
+      - description: Page size, default 10, max 50
+        in: query
+        name: limit
+        type: integer
       produces:
       - application/json
       responses:
         "200":
           description: OK
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Unauthorized
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
