@@ -23,10 +23,13 @@ func NewWalletHandler(service *WalletService) *WalletHandler {
 
 // CreateWalletHandler godoc
 // @Summary      Create a Stellar wallet
+// @Description  Create the user's Stellar wallet (one per user). On testnet the account is funded in the background. The secret key is stored encrypted.
 // @Tags         wallet
 // @Produce      json
-// @Success      201  {object}  utils.ApiResponse
-// @Failure      401  {object}  utils.ApiResponse
+// @Success      201  {object}  utils.ApiResponse{data=WalletResponseDto}  "Wallet created"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      403  {object}  utils.ApiResponse  "Wallet limit reached: one wallet per user"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /wallet [post]
 func (h *WalletHandler) CreateWalletHandler(w http.ResponseWriter, r *http.Request) {
@@ -43,11 +46,16 @@ func (h *WalletHandler) CreateWalletHandler(w http.ResponseWriter, r *http.Reque
 
 // GetWalletHandler godoc
 // @Summary      Get wallet by ID
+// @Description  Wallet details with live balances.
 // @Tags         wallet
 // @Produce      json
 // @Param        id  path  string  true  "Wallet ID"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      401  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=WalletResponseDto}  "Wallet"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      403  {object}  utils.ApiResponse  "Access denied: not your wallet"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /wallet/{id} [get]
 func (h *WalletHandler) GetWalletHandler(w http.ResponseWriter, r *http.Request) {
@@ -70,11 +78,16 @@ func (h *WalletHandler) GetWalletHandler(w http.ResponseWriter, r *http.Request)
 
 // ExportWalletHandler godoc
 // @Summary      Export wallet keys
+// @Description  Return the wallet's secret key. Sensitive: the response must never be logged or cached.
 // @Tags         wallet
 // @Produce      json
 // @Param        id  path  string  true  "Wallet ID"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      401  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=WalletExportResult}  "Secret key"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      403  {object}  utils.ApiResponse  "Not your wallet"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /wallet/export/{id} [get]
 func (h *WalletHandler) ExportWalletHandler(w http.ResponseWriter, r *http.Request) {
@@ -103,12 +116,14 @@ func (h *WalletHandler) ExportWalletHandler(w http.ResponseWriter, r *http.Reque
 
 // LookupWalletHandler godoc
 // @Summary      Lookup wallet address by email
-// @Description  Returns the primary wallet address for a given user email. Used to resolve a recipient before sending payment.
+// @Description  Find the primary wallet address of a user by email, for transfers.
 // @Tags         wallet
 // @Produce      json
 // @Param        email  query  string  true  "Recipient email address"
-// @Success      200    {object}  utils.ApiResponse
-// @Failure      404    {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=WalletLookupResult}  "Wallet address"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /wallet/lookup [get]
 func (h *WalletHandler) LookupWalletHandler(w http.ResponseWriter, r *http.Request) {
@@ -123,14 +138,18 @@ func (h *WalletHandler) LookupWalletHandler(w http.ResponseWriter, r *http.Reque
 
 // SetPinHandler godoc
 // @Summary      Set or update transaction PIN
-// @Description  Sets a 4-8 digit numeric PIN required for all payment operations
+// @Description  Set or replace the 4-8 digit PIN that authorises payments from this wallet.
 // @Tags         wallet
 // @Accept       json
 // @Produce      json
 // @Param        id    path  string     true  "Wallet ID"
 // @Param        body  body  SetPinDTO  true  "PIN"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      400  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse  "PIN set"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      403  {object}  utils.ApiResponse  "Not your wallet"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /wallet/{id}/pin [post]
 func (h *WalletHandler) SetPinHandler(w http.ResponseWriter, r *http.Request) {
@@ -155,15 +174,19 @@ func (h *WalletHandler) SetPinHandler(w http.ResponseWriter, r *http.Request) {
 
 // PayInvoiceHandler godoc
 // @Summary      Pay an invoice via path payment
-// @Description  Pays invoice using PathPaymentStrictReceive — payer sends source asset, vendor receives exact USDC
+// @Description  Pay an invoice from this wallet, swapping XLM or USDC to the invoice asset by path payment. The memo is the invoice's payment reference; settlement happens only after the chain payment is verified, so `payment_status` may still be `detected`.
 // @Tags         wallet
 // @Accept       json
 // @Produce      json
 // @Param        id    path  string         true  "Wallet ID"
 // @Param        body  body  PayInvoiceDTO  true  "Payment details"
-// @Success      200  {object}  utils.ApiResponse{data=PathPaymentResult}
-// @Failure      400  {object}  utils.ApiResponse
-// @Failure      403  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=PathPaymentResult}  "Payment submitted"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      409  {object}  utils.ApiResponse  "Another payment for this invoice is being verified"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
+// @Failure      502  {object}  utils.ApiResponse  "Stellar rejected the transaction"
 // @Security     BearerAuth
 // @Router       /wallet/{id}/pay/invoice [post]
 func (h *WalletHandler) PayInvoiceHandler(w http.ResponseWriter, r *http.Request) {
@@ -188,15 +211,18 @@ func (h *WalletHandler) PayInvoiceHandler(w http.ResponseWriter, r *http.Request
 
 // TransferHandler godoc
 // @Summary      Transfer funds to another wallet
-// @Description  Sends assets to any Stellar address. Uses path payment if source and dest assets differ
+// @Description  Transfer XLM or USDC to another address, converting between assets by path payment if needed.
 // @Tags         wallet
 // @Accept       json
 // @Produce      json
 // @Param        id    path  string       true  "Wallet ID"
 // @Param        body  body  TransferDTO  true  "Transfer details"
-// @Success      200  {object}  utils.ApiResponse{data=PathPaymentResult}
-// @Failure      400  {object}  utils.ApiResponse
-// @Failure      403  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=PathPaymentResult}  "Transfer submitted"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
+// @Failure      502  {object}  utils.ApiResponse  "Stellar rejected the transaction"
 // @Security     BearerAuth
 // @Router       /wallet/{id}/pay/transfer [post]
 func (h *WalletHandler) TransferHandler(w http.ResponseWriter, r *http.Request) {

@@ -24,12 +24,14 @@ func NewInvoiceCommentHandler(s *InvoiceCommentsService) *InvoiceCommentHandler 
 
 // CreateComment godoc
 // @Summary      Post a comment on an invoice
+// @Description  Comment on an invoice as a signed-in user or a guest holding a valid invoice access token.
 // @Tags         comments
 // @Accept       json
 // @Produce      json
 // @Param        body  body      CreateCommentDTO  true  "Comment data (include token for guest access)"
-// @Success      201   {object}  utils.ApiResponse
-// @Failure      400   {object}  utils.ApiResponse
+// @Success      201  {object}  utils.ApiResponse{data=CreateCommentQueryResponse}  "Comment created"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Router       /comments [post]
 func (ch *InvoiceCommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	var dto CreateCommentDTO
@@ -87,6 +89,7 @@ func (ch *InvoiceCommentHandler) CreateComment(w http.ResponseWriter, r *http.Re
 
 // GetComments godoc
 // @Summary      List comments for an invoice
+// @Description  Paginated comments for an invoice with reply threads, reactions and per-viewer edit flags.
 // @Tags         comments
 // @Produce      json
 // @Param        invoice_id  query  string  true   "Invoice ID"
@@ -94,7 +97,9 @@ func (ch *InvoiceCommentHandler) CreateComment(w http.ResponseWriter, r *http.Re
 // @Param        page        query  int     false  "Page number"
 // @Param        limit       query  int     false  "Items per page"
 // @Param        sort_order  query  string  false  "ASC or DESC"
-// @Success      200  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=GetCommentsResponse}  "Comments page"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Router       /comments [get]
 func (ch *InvoiceCommentHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 	userID, _ := utils.GetUserIDFromContext(r.Context())
@@ -133,10 +138,14 @@ func (ch *InvoiceCommentHandler) GetComments(w http.ResponseWriter, r *http.Requ
 
 // GetCommentByID godoc
 // @Summary      Get comment by ID
+// @Description  One comment with replies and reactions.
 // @Tags         comments
 // @Produce      json
 // @Param        id  path  string  true  "Comment ID"
-// @Success      200  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=CommentResponse}  "Comment"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Router       /comments/{id} [get]
 func (ch *InvoiceCommentHandler) GetCommentByID(w http.ResponseWriter, r *http.Request) {
 	userID, _ := utils.GetUserIDFromContext(r.Context())
@@ -160,13 +169,17 @@ func (ch *InvoiceCommentHandler) GetCommentByID(w http.ResponseWriter, r *http.R
 
 // UpdateComment godoc
 // @Summary      Edit a comment
+// @Description  Edit your own comment.
 // @Tags         comments
 // @Accept       json
 // @Produce      json
 // @Param        id    path  string           true  "Comment ID"
 // @Param        body  body  UpdateCommentDTO  true  "Updated comment text"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      400  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=CommentResponse}  "Comment updated"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      403  {object}  utils.ApiResponse  "Not the author"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Router       /comments/{id} [patch]
 func (ch *InvoiceCommentHandler) UpdateComment(w http.ResponseWriter, r *http.Request) {
 	userID, _ := utils.GetUserIDFromContext(r.Context())
@@ -222,12 +235,16 @@ func (ch *InvoiceCommentHandler) UpdateComment(w http.ResponseWriter, r *http.Re
 
 // AddReaction godoc
 // @Summary      Add emoji reaction to a comment
+// @Description  Add an emoji reaction. Returns the updated reaction counts.
 // @Tags         comments
 // @Accept       json
 // @Produce      json
 // @Param        id    path  string             true  "Comment ID"
 // @Param        body  body  ReactToCommentDTO  true  "Emoji and optional guest token"
-// @Success      200  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=[]ReactionCount}  "Reaction counts"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Router       /comments/{id}/react [post]
 func (ch *InvoiceCommentHandler) AddReaction(w http.ResponseWriter, r *http.Request) {
 	userID, _ := utils.GetUserIDFromContext(r.Context())
@@ -258,12 +275,16 @@ func (ch *InvoiceCommentHandler) AddReaction(w http.ResponseWriter, r *http.Requ
 
 // RemoveReaction godoc
 // @Summary      Remove emoji reaction from a comment
+// @Description  Remove your emoji reaction. Returns the updated reaction counts.
 // @Tags         comments
 // @Produce      json
 // @Param        id     path   string  true  "Comment ID"
 // @Param        emoji  query  string  true  "Emoji to remove"
 // @Param        email  query  string  false "Guest email"
-// @Success      200  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=[]ReactionCount}  "Reaction counts"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Router       /comments/{id}/react [delete]
 func (ch *InvoiceCommentHandler) RemoveReaction(w http.ResponseWriter, r *http.Request) {
 	userID, _ := utils.GetUserIDFromContext(r.Context())

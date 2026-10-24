@@ -572,12 +572,15 @@ func (is *InvoiceService) GetManyInvoice(ctx context.Context, dto InvoiceFilters
 
 	totalPages := int(math.Ceil(float64(totalItems) / float64(dto.Count)))
 	response := InvoiceListResponseDto{
+		Items:   invoices,
 		Invoice: invoices,
 		Meta: PaginationMeta{
 			Page:              dto.Page,
+			Limit:             dto.Count,
+			Total:             totalItems,
+			TotalPages:        totalPages,
 			PageCount:         len(invoices),
 			TotalInvoiceCount: totalItems,
-			TotalPages:        totalPages,
 		},
 	}
 
@@ -2365,14 +2368,7 @@ func (is *InvoiceService) GetStats(ctx context.Context, userId string) *utils.Ap
 		WHERE created_by_id = $1;
 	`
 
-	var stats struct {
-		PendingCount        int `db:"pending_count" json:"pending_count"`
-		PaidCount           int `db:"paid_count" json:"paid_count"`
-		OverdueCount        int `db:"overdue_count" json:"overdue_count"`
-		ExpiredCount        int `db:"expired_count" json:"expired_count"`
-		InvalidPaymentCount int `db:"invalid_payment_count" json:"invalid_payment_count"`
-		TotalCount          int `db:"total_count" json:"total_count"`
-	}
+	var stats InvoiceStatsResponse
 
 	err := is.postgres.QueryRow(ctx, query, userId).Scan(&stats.PendingCount, &stats.PaidCount, &stats.OverdueCount, &stats.ExpiredCount, &stats.InvalidPaymentCount, &stats.TotalCount)
 	if err != nil {
@@ -2808,24 +2804,24 @@ func (is *InvoiceService) GetInvoiceItems(ctx context.Context, invoiceID string)
 
 func (is *InvoiceService) GenerateInvoiceHTML(ctx context.Context, invoiceID, userID string) ([]byte, string, error) {
 	type invoiceRow struct {
-		invoiceNumber   string
-		status          string
-		payerEmail      string
-		payerName       string
-		currency        string
-		subTotal        float64
-		serviceFee      float64
-		total           float64
-		createdAt       time.Time
-		dueDate         sql.NullTime
-		note            sql.NullString
-		creatorEmail    string
-		creatorFirst    string
-		creatorLast     string
-		creatorBiz      sql.NullString
-		creatorPhone    sql.NullString
-		creatorCountry  sql.NullString
-		country         sql.NullString
+		invoiceNumber  string
+		status         string
+		payerEmail     string
+		payerName      string
+		currency       string
+		subTotal       float64
+		serviceFee     float64
+		total          float64
+		createdAt      time.Time
+		dueDate        sql.NullTime
+		note           sql.NullString
+		creatorEmail   string
+		creatorFirst   string
+		creatorLast    string
+		creatorBiz     sql.NullString
+		creatorPhone   sql.NullString
+		creatorCountry sql.NullString
+		country        sql.NullString
 	}
 
 	var r invoiceRow

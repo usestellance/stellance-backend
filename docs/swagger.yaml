@@ -1,101 +1,418 @@
 basePath: /api/v1
 definitions:
+  admin.ActivityLog:
+    properties:
+      action:
+        description: Action name
+        example: login
+        type: string
+      created_at:
+        description: When it happened
+        example: "2026-10-22T14:03:26Z"
+        type: string
+      entity_id:
+        description: Id of the object acted on
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
+        type: string
+      entity_type:
+        description: Kind of object acted on
+        example: invoice
+        type: string
+      id:
+        description: Entry id
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
+        type: string
+      ip_address:
+        description: Client IP
+        example: 203.0.113.7
+        type: string
+      metadata: {}
+      user_id:
+        description: Acting user
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
+        type: string
+    type: object
+  admin.AdminActivityList:
+    properties:
+      logs:
+        items:
+          $ref: '#/definitions/admin.ActivityLog'
+        type: array
+      meta:
+        $ref: '#/definitions/admin.AdminPaginationMeta'
+    type: object
+  admin.AdminInvoiceList:
+    properties:
+      invoices:
+        items:
+          $ref: '#/definitions/admin.AdminInvoiceRow'
+        type: array
+      meta:
+        $ref: '#/definitions/admin.AdminPaginationMeta'
+    type: object
   admin.AdminInvoiceRow:
     properties:
       created_at:
+        description: Created
+        example: "2026-10-20T09:00:00Z"
         type: string
       creator_email:
+        description: Creator
+        example: jane@example.com
         type: string
       currency:
+        description: Currency
+        example: usdc
         type: string
       id:
+        description: Invoice id
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
         type: string
       invoice_number:
+        description: Number
+        example: INV-20261020-0019
         type: string
       payer_email:
+        description: Client
+        example: billing@acme.com
         type: string
       status:
+        description: Invoice status
+        example: paid
         type: string
       total:
+        description: Amount due
+        example: 454
         type: number
+    type: object
+  admin.AdminPaginationMeta:
+    properties:
+      limit:
+        description: Page size
+        example: 20
+        type: integer
+      page:
+        description: Current page
+        example: 1
+        type: integer
+      total:
+        description: Total matching rows
+        example: 57
+        type: integer
+      total_pages:
+        description: Total pages
+        example: 3
+        type: integer
     type: object
   admin.AdminStats:
     properties:
       active_users:
+        description: Active users
+        example: 112
         type: integer
       overdue_count:
+        description: Invoices in overdue status
+        example: 12
         type: integer
       paid_invoices:
+        description: Paid invoices
+        example: 310
         type: integer
       total_invoices:
+        description: All invoices
+        example: 560
         type: integer
       total_revenue:
+        description: Sum of paid invoice totals
+        example: 48210.5
         type: number
       total_users:
+        description: All users
+        example: 120
         type: integer
+    type: object
+  admin.AdminTransactionList:
+    properties:
+      meta:
+        $ref: '#/definitions/admin.AdminPaginationMeta'
+      transactions:
+        items:
+          $ref: '#/definitions/admin.AdminTransactionRow'
+        type: array
+    type: object
+  admin.AdminTransactionRow:
+    properties:
+      amount:
+        description: Amount
+        example: 2.03
+        type: number
+      created_at:
+        description: Created
+        example: "2026-10-22T14:03:26Z"
+        type: string
+      id:
+        description: Ledger entry id
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
+        type: string
+      invoice_number:
+        description: Related invoice
+        example: INV-20261020-0019
+        type: string
+      source_amount:
+        description: Amount spent
+        example: "12.3456789"
+        type: string
+      source_asset:
+        description: Asset spent for path payments
+        example: XLM
+        type: string
+      status:
+        description: On-chain result
+        example: confirmed
+        type: string
+      type:
+        description: payment, withdrawal, funding or path_payment
+        example: payment
+        type: string
+      user_email:
+        description: Owner
+        example: jane@example.com
+        type: string
+    type: object
+  admin.AdminUserDetail:
+    properties:
+      recent_activity:
+        items:
+          $ref: '#/definitions/admin.ActivityLog'
+        type: array
+      recent_transactions:
+        items:
+          $ref: '#/definitions/admin.AdminTransactionRow'
+        type: array
+      user:
+        $ref: '#/definitions/admin.AdminUserRow'
+      wallets:
+        items:
+          $ref: '#/definitions/admin.AdminWalletRow'
+        type: array
+    type: object
+  admin.AdminUserList:
+    properties:
+      meta:
+        $ref: '#/definitions/admin.AdminPaginationMeta'
+      users:
+        items:
+          $ref: '#/definitions/admin.AdminUserRow'
+        type: array
     type: object
   admin.AdminUserRow:
     properties:
       created_at:
+        description: Created
+        example: "2026-10-20T09:00:00Z"
         type: string
       email:
+        description: Email
+        example: jane@example.com
         type: string
       email_verified:
+        description: Verified
+        example: true
         type: boolean
       first_name:
+        description: First name
+        example: Jane
         type: string
       id:
+        description: User id
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
         type: string
       is_active:
+        description: Active
+        example: true
         type: boolean
       last_name:
+        description: Last name
+        example: Doe
         type: string
       role:
+        description: user or admin
+        example: user
         type: string
+    type: object
+  admin.AdminWalletRow:
+    properties:
+      address:
+        description: Stellar account id
+        example: GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5
+        type: string
+      id:
+        description: Wallet id
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
+        type: string
+      is_primary:
+        description: Receives invoice payments
+        example: true
+        type: boolean
+      tag:
+        description: Label
+        example: Main
+        type: string
+      usdc_balance:
+        description: Cached USDC balance
+        example: 5.03
+        type: number
+      xlm_balance:
+        description: Cached XLM balance
+        example: 10002
+        type: number
+    type: object
+  admin.NetworkConfig:
+    properties:
+      stage:
+        enum:
+        - testnet
+        - mainnet
+        type: string
+      updated_at:
+        description: When the setting last changed
+        example: "2026-10-22T14:03:26Z"
+        type: string
+    type: object
+  admin.NetworkUpdate:
+    properties:
+      stage:
+        description: Network used by wallets and payment detection
+        enum:
+        - testnet
+        - mainnet
+        example: testnet
+        type: string
+    type: object
+  auth.AuthLoginResponseDto:
+    properties:
+      access_token:
+        description: Bearer token, valid for 1 hour
+        example: eyJhbGciOi...
+        type: string
+      email_verified:
+        description: Always true on a successful login
+        example: true
+        type: boolean
+      expires_in:
+        description: Unix time the token expires
+        example: 1793000000
+        type: integer
+      profile_complete:
+        description: False until POST /profile has been called
+        example: false
+        type: boolean
+      user:
+        $ref: '#/definitions/user.User'
     type: object
   auth.AuthRequestDto:
     properties:
       email:
+        description: Account email, case-insensitive
+        example: jane@example.com
         type: string
       password:
+        description: Password; must satisfy the password policy
+        example: S3cure!pass
         type: string
     required:
     - email
     - password
     type: object
+  auth.AuthResponseDto:
+    properties:
+      access_token:
+        description: Bearer token, valid for 1 hour
+        example: eyJhbGciOi...
+        type: string
+      email_verified:
+        description: New accounts start unverified
+        example: false
+        type: boolean
+      expires_in:
+        description: Unix time the access token expires
+        example: 1793000000
+        type: integer
+      profile_complete:
+        description: Profile onboarding done
+        example: false
+        type: boolean
+      refresh_token:
+        description: Only on the refresh endpoint
+        type: string
+      refresh_token_expiry:
+        description: Unix time the refresh token expires
+        example: 1793600000
+        type: integer
+      user:
+        $ref: '#/definitions/user.UserProfileDto'
+    type: object
   auth.ChangePasswordDTO:
     properties:
       new_password:
+        description: New password, 8-100 characters
+        example: N3w!password
         maxLength: 100
         minLength: 8
         type: string
       old_password:
+        description: Current password
+        example: S3cure!pass
         type: string
     required:
     - new_password
     - old_password
     type: object
+  auth.PasswordChangedResult:
+    properties:
+      changedAt:
+        description: When the password changed
+        example: "2026-10-22T14:03:26Z"
+        type: string
+    type: object
   auth.ProviderLogin:
     properties:
-      email:
-        type: string
-      provider_id:
+      id_token:
+        description: Google ID token (JWT) from Google Sign-In; verified server-side
+        example: eyJhbGciOiJSUzI1NiIs...
         type: string
     required:
-    - email
-    - provider_id
+    - id_token
+    type: object
+  auth.RefreshTokenResult:
+    properties:
+      refresh_token:
+        description: 7-day refresh token
+        example: eyJhbGciOi...
+        type: string
+      refresh_token_expiry:
+        example: 1793000000
+        type: integer
     type: object
   auth.ResetPasswordDto:
     properties:
       confirm_password:
+        description: Must equal password
+        example: N3w!password
         type: string
       email:
+        description: Email the reset link was sent to
+        example: jane@example.com
         type: string
       otp:
+        description: Code from the reset email
+        example: "48213"
         maxLength: 6
         minLength: 2
         type: string
       password:
+        description: New password
+        example: N3w!password
         type: string
     required:
     - confirm_password
@@ -106,28 +423,49 @@ definitions:
   invoice.CreateInvoiceDTO:
     properties:
       country:
+        description: Client country
+        example: NG
         type: string
       due_date:
+        description: YYYY-MM-DD. Payments are accepted until the end of this day (UTC)
+          plus PAYMENT_EXPIRY_GRACE_DAYS
+        example: "2026-12-31"
         type: string
       invoice_items:
+        description: At least one line item
         items:
           $ref: '#/definitions/invoice.InvoiceItems'
         minItems: 1
         type: array
       make_default:
+        description: Save this template as the default
+        example: false
         type: boolean
       note:
+        description: Optional note shown on the invoice
+        example: Thanks for your business
         type: string
       payer_email:
+        description: Client email the invoice is sent to
+        example: billing@acme.com
         type: string
       payer_name:
+        description: Client name
+        example: Acme Ltd
         type: string
       service_fee:
+        description: Extra fee added to the subtotal, >= 0
+        example: 2.5
         minimum: 0
         type: number
       template_id:
-        $ref: '#/definitions/invoice.TemplateIDType'
+        allOf:
+        - $ref: '#/definitions/invoice.TemplateIDType'
+        description: One of template_001..template_005
+        example: template_001
       title:
+        description: Invoice title, min 3 characters
+        example: Website redesign
         minLength: 3
         type: string
     required:
@@ -142,24 +480,39 @@ definitions:
   invoice.InvoiceItems:
     properties:
       amount:
+        description: Line total; the server checks it against quantity x unit_price
+        example: 451.5
         type: number
       created_at:
+        description: When the item was added
+        example: "2026-10-20T09:00:00Z"
         type: string
       description:
+        description: What was delivered
+        example: Design work
         type: string
       discount:
+        description: Discount percent
+        example: 0
         type: integer
       invoice_type:
         allOf:
         - $ref: '#/definitions/invoice.InvoiceType'
+        description: per_hour or per_unit
         enum:
         - per_hour
         - per_unit
+        example: per_unit
       item_id:
+        description: Existing item id when editing; omit for new items
         type: string
       quantity:
+        description: Hours or units, > 0
+        example: 3
         type: integer
       unit_price:
+        description: Price per hour or unit, > 0
+        example: 150.5
         type: number
     required:
     - amount
@@ -167,6 +520,208 @@ definitions:
     - invoice_type
     - quantity
     - unit_price
+    type: object
+  invoice.InvoiceListResponseDto:
+    properties:
+      invoice:
+        description: 'deprecated: use items'
+        items:
+          $ref: '#/definitions/invoice.InvoiceResponse'
+        type: array
+      items:
+        items:
+          $ref: '#/definitions/invoice.InvoiceResponse'
+        type: array
+      meta:
+        $ref: '#/definitions/invoice.PaginationMeta'
+    type: object
+  invoice.InvoiceResponse:
+    properties:
+      approved:
+        description: Payer review result; null before review
+        example: true
+        type: boolean
+      country:
+        description: Client country
+        example: NG
+        type: string
+      created_at:
+        description: Creation time
+        example: "2026-10-20T09:00:00Z"
+        type: string
+      createdBy:
+        $ref: '#/definitions/invoice.InvoiceSenderDetails'
+      currency:
+        description: usdc or xlm
+        example: usdc
+        type: string
+      due_date:
+        description: Due date
+        example: "2026-12-31T00:00:00Z"
+        type: string
+      id:
+        description: Invoice id
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
+        type: string
+      invoice_number:
+        description: Human-readable number
+        example: INV-20261020-0019
+        type: string
+      invoice_url:
+        description: Short public url used by /invoice/search and /payments/request
+        example: aB3dE9
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/invoice.InvoiceItems'
+        type: array
+      logo_url:
+        description: Signed logo url
+        type: string
+      note:
+        description: Note shown on the invoice
+        type: string
+      paid_at:
+        description: Set once paid
+        example: "2026-10-22T14:03:26Z"
+        type: string
+      payer_email:
+        description: Client email
+        example: billing@acme.com
+        type: string
+      payer_name:
+        description: Client name
+        example: Acme Ltd
+        type: string
+      payer_wallet_address:
+        description: Account that paid; set once paid
+        example: GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5
+        type: string
+      payment_reference:
+        description: Memo to attach to the on-chain payment
+        example: STL-B9371BD3A173
+        type: string
+      payment_status:
+        description: Derived from status; see docs/payment-status-model.md
+        example: awaiting_payment
+        type: string
+      review_date:
+        description: When the payer approved or rejected
+        example: "2026-10-21T10:00:00Z"
+        type: string
+      service_fee:
+        description: Fee added to the subtotal
+        example: 2.5
+        type: number
+      status:
+        description: draft, sent, viewed, pending, overdue, payment_detected, invalid_payment,
+          paid, expired, cancelled or refunded
+        example: sent
+        type: string
+      sub_total:
+        description: Sum of line items
+        example: 451.5
+        type: number
+      template_id:
+        allOf:
+        - $ref: '#/definitions/invoice.TemplateIDType'
+        description: Template
+        example: template_001
+      title:
+        description: Title
+        example: Website redesign
+        type: string
+      total:
+        description: Amount due
+        example: 454
+        type: number
+      updated_at:
+        description: Last change
+        example: "2026-10-22T14:03:26Z"
+        type: string
+    required:
+    - template_id
+    type: object
+  invoice.InvoiceSearchResult:
+    properties:
+      invoice:
+        items:
+          $ref: '#/definitions/invoice.InvoiceResponse'
+        type: array
+      meta:
+        $ref: '#/definitions/invoice.SearchPaginationMeta'
+    type: object
+  invoice.InvoiceSendResult:
+    properties:
+      invoice_url:
+        example: aB3dE9
+        type: string
+      total_recipients:
+        example: 2
+        type: integer
+    type: object
+  invoice.InvoiceSenderDetails:
+    properties:
+      business_name:
+        description: Business name
+        example: Doe Studio
+        type: string
+      email:
+        description: Hidden on the public view
+        example: jane@example.com
+        type: string
+      location:
+        description: Creator country
+        example: NG
+        type: string
+      name:
+        description: Creator name
+        example: Jane Doe
+        type: string
+      phone_number:
+        description: Hidden on the public view
+        example: "+2348012345678"
+        type: string
+      user_id:
+        description: Creator id
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
+        type: string
+      wallet_address:
+        description: Creator primary wallet
+        example: GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5
+        type: string
+    type: object
+  invoice.InvoiceStatsResponse:
+    properties:
+      expired_count:
+        example: 2
+        type: integer
+      invalid_payment_count:
+        example: 1
+        type: integer
+      overdue_count:
+        example: 0
+        type: integer
+      paid_count:
+        example: 12
+        type: integer
+      pending_count:
+        example: 4
+        type: integer
+      total_count:
+        example: 19
+        type: integer
+    type: object
+  invoice.InvoiceStatusDataPoint:
+    properties:
+      status:
+        description: Capitalised status name
+        example: Paid
+        type: string
+      value:
+        description: Invoices in this status
+        example: 12
+        type: integer
     type: object
   invoice.InvoiceType:
     enum:
@@ -176,21 +731,99 @@ definitions:
     x-enum-varnames:
     - PerUnit
     - PerHour
+  invoice.InvoiceUpdateResult:
+    properties:
+      invoice_id:
+        description: Updated invoice
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
+        type: string
+      updated_at:
+        description: Update time
+        example: "2026-10-22T14:03:26Z"
+        type: string
+    type: object
   invoice.MarkInvoicePaidDTO:
     properties:
       transaction_hash:
+        description: 64-character hex Stellar transaction hash. The server re-verifies
+          it on-chain
+        example: a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7
         type: string
     required:
     - transaction_hash
     type: object
+  invoice.MarkPaidResult:
+    properties:
+      invoice_id:
+        description: Invoice id
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
+        type: string
+      payment:
+        description: The verified payment record
+      status:
+        example: paid
+        type: string
+    type: object
+  invoice.PaginationMeta:
+    properties:
+      limit:
+        description: Page size
+        example: 10
+        type: integer
+      page:
+        description: Current page
+        example: 1
+        type: integer
+      page_count:
+        description: 'deprecated: use limit'
+        type: integer
+      total:
+        description: Total matching invoices
+        example: 57
+        type: integer
+      total_invoice_count:
+        description: 'deprecated: use total'
+        type: integer
+      total_pages:
+        description: Total pages
+        example: 6
+        type: integer
+    type: object
   invoice.ReviewInvoiceDTO:
     properties:
       approve:
+        description: true approves, false rejects (cancels) the invoice
+        example: true
         type: boolean
+    type: object
+  invoice.SearchPaginationMeta:
+    properties:
+      has_next:
+        description: More rows after this page
+        example: true
+        type: boolean
+      has_prev:
+        description: Rows before this page
+        example: false
+        type: boolean
+      limit:
+        description: Page size
+        example: 10
+        type: integer
+      offset:
+        description: Rows skipped
+        example: 0
+        type: integer
+      total:
+        description: Total matches
+        example: 57
+        type: integer
     type: object
   invoice.SendInvoiceDto:
     properties:
       emails:
+        description: 1-10 recipient emails; the first is the primary recipient, the
+          rest are CC
         items:
           type: string
         maxItems: 10
@@ -213,92 +846,373 @@ definitions:
     - TemplateID3
     - TemplateID4
     - TemplateID5
+  invoice_comments.CommentResponse:
+    properties:
+      can_delete:
+        description: Viewer may delete
+        example: true
+        type: boolean
+      can_edit:
+        description: Viewer may edit
+        example: true
+        type: boolean
+      comment_text:
+        description: Comment body
+        example: Looks good
+        type: string
+      commenter_email:
+        description: Author email
+        example: jane@example.com
+        type: string
+      commenter_name:
+        description: Display name
+        example: Jane Doe
+        type: string
+      created_at:
+        description: Posted
+        example: "2026-10-22T14:03:26Z"
+        type: string
+      edited:
+        description: Edited after posting
+        example: false
+        type: boolean
+      edited_at:
+        description: When last edited
+        type: object
+      id:
+        description: Comment id
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
+        type: string
+      invoice_id:
+        description: Invoice id
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
+        type: string
+      is_guest:
+        description: Author commented with a guest token
+        example: false
+        type: boolean
+      is_verified:
+        description: Author is a verified account
+        example: true
+        type: boolean
+      parent_comment_id:
+        description: Parent comment when this is a reply
+        type: object
+      parent_id:
+        description: Same as parent_comment_id
+        type: object
+      reactions:
+        items:
+          $ref: '#/definitions/invoice_comments.ReactionCount'
+        type: array
+      replies:
+        items:
+          $ref: '#/definitions/invoice_comments.CommentResponse'
+        type: array
+      updated_at:
+        description: Last change
+        example: "2026-10-22T14:03:26Z"
+        type: string
+      user_id:
+        description: Author id; empty for guests
+        type: object
+    type: object
   invoice_comments.CreateCommentDTO:
     properties:
       comment_text:
+        description: 1-2000 characters
+        example: Can you split this into two payments?
         maxLength: 2000
         minLength: 1
         type: string
       invoice_id:
+        description: Invoice being discussed
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
         type: string
       parent_id:
+        description: Comment id to reply to; omit for a top-level comment
         type: string
       token:
+        description: Invoice access token for guests; omit when signed in
         type: string
     required:
     - comment_text
     - invoice_id
     type: object
+  invoice_comments.CreateCommentQueryResponse:
+    properties:
+      created_at:
+        type: string
+      guest:
+        type: boolean
+      id:
+        type: string
+      verified:
+        type: boolean
+    type: object
+  invoice_comments.GetCommentsResponse:
+    properties:
+      comments:
+        items:
+          $ref: '#/definitions/invoice_comments.CommentResponse'
+        type: array
+      limit:
+        description: Page size
+        example: 20
+        type: integer
+      page:
+        description: Current page
+        example: 1
+        type: integer
+      stats:
+        $ref: '#/definitions/invoice_comments.InvoiceCommentStats'
+      total:
+        description: Total top-level comments
+        example: 8
+        type: integer
+      total_pages:
+        description: Total pages
+        example: 1
+        type: integer
+    type: object
+  invoice_comments.InvoiceCommentStats:
+    properties:
+      guest_comments:
+        description: By guests
+        example: 3
+        type: integer
+      invoice_id:
+        description: Invoice id
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
+        type: string
+      latest_comment_at:
+        description: Most recent comment
+        example: "2026-10-22T14:03:26Z"
+        type: string
+      reply_comments:
+        description: Replies
+        example: 2
+        type: integer
+      top_level_comments:
+        description: Not replies
+        example: 6
+        type: integer
+      total_comments:
+        description: All comments
+        example: 8
+        type: integer
+      verified_comments:
+        description: By verified accounts
+        example: 5
+        type: integer
+    type: object
   invoice_comments.ReactToCommentDTO:
     properties:
       email:
+        description: Guest email
         type: string
       emoji:
+        description: 1-10 characters
+        example: "\U0001F44D"
         maxLength: 10
         minLength: 1
         type: string
       token:
+        description: Guest invoice access token
         type: string
     required:
     - emoji
     type: object
+  invoice_comments.ReactionCount:
+    properties:
+      count:
+        description: Reactions with this emoji
+        example: 3
+        type: integer
+      emoji:
+        description: Emoji
+        example: "\U0001F44D"
+        type: string
+      reacted:
+        description: Reacted is true if the current viewer has reacted with this emoji
+        type: boolean
+    type: object
   invoice_comments.UpdateCommentDTO:
     properties:
       comment_text:
+        description: 1-2000 characters
+        example: Updated text
         maxLength: 2000
         minLength: 1
         type: string
       email:
+        description: Guest email, required for guests
         type: string
       token:
+        description: Guest invoice access token
         type: string
     required:
     - comment_text
     type: object
+  notifications.GetNotificationResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/notifications.Notification'
+        type: array
+      meta:
+        $ref: '#/definitions/notifications.PaginationMeta'
+      notifications:
+        description: 'deprecated: use items'
+        items:
+          $ref: '#/definitions/notifications.Notification'
+        type: array
+    type: object
+  notifications.Notification:
+    properties:
+      body:
+        description: Message
+        example: Payment for invoice INV-1 was verified on Stellar.
+        type: string
+      id:
+        description: Notification id
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
+        type: string
+      title:
+        description: Short title
+        example: Invoice Paid
+        type: string
+      viewed:
+        description: Read flag
+        example: false
+        type: boolean
+      viewed_at:
+        description: When it was read
+        example: "2026-10-22T14:10:00Z"
+        type: string
+    type: object
+  notifications.PaginationMeta:
+    properties:
+      limit:
+        description: Page size
+        example: 15
+        type: integer
+      page:
+        description: Current page
+        example: 1
+        type: integer
+      page_count:
+        description: 'Deprecated: items on this page'
+        example: 15
+        type: integer
+      read_count:
+        description: All read notifications
+        example: 37
+        type: integer
+      total:
+        description: Notifications matching the viewed filter
+        example: 42
+        type: integer
+      total_pages:
+        description: Total pages
+        example: 3
+        type: integer
+      unread_count:
+        description: All unread notifications
+        example: 5
+        type: integer
+    type: object
   payments.Checks:
     properties:
       amount:
+        enum:
+        - pass
+        - fail
+        - skip
         type: string
       asset:
+        enum:
+        - pass
+        - fail
+        - skip
         type: string
       invoice:
+        enum:
+        - pass
+        - fail
+        - skip
         type: string
       recipient:
+        enum:
+        - pass
+        - fail
+        - skip
         type: string
       reference:
+        enum:
+        - pass
+        - fail
+        - skip
         type: string
       success:
+        enum:
+        - pass
+        - fail
+        - skip
         type: string
     type: object
   payments.Expected:
     properties:
       amount:
+        description: Exact amount, 7 decimals
+        example: "100.0000000"
         type: string
       asset_code:
+        description: Asset code
+        example: USDC
         type: string
       asset_issuer:
+        description: Issuer; null for XLM
+        example: GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5
         type: string
       payment_reference:
+        description: Required memo
+        example: STL-B9371BD3A173
         type: string
       recipient:
+        description: Required recipient
+        example: GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5
         type: string
     type: object
   payments.PageMeta:
     properties:
       limit:
+        description: Page size
+        example: 20
         type: integer
       page:
+        description: Current page, from 1
+        example: 1
         type: integer
       total:
+        description: Total matching rows
+        example: 57
         type: integer
       total_pages:
+        description: Total pages
+        example: 3
         type: integer
     type: object
   payments.PaymentList:
     properties:
+      items:
+        items:
+          $ref: '#/definitions/payments.PaymentRecord'
+        type: array
       meta:
         $ref: '#/definitions/payments.PageMeta'
       payments:
+        description: 'deprecated: use items'
         items:
           $ref: '#/definitions/payments.PaymentRecord'
         type: array
@@ -306,90 +1220,185 @@ definitions:
   payments.PaymentRecord:
     properties:
       amount:
+        example: "2.0300000"
         type: string
       asset_code:
+        example: USDC
         type: string
       asset_issuer:
+        description: Issuer account; null for XLM
+        example: GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5
         type: string
       checks:
-        $ref: '#/definitions/payments.Checks'
+        allOf:
+        - $ref: '#/definitions/payments.Checks'
+        description: 'Per-check result: pass, fail or skip'
       detected_at:
+        description: When the server first saw the payment
+        example: "2026-10-22T14:03:25Z"
         type: string
       expected:
-        $ref: '#/definitions/payments.Expected'
+        allOf:
+        - $ref: '#/definitions/payments.Expected'
+        description: What the invoice demanded; null when no invoice matched
       explorer_url:
+        description: Block explorer link
+        example: https://stellar.expert/explorer/testnet/tx/a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7
         type: string
       failure_code:
+        description: Machine-readable reason; null when verified
+        enum:
+        - insufficient_amount
+        - amount_mismatch
+        - wrong_asset
+        - wrong_recipient
+        - missing_reference
+        - unknown_reference
+        - transaction_failed
+        - duplicate
+        - invoice_not_payable
+        - expired
+        - invalid_invoice_total
+        example: insufficient_amount
         type: string
       failure_reason:
+        description: Human-readable reason; null when verified
+        example: 'insufficient amount: expected 100.0000000, received 99.0000000'
         type: string
       id:
+        description: Payment id
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
         type: string
       invoice_id:
+        description: Invoice the payment was matched to; null for unmatched payments
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
         type: string
       invoice_number:
+        description: Number of the matched invoice; null when unmatched
+        example: INV-20261020-0019
         type: string
       ledger_closed_at:
+        description: When Stellar closed the ledger containing the payment
+        example: "2026-10-22T14:03:11Z"
         type: string
       merchant_email:
+        description: Receiving merchant; only on /admin/payments
+        example: merchant@example.com
         type: string
       payment_reference:
+        example: STL-B9371BD3A173
         type: string
       recipient:
+        description: Receiving account
+        example: GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5
         type: string
       sender:
+        description: Paying account
+        example: GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5
         type: string
       transaction_hash:
+        description: Stellar transaction hash
+        example: a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7
         type: string
       verification_status:
+        description: Outcome of the check; see docs/payment-status-model.md
+        enum:
+        - pending
+        - detected
+        - verified
+        - invalid
+        - unmatched
+        - failed
+        example: verified
         type: string
       verified_at:
+        description: When the payment was verified; null otherwise
+        example: "2026-10-22T14:03:26Z"
         type: string
     type: object
   payments.PaymentRequest:
     properties:
       amount:
+        description: Exact amount to send, 7 decimals. Over- and underpayments are
+          rejected
+        example: "2.0300000"
         type: string
       asset_code:
+        description: Asset to send
+        example: USDC
         type: string
       asset_issuer:
+        description: Issuer of the asset; null for XLM
+        example: GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5
         type: string
       expires_at:
+        description: Payments closed at or after this time are rejected
+        example: "2026-12-01T00:00:00Z"
         type: string
       explorer_url:
+        description: Explorer link for the verified payment
+        example: https://stellar.expert/explorer/testnet/tx/a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7
         type: string
       invoice_id:
+        description: Invoice id
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
         type: string
       invoice_number:
+        description: Invoice number
+        example: INV-20261020-0019
         type: string
       invoice_status:
+        description: Invoice status
+        example: sent
         type: string
       network:
+        description: Stellar network
+        example: testnet
         type: string
       paid_at:
+        description: When the invoice was marked paid
+        example: "2026-10-22T14:03:26Z"
         type: string
       payment_detected_at:
+        description: When a payment was first detected
+        example: "2026-10-22T14:03:25Z"
         type: string
       payment_reference:
+        description: Text memo that must be attached to the payment
+        example: STL-B9371BD3A173
         type: string
       payment_status:
+        description: 'Derived: awaiting_payment for sent, viewed, pending and overdue;
+          otherwise the invoice status'
+        example: awaiting_payment
         type: string
       payments:
+        description: All payments recorded for the invoice; owner view only
         items:
           $ref: '#/definitions/payments.PaymentRecord'
         type: array
       recipient:
+        description: Account to pay
+        example: GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5
         type: string
       transaction_hash:
+        description: Hash of the verified payment; only set once verified
+        example: a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7
         type: string
       verification_status:
+        description: Status of the most relevant payment
+        example: verified
         type: string
       verified_at:
+        description: When it was verified
+        example: "2026-10-22T14:03:26Z"
         type: string
     type: object
   payments.VerifyTransactionDTO:
     properties:
       transaction_hash:
+        description: 64-character hex Stellar transaction hash
+        example: a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7
         type: string
     required:
     - transaction_hash
@@ -397,35 +1406,53 @@ definitions:
   recurring.CreateRecurringDTO:
     properties:
       country:
+        description: Client country
+        example: NG
         type: string
       interval:
         allOf:
         - $ref: '#/definitions/recurring.RecurringInterval'
+        description: weekly, biweekly, monthly, quarterly or yearly
         enum:
         - weekly
         - biweekly
         - monthly
         - quarterly
         - yearly
+        example: monthly
       invoice_items:
+        description: Line items copied to each invoice
         items:
           $ref: '#/definitions/invoice.InvoiceItems'
         minItems: 1
         type: array
       note:
+        description: Optional note
         type: string
       payer_email:
+        description: Client email
+        example: billing@acme.com
         type: string
       payer_name:
+        description: Client name
+        example: Acme Ltd
         type: string
       service_fee:
+        description: '>= 0'
+        example: 0
         minimum: 0
         type: number
       start_date:
+        description: YYYY-MM-DD of the first generated invoice
+        example: "2026-11-01"
         type: string
       template_id:
+        description: Invoice template
+        example: template_001
         type: string
       title:
+        description: Title copied to each generated invoice
+        example: Monthly retainer
         minLength: 3
         type: string
     required:
@@ -437,6 +1464,17 @@ definitions:
     - start_date
     - template_id
     - title
+    type: object
+  recurring.RecurringCreated:
+    properties:
+      id:
+        description: Schedule id
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
+        type: string
+      next_run_at:
+        description: First run
+        example: "2026-11-01T00:00:00Z"
+        type: string
     type: object
   recurring.RecurringInterval:
     enum:
@@ -452,64 +1490,503 @@ definitions:
     - IntervalMonthly
     - IntervalQuarterly
     - IntervalYearly
+  recurring.RecurringInvoice:
+    properties:
+      country:
+        description: Country
+        example: NG
+        type: string
+      created_at:
+        description: Created
+        example: "2026-09-01T00:00:00Z"
+        type: string
+      currency:
+        description: Currency
+        example: usdc
+        type: string
+      id:
+        description: Schedule id
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
+        type: string
+      interval:
+        allOf:
+        - $ref: '#/definitions/recurring.RecurringInterval'
+        description: Schedule interval
+        example: monthly
+      invoice_items:
+        items:
+          $ref: '#/definitions/invoice.InvoiceItems'
+        type: array
+      is_active:
+        description: False when paused
+        example: true
+        type: boolean
+      last_run_at:
+        description: Last invoice time
+        example: "2026-10-01T00:00:00Z"
+        type: string
+      next_run_at:
+        description: Next invoice time
+        example: "2026-11-01T00:00:00Z"
+        type: string
+      note:
+        description: Note
+        type: string
+      payer_email:
+        description: Client email
+        example: billing@acme.com
+        type: string
+      payer_name:
+        description: Client
+        example: Acme Ltd
+        type: string
+      service_fee:
+        description: Fee
+        example: 0
+        type: number
+      sub_total:
+        description: Sum of items
+        example: 451.5
+        type: number
+      template_id:
+        description: Template
+        example: template_001
+        type: string
+      title:
+        description: Title
+        example: Monthly retainer
+        type: string
+      total:
+        description: Total per invoice
+        example: 451.5
+        type: number
+      updated_at:
+        description: Updated
+        example: "2026-10-01T00:00:00Z"
+        type: string
+      user_id:
+        description: Owner
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
+        type: string
+    type: object
   recurring.UpdateRecurringDTO:
     properties:
       interval:
         allOf:
         - $ref: '#/definitions/recurring.RecurringInterval'
+        description: New interval
         enum:
         - weekly
         - biweekly
         - monthly
         - quarterly
         - yearly
+        example: monthly
       is_active:
+        description: false pauses the schedule, true resumes it
+        example: false
         type: boolean
       start_date:
+        description: YYYY-MM-DD, resets the next run date
+        example: "2026-12-01"
         type: string
+    type: object
+  transactions.CashFlowDataPoint:
+    properties:
+      amount:
+        description: Integer cents
+        example: 45000
+        type: integer
+      date:
+        description: Month start, YYYY-MM-DD
+        example: "2026-10-01"
+        type: string
+      invoices:
+        description: Paid invoices
+        example: 3
+        type: integer
+    type: object
+  transactions.GetTransactionCashFlowResponse:
+    properties:
+      cash_flow:
+        items:
+          $ref: '#/definitions/transactions.CashFlowDataPoint'
+        type: array
+    type: object
+  transactions.GetTransactionDto:
+    properties:
+      amount:
+        description: Amount in the entry currency
+        example: 2.03
+        type: number
+      confirmed_at:
+        description: Ledger close time
+        example: "2026-10-22T14:03:11Z"
+        type: string
+      created_at:
+        description: Created
+        example: "2026-10-22T14:03:26Z"
+        type: string
+      currency:
+        description: usdc or xlm
+        example: usdc
+        type: string
+      id:
+        description: Ledger entry id
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
+        type: string
+      invoice_id:
+        description: Related invoice; null for transfers
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
+        type: string
+      network_fee:
+        description: Fee in XLM
+        example: 1e-05
+        type: number
+      source_amount:
+        description: Amount spent for path payments
+        example: "12.3456789"
+        type: string
+      source_asset:
+        description: Asset spent for path payments
+        example: XLM
+        type: string
+      status:
+        description: 'On-chain result: pending, confirmed, failed, aborted or refunded'
+        example: confirmed
+        type: string
+      token_type:
+        description: Token
+        example: usdc
+        type: string
+      transaction_hash:
+        description: Stellar transaction hash
+        example: a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7
+        type: string
+      transaction_type:
+        description: payment, withdrawal, funding or path_payment
+        example: payment
+        type: string
+      wallet_id:
+        description: Wallet involved
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
+        type: string
+    type: object
+  transactions.GetTransactionOverViewResponse:
+    properties:
+      expired_amount:
+        $ref: '#/definitions/transactions.TransactionCard'
+      invalid_payment_amount:
+        $ref: '#/definitions/transactions.TransactionCard'
+      overdue_amount:
+        $ref: '#/definitions/transactions.TransactionCard'
+      paid_amount:
+        $ref: '#/definitions/transactions.TransactionCard'
+      pending_amount:
+        $ref: '#/definitions/transactions.TransactionCard'
+      total_amount:
+        $ref: '#/definitions/transactions.TransactionCard'
+    type: object
+  transactions.PaginatedTransactions:
+    properties:
+      data:
+        description: 'deprecated: use items'
+        items:
+          $ref: '#/definitions/transactions.GetTransactionDto'
+        type: array
+      items:
+        items:
+          $ref: '#/definitions/transactions.GetTransactionDto'
+        type: array
+      limit:
+        description: 'Deprecated: use meta.limit'
+        example: 10
+        type: integer
+      meta:
+        $ref: '#/definitions/utils.PageMeta'
+      page:
+        description: 'Deprecated: use meta.page'
+        example: 1
+        type: integer
+      total_count:
+        description: 'Deprecated: use meta.total'
+        example: 57
+        type: integer
+    type: object
+  transactions.PaymentStatusResult:
+    properties:
+      status:
+        enum:
+        - pending
+        - confirmed
+        - failed
+        - aborted
+        - refunded
+        type: string
+      stellar_url:
+        description: Explorer link
+        example: https://stellar.expert/explorer/testnet/tx/a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7
+        type: string
+      transaction_hash:
+        description: Stellar transaction hash
+        example: a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7
+        type: string
+      transaction_id:
+        description: Ledger entry id
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
+        type: string
+    type: object
+  transactions.TransactionCard:
+    properties:
+      amount:
+        description: Integer cents
+        example: 45000
+        type: integer
+      invoice_count:
+        description: Invoices in this bucket
+        example: 3
+        type: integer
     type: object
   user.CompleteProfileRequestDto:
     properties:
       business_name:
+        description: Optional, max 50
+        example: Doe Studio
         maxLength: 50
         type: string
       country:
+        description: Optional, max 25
+        example: Nigeria
         maxLength: 25
         type: string
       first_name:
+        description: 2-15 characters
+        example: Jane
         maxLength: 15
         minLength: 2
         type: string
       last_name:
+        description: 2-15 characters
+        example: Doe
         maxLength: 15
         minLength: 2
         type: string
       phone_number:
+        description: Optional, max 15
+        example: "+2348012345678"
         maxLength: 15
         type: string
     required:
     - first_name
     - last_name
     type: object
+  user.CompleteProfileResult:
+    properties:
+      business_name:
+        description: Business
+        example: Doe Studio
+        type: string
+      country:
+        description: Country
+        example: Nigeria
+        type: string
+      email:
+        description: Email
+        example: jane@example.com
+        type: string
+      first_name:
+        description: First name
+        example: Jane
+        type: string
+      id:
+        description: User id
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
+        type: string
+      last_name:
+        description: Last name
+        example: Doe
+        type: string
+      phone_number:
+        description: Phone
+        example: "+2348012345678"
+        type: string
+      profile_completed:
+        example: true
+        type: boolean
+    type: object
+  user.ProfileResult:
+    properties:
+      profile:
+        $ref: '#/definitions/user.UserProfileDto'
+      profile_complete:
+        type: boolean
+      wallet:
+        $ref: '#/definitions/user.UserWallet'
+    type: object
   user.UpdateProfileDto:
     properties:
       business_name:
+        description: Max 50
+        example: Doe Studio
         maxLength: 50
         type: string
       country:
+        description: Max 25
+        example: Nigeria
         maxLength: 25
         type: string
       first_name:
+        description: 2-15 characters
+        example: Jane
         maxLength: 15
         minLength: 2
         type: string
       last_name:
+        description: 2-15 characters
+        example: Doe
         maxLength: 15
         minLength: 2
         type: string
       phone_number:
+        description: Max 15
+        example: "+2348012345678"
         maxLength: 15
         type: string
+    type: object
+  user.User:
+    properties:
+      business_name:
+        description: Business
+        example: Doe Studio
+        type: string
+      country:
+        description: Country
+        example: Nigeria
+        type: string
+      email:
+        description: Email
+        example: jane@example.com
+        type: string
+      email_verified:
+        description: Email verified
+        example: true
+        type: boolean
+      first_name:
+        description: First name
+        example: Jane
+        type: string
+      id:
+        description: User id
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
+        type: string
+      last_name:
+        description: Last name
+        example: Doe
+        type: string
+      phone_number:
+        description: Phone
+        example: "+2348012345678"
+        type: string
+      wallet:
+        $ref: '#/definitions/user.UserWallet'
+    type: object
+  user.UserProfileDto:
+    properties:
+      auth_type:
+        description: password or google
+        example: password
+        type: string
+      business_name:
+        description: Business
+        example: Doe Studio
+        type: string
+      country:
+        description: Country
+        example: Nigeria
+        type: string
+      created_at:
+        description: Created
+        example: "2026-10-20T09:00:00Z"
+        type: string
+      email:
+        description: Email
+        example: jane@example.com
+        type: string
+      email_verified:
+        description: Email verified
+        example: true
+        type: boolean
+      email_verified_at:
+        description: When verified
+        example: "2026-10-20T09:00:00Z"
+        type: string
+      first_name:
+        description: First name
+        example: Jane
+        type: string
+      id:
+        description: User id
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
+        type: string
+      is_active:
+        description: Active flag
+        example: true
+        type: boolean
+      last_name:
+        description: Last name
+        example: Doe
+        type: string
+      phone_number:
+        description: Phone
+        example: "+2348012345678"
+        type: string
+      role:
+        allOf:
+        - $ref: '#/definitions/user.UserRole'
+        description: user or admin
+        example: user
+      updated_at:
+        description: Updated
+        example: "2026-10-22T09:00:00Z"
+        type: string
+      wallet:
+        allOf:
+        - $ref: '#/definitions/user.UserWallet'
+        description: Primary wallet
+    type: object
+  user.UserRole:
+    enum:
+    - user
+    - admin
+    type: string
+    x-enum-varnames:
+    - RoleUser
+    - RoleAdmin
+  user.UserWallet:
+    properties:
+      address:
+        description: Stellar account id
+        example: GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5
+        type: string
+      balance:
+        allOf:
+        - $ref: '#/definitions/user.WalletBalance'
+        description: USDC and XLM balances
+      id:
+        description: Wallet id, needed by PIN, transfer and export endpoints
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
+        type: string
+    type: object
+  user.WalletBalance:
+    properties:
+      usdc:
+        description: USDC
+        example: 5.03
+        type: number
+      xlm:
+        description: XLM
+        example: 10002
+        type: number
     type: object
   utils.ApiResponse:
     properties:
@@ -521,35 +1998,77 @@ definitions:
       status_code:
         type: integer
     type: object
+  utils.PageMeta:
+    properties:
+      limit:
+        description: Page size
+        example: 20
+        type: integer
+      page:
+        description: Current page, from 1
+        example: 1
+        type: integer
+      total:
+        description: Total matching rows
+        example: 57
+        type: integer
+      total_pages:
+        description: Total pages
+        example: 3
+        type: integer
+    type: object
   wallet.PathPaymentResult:
     properties:
       dest_amount:
+        description: Amount delivered
+        example: "10.5"
         type: string
       dest_asset:
+        description: Asset delivered
+        example: USDC
         type: string
       destination:
+        description: Recipient account
+        example: GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5
         type: string
       fee_xlm:
+        description: Network fee in XLM
+        example: 1e-05
         type: number
       payment_status:
+        description: 'Invoice payments only: detected until the chain data is verified,
+          then verified, invalid or failed'
+        example: detected
         type: string
       source_amount:
+        description: Amount spent, 7 decimals
+        example: "12.3456789"
         type: string
       source_asset:
+        description: Asset spent
+        example: XLM
         type: string
       transaction_hash:
+        description: Stellar transaction hash
+        example: a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7
         type: string
     type: object
   wallet.PayInvoiceDTO:
     properties:
       invoice_id:
+        description: Invoice to pay
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
         type: string
       pin:
+        description: Wallet PIN
+        example: "4821"
         type: string
       source_asset:
+        description: 'Asset spent from this wallet: XLM or USDC'
         enum:
         - XLM
         - USDC
+        example: XLM
         type: string
     required:
     - invoice_id
@@ -559,29 +2078,52 @@ definitions:
   wallet.SetPinDTO:
     properties:
       pin:
+        description: 4-8 digits
+        example: "4821"
         maxLength: 8
         minLength: 4
         type: string
     required:
     - pin
     type: object
+  wallet.StellarWalletBalance:
+    properties:
+      usdc:
+        description: USDC balance
+        example: 5.03
+        type: number
+      xlm:
+        description: XLM balance
+        example: 10002
+        type: number
+    type: object
   wallet.TransferDTO:
     properties:
       amount:
+        description: Amount the recipient receives, in dest_asset
+        example: "10.5"
         type: string
       dest_asset:
+        description: 'Asset received: XLM or USDC'
         enum:
         - XLM
         - USDC
+        example: USDC
         type: string
       destination_address:
+        description: Stellar account id (G...)
+        example: GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5
         type: string
       pin:
+        description: Wallet PIN
+        example: "4821"
         type: string
       source_asset:
+        description: 'Asset spent: XLM or USDC'
         enum:
         - XLM
         - USDC
+        example: XLM
         type: string
     required:
     - amount
@@ -590,12 +2132,82 @@ definitions:
     - pin
     - source_asset
     type: object
+  wallet.WalletExportResult:
+    properties:
+      private_key:
+        description: Secret key. Never log or cache
+        example: S...
+        type: string
+      wallet_address:
+        description: Stellar account id
+        example: GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5
+        type: string
+    type: object
+  wallet.WalletLookupResult:
+    properties:
+      user_id:
+        description: Wallet owner
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
+        type: string
+      wallet_address:
+        description: Recipient account
+        example: GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5
+        type: string
+    type: object
+  wallet.WalletResponseDto:
+    properties:
+      balance:
+        $ref: '#/definitions/wallet.StellarWalletBalance'
+      chain:
+        description: Chain
+        example: stellar
+        type: string
+      created_at:
+        description: Created
+        example: "2026-10-20T09:00:00Z"
+        type: string
+      id:
+        description: Wallet id
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
+        type: string
+      is_active:
+        description: Active flag
+        example: true
+        type: boolean
+      is_primary:
+        description: Receives invoice payments
+        example: true
+        type: boolean
+      private_key:
+        description: Only returned once, at creation
+        type: string
+      tag:
+        description: Label
+        example: Main
+        type: string
+      user_id:
+        description: Owner
+        example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
+        type: string
+      wallet_address:
+        description: Stellar account id
+        example: GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5
+        type: string
+    type: object
 host: localhost:4000
 info:
   contact:
     email: davidhero125@gmail.com
     name: API Support
-  description: Invoice management and payment platform API
+  description: |-
+    Invoice management and Stellar payment platform API.
+
+    **Envelope.** Every JSON response is `{status_code, message, data?, error?}`; the types below describe `data`.
+    **Auth.** Send `Authorization: Bearer <access_token>`. Tokens last 1 hour; deleted or deactivated users are rejected immediately. Unverified emails cannot sign in.
+    **Pagination.** List endpoints take `page` (from 1) and `limit`, and return `{items, meta:{page, limit, total, total_pages}}`. Old names (`page_count`, `count`, `payments`, `invoice`, `data`, `notifications`) still work and are deprecated.
+    **Amounts.** Payment records and requests use 7-decimal strings (`"2.0300000"`). Invoice and ledger fields are JSON numbers in the invoice currency. `/transaction/stats` and `/transaction/inflow` are integer cents. See docs/api-conventions.md.
+    **Payments (v2).** Invoices are paid with a text memo equal to the invoice's `payment_reference`. The server detects and verifies the on-chain payment; only a verified payment marks an invoice paid. Status values and transitions are in docs/payment-status-model.md.
+    **Errors.** 400 invalid input, 401 missing or invalid token, 403 not allowed, 404 not found, 409 state conflict, 422 valid request that fails a business rule, 502 Stellar unreachable, 500 unexpected.
   license:
     name: MIT
   termsOfService: http://swagger.io/terms/
@@ -604,12 +2216,34 @@ info:
 paths:
   /admin/config/network:
     get:
-      description: Returns whether the platform is running on testnet or mainnet
+      description: Stellar network (testnet or mainnet) used by payment detection
+        and wallet operations. Seeded as `testnet` at server start when unset.
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Current network
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/admin.NetworkConfig'
+              type: object
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Caller is not an admin
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Network config not set
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -620,23 +2254,36 @@ paths:
     patch:
       consumes:
       - application/json
-      description: Switches platform between testnet and mainnet. Value stored encrypted.
+      description: Switch the Stellar network. Payment cursors are kept per network,
+        so switching does not replay history.
       parameters:
-      - description: 'stage: testnet or mainnet'
+      - description: Target network
         in: body
         name: body
         required: true
         schema:
-          type: object
+          $ref: '#/definitions/admin.NetworkUpdate'
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Network updated
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "400":
-          description: Bad Request
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Caller is not an admin
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -646,7 +2293,8 @@ paths:
       - admin
   /admin/invoices:
     get:
-      description: Paginated list of invoices with optional status and search filters
+      description: Paginated list of every invoice on the platform, filterable by
+        status and search term.
       parameters:
       - description: Page number
         in: query
@@ -668,11 +2316,28 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Invoices page
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/admin.AdminInvoiceList'
+              type: object
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Missing or invalid bearer token
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "403":
-          description: Forbidden
+          description: Caller is not an admin
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -682,7 +2347,7 @@ paths:
       - admin
   /admin/invoices/{id}:
     get:
-      description: Returns invoice details for admin view
+      description: One invoice with its creator, regardless of owner.
       parameters:
       - description: Invoice ID
         in: path
@@ -693,7 +2358,7 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Invoice
           schema:
             allOf:
             - $ref: '#/definitions/utils.ApiResponse'
@@ -701,8 +2366,24 @@ paths:
                 data:
                   $ref: '#/definitions/admin.AdminInvoiceRow'
               type: object
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Caller is not an admin
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
         "404":
-          description: Not Found
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -712,8 +2393,10 @@ paths:
       - admin
   /admin/payments:
     get:
-      description: Paginated list of every detected payment, including unmatched,
-        invalid and failed ones
+      description: Every detected payment on the platform, newest first, including
+        unmatched, invalid and failed ones. `search` matches transaction hash, payment
+        reference, sender or recipient address and invoice number. Records include
+        `merchant_email`.
       parameters:
       - description: Page number
         in: query
@@ -735,7 +2418,7 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Payments page
           schema:
             allOf:
             - $ref: '#/definitions/utils.ApiResponse'
@@ -743,8 +2426,20 @@ paths:
                 data:
                   $ref: '#/definitions/payments.PaymentList'
               type: object
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
         "403":
-          description: Forbidden
+          description: Caller is not an admin
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -754,12 +2449,13 @@ paths:
       - admin
   /admin/stats:
     get:
-      description: Returns total users, invoices, revenue, and overdue counts
+      description: 'Platform-wide totals: users, invoices, paid and overdue invoice
+        counts and total revenue. Admin only.'
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Platform statistics
           schema:
             allOf:
             - $ref: '#/definitions/utils.ApiResponse'
@@ -767,8 +2463,16 @@ paths:
                 data:
                   $ref: '#/definitions/admin.AdminStats'
               type: object
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
         "403":
-          description: Forbidden
+          description: Caller is not an admin
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -778,7 +2482,8 @@ paths:
       - admin
   /admin/transactions:
     get:
-      description: Paginated list of all platform transactions
+      description: Paginated ledger of every transaction. `search` matches user email
+        and invoice number.
       parameters:
       - description: Page number
         in: query
@@ -796,11 +2501,28 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Transactions page
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/admin.AdminTransactionList'
+              type: object
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Missing or invalid bearer token
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "403":
-          description: Forbidden
+          description: Caller is not an admin
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -810,7 +2532,8 @@ paths:
       - admin
   /admin/users:
     get:
-      description: Paginated list of users with optional search
+      description: Paginated list of all users, newest first. `search` matches email
+        and name.
       parameters:
       - description: Page number
         in: query
@@ -828,11 +2551,28 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Users page
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/admin.AdminUserList'
+              type: object
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Missing or invalid bearer token
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "403":
-          description: Forbidden
+          description: Caller is not an admin
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -842,7 +2582,8 @@ paths:
       - admin
   /admin/users/{id}:
     delete:
-      description: Permanently deletes a user account
+      description: Permanently delete a user and the data that cascades from it. Users
+        who own invoices cannot be deleted.
       parameters:
       - description: User ID
         in: path
@@ -853,11 +2594,31 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: User deleted
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Caller is not an admin
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "404":
-          description: Not Found
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "409":
+          description: User owns invoices
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -866,7 +2627,9 @@ paths:
       tags:
       - admin
     get:
-      description: Returns full user details for admin view
+      description: User record plus wallets, the 10 most recent transactions and the
+        20 most recent activity entries. Empty collections are returned as `[]`, never
+        `null`.
       parameters:
       - description: User ID
         in: path
@@ -877,16 +2640,32 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: User detail
           schema:
             allOf:
             - $ref: '#/definitions/utils.ApiResponse'
             - properties:
                 data:
-                  $ref: '#/definitions/admin.AdminUserRow'
+                  $ref: '#/definitions/admin.AdminUserDetail'
               type: object
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Caller is not an admin
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
         "404":
-          description: Not Found
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -896,7 +2675,8 @@ paths:
       - admin
   /admin/users/{id}/activity:
     get:
-      description: Returns paginated activity log entries for a specific user
+      description: Paginated audit trail of one user's actions (logins, invoice and
+        wallet events).
       parameters:
       - description: User ID
         in: path
@@ -915,11 +2695,32 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Activity page
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/admin.AdminActivityList'
+              type: object
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Caller is not an admin
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "404":
-          description: Not Found
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -929,7 +2730,7 @@ paths:
       - admin
   /admin/users/{id}/invoices:
     get:
-      description: Returns paginated invoices created by a specific user
+      description: Paginated invoices created by one user.
       parameters:
       - description: User ID
         in: path
@@ -948,11 +2749,32 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Invoices page
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/admin.AdminInvoiceList'
+              type: object
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Caller is not an admin
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "404":
-          description: Not Found
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -962,7 +2784,8 @@ paths:
       - admin
   /admin/users/{id}/reset-password:
     post:
-      description: Generates OTP and sends password reset email to the user
+      description: Send the user a password reset email. The admin never sees the
+        new password.
       parameters:
       - description: User ID
         in: path
@@ -973,11 +2796,27 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Reset email sent
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Caller is not an admin
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "404":
-          description: Not Found
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -987,8 +2826,8 @@ paths:
       - admin
   /admin/users/{id}/status:
     patch:
-      description: Activates or deactivates a user account. Pass ?active=true to activate,
-        ?active=false to deactivate/suspend.
+      description: Activate or deactivate a user. A deactivated user's existing tokens
+        are rejected on the next request.
       parameters:
       - description: User ID
         in: path
@@ -1004,15 +2843,27 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Status updated
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "400":
-          description: Bad Request
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Caller is not an admin
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "404":
-          description: Not Found
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -1022,7 +2873,7 @@ paths:
       - admin
   /admin/users/{id}/transactions:
     get:
-      description: Returns paginated transactions belonging to a specific user
+      description: Paginated ledger entries belonging to one user.
       parameters:
       - description: User ID
         in: path
@@ -1041,11 +2892,32 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Transactions page
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/admin.AdminTransactionList'
+              type: object
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Caller is not an admin
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "404":
-          description: Not Found
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -1057,6 +2929,7 @@ paths:
     post:
       consumes:
       - application/json
+      description: Change the password of the signed-in user. Requires the old password.
       parameters:
       - description: Old and new passwords
         in: body
@@ -1068,11 +2941,28 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Password changed
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/auth.PasswordChangedResult'
+              type: object
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Old password is wrong
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -1082,15 +2972,21 @@ paths:
       - auth
   /auth/clear:
     post:
+      description: Flush the Redis cache (invoice and search caches, email tokens).
+        Admin only; use sparingly.
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Cache cleared
           schema:
             $ref: '#/definitions/utils.ApiResponse'
-        "403":
-          description: Forbidden
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -1102,6 +2998,9 @@ paths:
     post:
       consumes:
       - application/json
+      description: Email and password sign-in. Unverified accounts get 403 with a
+        fresh verification email and no token. Returns an access token valid for 1
+        hour.
       parameters:
       - description: Login credentials
         in: body
@@ -1113,15 +3012,28 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Signed in
           schema:
-            $ref: '#/definitions/utils.ApiResponse'
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/auth.AuthLoginResponseDto'
+              type: object
         "400":
-          description: Bad Request
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
-        "401":
-          description: Unauthorized
+        "403":
+          description: Email not verified (data.email_verified=false), or wrong password
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Unknown email
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       summary: Login
@@ -1129,6 +3041,7 @@ paths:
       - auth
   /auth/resend-email:
     get:
+      description: Send the verification email again.
       parameters:
       - description: Email address
         in: query
@@ -1139,11 +3052,15 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Email sent
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "400":
-          description: Bad Request
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       summary: Resend email verification
@@ -1151,6 +3068,7 @@ paths:
       - auth
   /auth/reset:
     get:
+      description: Email a password reset link to the address, if an account exists.
       parameters:
       - description: Email address
         in: query
@@ -1161,11 +3079,15 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Reset email sent
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "400":
-          description: Bad Request
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       summary: Request password reset email
@@ -1175,6 +3097,7 @@ paths:
     post:
       consumes:
       - application/json
+      description: Set a new password using the token from the reset email.
       parameters:
       - description: Reset token and new password
         in: body
@@ -1186,11 +3109,15 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Password updated
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "400":
-          description: Bad Request
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       summary: Reset password via token
@@ -1200,6 +3127,8 @@ paths:
     post:
       consumes:
       - application/json
+      description: Create a password account and send a verification email. The user
+        cannot log in until the email is verified.
       parameters:
       - description: Sign up credentials
         in: body
@@ -1211,11 +3140,24 @@ paths:
       - application/json
       responses:
         "201":
-          description: Created
+          description: Account created
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/auth.AuthResponseDto'
+              type: object
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
-        "400":
-          description: Bad Request
+        "403":
+          description: Email already registered
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       summary: Register a new user
@@ -1225,6 +3167,10 @@ paths:
     post:
       consumes:
       - application/json
+      description: Google sign-in. The server verifies the Google ID token (RS256
+        signature, issuer, audience = GOOGLE_CLIENT_ID, expiry, verified email) and
+        ignores any email or user id sent by the client. Creates an email-verified
+        account on first use.
       parameters:
       - description: Provider token payload
         in: body
@@ -1236,27 +3182,58 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Signed in (new accounts get SocialSignupResult)
           schema:
-            $ref: '#/definitions/utils.ApiResponse'
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/auth.AuthLoginResponseDto'
+              type: object
         "400":
-          description: Bad Request
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
-      summary: Social auth (Google / GitHub)
+        "401":
+          description: Invalid Google token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Account uses password login
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "503":
+          description: Google keys unreachable
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+      summary: Google sign-in; the server verifies the Google ID token
       tags:
       - auth
   /auth/token:
     post:
+      description: Exchange the current access token for a 7-day refresh token.
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Refresh token issued
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/auth.RefreshTokenResult'
+              type: object
+        "401":
+          description: Missing or invalid bearer token
           schema:
             $ref: '#/definitions/utils.ApiResponse'
-        "401":
-          description: Unauthorized
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -1266,6 +3243,8 @@ paths:
       - auth
   /auth/validate:
     get:
+      description: Confirm an email address with the token from the verification email.
+        An expired token triggers a new email.
       parameters:
       - description: Verification token
         in: query
@@ -1280,11 +3259,15 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Email verified
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "400":
-          description: Bad Request
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       summary: Validate email address
@@ -1292,6 +3275,8 @@ paths:
       - auth
   /comments:
     get:
+      description: Paginated comments for an invoice with reply threads, reactions
+        and per-viewer edit flags.
       parameters:
       - description: Invoice ID
         in: query
@@ -1318,7 +3303,20 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Comments page
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/invoice_comments.GetCommentsResponse'
+              type: object
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       summary: List comments for an invoice
@@ -1327,6 +3325,8 @@ paths:
     post:
       consumes:
       - application/json
+      description: Comment on an invoice as a signed-in user or a guest holding a
+        valid invoice access token.
       parameters:
       - description: Comment data (include token for guest access)
         in: body
@@ -1338,11 +3338,20 @@ paths:
       - application/json
       responses:
         "201":
-          description: Created
+          description: Comment created
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/invoice_comments.CreateCommentQueryResponse'
+              type: object
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
-        "400":
-          description: Bad Request
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       summary: Post a comment on an invoice
@@ -1350,6 +3359,7 @@ paths:
       - comments
   /comments/{id}:
     get:
+      description: One comment with replies and reactions.
       parameters:
       - description: Comment ID
         in: path
@@ -1360,7 +3370,24 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Comment
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/invoice_comments.CommentResponse'
+              type: object
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       summary: Get comment by ID
@@ -1369,6 +3396,7 @@ paths:
     patch:
       consumes:
       - application/json
+      description: Edit your own comment.
       parameters:
       - description: Comment ID
         in: path
@@ -1385,11 +3413,28 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Comment updated
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/invoice_comments.CommentResponse'
+              type: object
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
-        "400":
-          description: Bad Request
+        "403":
+          description: Not the author
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       summary: Edit a comment
@@ -1397,6 +3442,7 @@ paths:
       - comments
   /comments/{id}/react:
     delete:
+      description: Remove your emoji reaction. Returns the updated reaction counts.
       parameters:
       - description: Comment ID
         in: path
@@ -1416,7 +3462,26 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Reaction counts
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/invoice_comments.ReactionCount'
+                  type: array
+              type: object
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       summary: Remove emoji reaction from a comment
@@ -1425,6 +3490,7 @@ paths:
     post:
       consumes:
       - application/json
+      description: Add an emoji reaction. Returns the updated reaction counts.
       parameters:
       - description: Comment ID
         in: path
@@ -1441,7 +3507,26 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Reaction counts
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/invoice_comments.ReactionCount'
+                  type: array
+              type: object
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       summary: Add emoji reaction to a comment
@@ -1449,6 +3534,8 @@ paths:
       - comments
   /invoice:
     get:
+      description: Paginated invoices created by the signed-in user. Each invoice
+        includes `payment_status` and `payment_reference`. Admins may pass `user_id`.
       parameters:
       - description: Filter by status
         in: query
@@ -1458,9 +3545,9 @@ paths:
         in: query
         name: page
         type: integer
-      - description: Items per page
+      - description: Items per page (page_count is a deprecated alias)
         in: query
-        name: page_count
+        name: limit
         type: integer
       - description: ASC or DESC
         in: query
@@ -1474,11 +3561,24 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Invoices page
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/invoice.InvoiceListResponseDto'
+              type: object
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -1489,6 +3589,9 @@ paths:
     post:
       consumes:
       - multipart/form-data
+      description: Create a draft invoice from a multipart form (optional logo upload).
+        Each invoice gets a unique `payment_reference` used as the on-chain memo.
+        Totals are recomputed server-side.
       parameters:
       - description: Invoice title
         in: formData
@@ -1523,11 +3626,24 @@ paths:
       - application/json
       responses:
         "201":
-          description: Created
+          description: Invoice created
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/invoice.InvoiceResponse'
+              type: object
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
-        "400":
-          description: Bad Request
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -1537,6 +3653,8 @@ paths:
       - invoices
   /invoice/{id}:
     delete:
+      description: Delete an unpaid invoice you own. Invoices that have payment records
+        return 409.
       parameters:
       - description: Invoice ID
         in: path
@@ -1547,11 +3665,31 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Invoice deleted
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Invoice is paid
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Not the owner
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "409":
+          description: Invoice has payment records
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -1560,6 +3698,7 @@ paths:
       tags:
       - invoices
     get:
+      description: One invoice owned by the caller (or any invoice for admins).
       parameters:
       - description: Invoice ID
         in: path
@@ -1570,11 +3709,32 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Invoice
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/invoice.InvoiceResponse'
+              type: object
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Not the owner
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -1585,6 +3745,8 @@ paths:
     post:
       consumes:
       - application/json
+      description: Edit a draft invoice with a JSON body. Only invoices in `draft`
+        status can be edited; any other status returns 400.
       parameters:
       - description: Invoice ID
         in: path
@@ -1601,11 +3763,27 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Invoice updated
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "400":
-          description: Bad Request
+          description: Invoice is not a draft
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Not the owner
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -1616,6 +3794,9 @@ paths:
     put:
       consumes:
       - multipart/form-data
+      description: Update an invoice from a multipart form (items, logo, fields).
+        Invoices that are sent, viewed, paid, overdue, payment_detected, invalid_payment
+        or expired are locked and reported as 404 'Invoice not found'.
       parameters:
       - description: Invoice ID
         in: path
@@ -1634,11 +3815,32 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Invoice updated
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/invoice.InvoiceUpdateResult'
+              type: object
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
-        "400":
-          description: Bad Request
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Not the owner
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -1650,6 +3852,10 @@ paths:
     patch:
       consumes:
       - application/json
+      description: Re-verify a Stellar transaction hash against the invoice and mark
+        it paid only if the chain confirms it. The caller's claim alone never marks
+        anything paid. 404 when the hash is unknown, 422 when the transaction does
+        not satisfy the invoice, 502 when Stellar is unreachable.
       parameters:
       - description: Invoice ID
         in: path
@@ -1666,11 +3872,40 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Verified and paid
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/invoice.MarkPaidResult'
+              type: object
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
-        "400":
-          description: Bad Request
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Not the owner
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Transaction not found on Stellar
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "422":
+          description: Transaction does not satisfy this invoice
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "502":
+          description: Stellar unreachable
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -1680,6 +3915,7 @@ paths:
       - invoices
   /invoice/download/{id}/pdf:
     get:
+      description: Render the invoice as a PDF file.
       parameters:
       - description: Invoice ID
         in: path
@@ -1690,11 +3926,23 @@ paths:
       - application/pdf
       responses:
         "200":
-          description: OK
+          description: PDF file
           schema:
             type: file
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
         "404":
-          description: Not Found
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -1704,6 +3952,8 @@ paths:
       - invoices
   /invoice/overview:
     get:
+      description: Invoice counts per status for one month, shaped for a pie chart.
+        `month` is YYYY-MM and defaults to the current month.
       parameters:
       - description: Month filter (YYYY-MM)
         in: query
@@ -1713,7 +3963,26 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Chart data
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/invoice.InvoiceStatusDataPoint'
+                  type: array
+              type: object
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -1723,6 +3992,7 @@ paths:
       - invoices
   /invoice/query:
     get:
+      description: Full-text search over the signed-in user's invoices.
       parameters:
       - description: Search term
         in: query
@@ -1741,11 +4011,24 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Matching invoices
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/invoice.InvoiceSearchResult'
+              type: object
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -1757,6 +4040,9 @@ paths:
     post:
       consumes:
       - application/json
+      description: Payer approves or rejects an invoice. Works signed out (email link)
+        or signed in; creators cannot review their own invoices. Changes state, so
+        it is POST.
       parameters:
       - description: Invoice ID
         in: path
@@ -1773,11 +4059,23 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Review recorded
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "400":
-          description: Bad Request
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Creator cannot review own invoice
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       summary: Approve or reject invoice (payer action)
@@ -1785,6 +4083,8 @@ paths:
       - invoices
   /invoice/search:
     get:
+      description: Public invoice view by id or short url, used by payers. The creator's
+        email and phone number are hidden from everyone except the creator and admins.
       parameters:
       - description: Invoice ID
         in: query
@@ -1798,11 +4098,20 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Invoice
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/invoice.InvoiceResponse'
+              type: object
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
-        "400":
-          description: Bad Request
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       summary: Search invoice by ID or URL (public)
@@ -1812,6 +4121,9 @@ paths:
     post:
       consumes:
       - application/json
+      description: Email the invoice to 1-10 recipients and snapshot the creator's
+        primary wallet as the payment recipient. Only `draft` or `viewed` invoices
+        can be sent.
       parameters:
       - description: Invoice ID
         in: path
@@ -1828,11 +4140,32 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Invoice sent
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/invoice.InvoiceSendResult'
+              type: object
+        "400":
+          description: Invalid email, or invoice already sent or paid
           schema:
             $ref: '#/definitions/utils.ApiResponse'
-        "400":
-          description: Bad Request
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Access denied
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -1842,11 +4175,25 @@ paths:
       - invoices
   /invoice/stats:
     get:
+      description: Invoice counts per status for the signed-in user.
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Counts
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/invoice.InvoiceStatsResponse'
+              type: object
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -1856,14 +4203,17 @@ paths:
       - invoices
   /notification:
     get:
+      description: Paginated notifications of the signed-in user, with unread and
+        read counts. Merchants are notified when a payment is verified, rejected or
+        arrives unmatched.
       parameters:
       - description: Page number
         in: query
         name: page
         type: integer
-      - description: Items per page
+      - description: Items per page, default 15 (count is a deprecated alias)
         in: query
-        name: count
+        name: limit
         type: integer
       - description: ASC or DESC
         in: query
@@ -1877,11 +4227,24 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Notifications page
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/notifications.GetNotificationResponse'
+              type: object
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -1891,6 +4254,7 @@ paths:
       - notifications
   /notification/{id}:
     delete:
+      description: Delete one notification.
       parameters:
       - description: Notification ID
         in: path
@@ -1901,11 +4265,23 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Deleted
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -1914,6 +4290,7 @@ paths:
       tags:
       - notifications
     get:
+      description: One notification of the signed-in user.
       parameters:
       - description: Notification ID
         in: path
@@ -1924,11 +4301,28 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Notification
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/notifications.Notification'
+              type: object
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -1937,6 +4331,7 @@ paths:
       tags:
       - notifications
     patch:
+      description: Mark one notification viewed or unviewed.
       parameters:
       - description: Notification ID
         in: path
@@ -1952,11 +4347,23 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Updated
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -1966,6 +4373,9 @@ paths:
       - notifications
   /payments:
     get:
+      description: 'Payments received on the signed-in user''s wallets, newest first:
+        verified, invalid, unmatched and failed. Filter with `status`. `limit` above
+        100 falls back to 20.'
       parameters:
       - description: verification status
         in: query
@@ -1983,7 +4393,7 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Payments page
           schema:
             allOf:
             - $ref: '#/definitions/utils.ApiResponse'
@@ -1991,6 +4401,18 @@ paths:
                 data:
                   $ref: '#/definitions/payments.PaymentList'
               type: object
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
       security:
       - BearerAuth: []
       summary: Payments received on the user's wallets (verified, invalid, unmatched,
@@ -1999,6 +4421,9 @@ paths:
       - payments-v2
   /payments/{id}:
     get:
+      description: One payment received on the signed-in user's wallets, with `failure_code`,
+        per-check results (`checks`) and the invoice's `expected` values. 404 for
+        payments on other users' wallets.
       parameters:
       - description: Payment ID
         in: path
@@ -2009,7 +4434,7 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Payment
           schema:
             allOf:
             - $ref: '#/definitions/utils.ApiResponse'
@@ -2017,8 +4442,20 @@ paths:
                 data:
                   $ref: '#/definitions/payments.PaymentRecord'
               type: object
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
         "404":
-          description: Not Found
+          description: Payment not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -2028,6 +4465,10 @@ paths:
       - payments-v2
   /payments/invoice/{id}:
     get:
+      description: 'Owner view of one invoice''s payment request: recipient, memo
+        reference, expected amount and asset, derived `payment_status`, and every
+        payment recorded against it. Fixes the recipient to the creator''s primary
+        wallet on first use.'
       parameters:
       - description: Invoice ID
         in: path
@@ -2038,7 +4479,7 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Payment request with records
           schema:
             allOf:
             - $ref: '#/definitions/utils.ApiResponse'
@@ -2046,6 +4487,30 @@ paths:
                 data:
                   $ref: '#/definitions/payments.PaymentRequest'
               type: object
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Not the owner
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Invoice not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "409":
+          description: Creator has no active Stellar wallet
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
       security:
       - BearerAuth: []
       summary: Payment request, status and payment records of an invoice (v2)
@@ -2053,6 +4518,9 @@ paths:
       - payments-v2
   /payments/request/{invoice_url}:
     get:
+      description: 'Public payer view by invoice short url: what to send, to whom
+        and with which memo. Draft invoices return 404. See docs/payment-status-model.md
+        for status values.'
       parameters:
       - description: Invoice URL
         in: path
@@ -2063,7 +4531,7 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Payment request
           schema:
             allOf:
             - $ref: '#/definitions/utils.ApiResponse'
@@ -2071,6 +4539,22 @@ paths:
                 data:
                   $ref: '#/definitions/payments.PaymentRequest'
               type: object
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Invoice not found or still a draft
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "409":
+          description: Invoice cannot accept payment yet
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
       summary: Payment instructions for an invoice, by invoice url (v2)
       tags:
       - payments-v2
@@ -2078,8 +4562,10 @@ paths:
     post:
       consumes:
       - application/json
-      description: 'Returns 404 when the hash is unknown to Stellar. Status values
-        and transitions: docs/payment-status-model.md (v2)'
+      description: 'Re-check a Stellar transaction hash against invoices. The caller
+        never supplies the outcome: the chain is read and every payment operation
+        is evaluated. Only payments on the caller''s own wallets are returned. 404
+        when the hash is unknown to Stellar; 502 only when Stellar is unreachable.'
       parameters:
       - description: Transaction hash
         in: body
@@ -2091,7 +4577,7 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Payments found in the transaction
           schema:
             allOf:
             - $ref: '#/definitions/utils.ApiResponse'
@@ -2101,6 +4587,26 @@ paths:
                     $ref: '#/definitions/payments.PaymentRecord'
                   type: array
               type: object
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Transaction not found on Stellar
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "502":
+          description: Stellar unreachable
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
       security:
       - BearerAuth: []
       summary: Re-check a Stellar transaction against invoices
@@ -2110,6 +4616,7 @@ paths:
     post:
       consumes:
       - application/json
+      description: Finish onboarding by setting name, business name, phone and country.
       parameters:
       - description: Profile data
         in: body
@@ -2121,11 +4628,24 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Profile completed
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/user.CompleteProfileResult'
+              type: object
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
-        "400":
-          description: Bad Request
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -2136,6 +4656,8 @@ paths:
     put:
       consumes:
       - application/json
+      description: Update the signed-in user's profile. Returns the profile with the
+        primary wallet, including `wallet.id`.
       parameters:
       - description: Fields to update
         in: body
@@ -2147,11 +4669,24 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Profile updated
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/user.UserProfileDto'
+              type: object
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
-        "400":
-          description: Bad Request
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -2161,6 +4696,8 @@ paths:
       - user
   /profile/{id}:
     get:
+      description: Profile and primary wallet of a user. Users may read only their
+        own profile; admins may read any.
       parameters:
       - description: User ID
         in: path
@@ -2171,15 +4708,28 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Profile
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/user.ProfileResult'
+              type: object
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid bearer token
           schema:
             $ref: '#/definitions/utils.ApiResponse'
-        "403":
-          description: Forbidden
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -2189,15 +4739,26 @@ paths:
       - user
   /profile/me:
     get:
+      description: Profile, completion flag and primary wallet (with `wallet.id` and
+        balances) of the signed-in user.
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Profile
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/user.ProfileResult'
+              type: object
+        "401":
+          description: Missing or invalid bearer token
           schema:
             $ref: '#/definitions/utils.ApiResponse'
-        "401":
-          description: Unauthorized
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -2207,15 +4768,27 @@ paths:
       - user
   /recurring:
     get:
+      description: All recurring schedules of the signed-in user.
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Schedules
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/recurring.RecurringInvoice'
+                  type: array
+              type: object
+        "401":
+          description: Missing or invalid bearer token
           schema:
             $ref: '#/definitions/utils.ApiResponse'
-        "401":
-          description: Unauthorized
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -2226,6 +4799,7 @@ paths:
     post:
       consumes:
       - application/json
+      description: Create a schedule that generates an invoice at each interval.
       parameters:
       - description: Recurring invoice config
         in: body
@@ -2237,11 +4811,24 @@ paths:
       - application/json
       responses:
         "201":
-          description: Created
+          description: Schedule created
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/recurring.RecurringCreated'
+              type: object
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
-        "400":
-          description: Bad Request
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -2251,6 +4838,7 @@ paths:
       - recurring
   /recurring/{id}:
     delete:
+      description: Delete a schedule. Invoices it already generated are kept.
       parameters:
       - description: Recurring ID
         in: path
@@ -2261,11 +4849,23 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Schedule deleted
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -2274,6 +4874,7 @@ paths:
       tags:
       - recurring
     get:
+      description: One recurring schedule.
       parameters:
       - description: Recurring ID
         in: path
@@ -2284,11 +4885,28 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Schedule
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/recurring.RecurringInvoice'
+              type: object
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -2299,6 +4917,8 @@ paths:
     patch:
       consumes:
       - application/json
+      description: Pause or resume a schedule (`is_active`), change its `interval`
+        or reset its next run date (`start_date`).
       parameters:
       - description: Recurring ID
         in: path
@@ -2315,11 +4935,23 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Schedule updated
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "400":
-          description: Bad Request
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -2329,28 +4961,71 @@ paths:
       - recurring
   /transaction:
     get:
+      description: 'Paginated ledger of the signed-in user: payments received, funding
+        and outgoing transfers. `status` is the on-chain result; verification results
+        live on /payments.'
       parameters:
       - description: Filter by user ID (admin only)
         in: query
         name: user_id
         type: string
-      - description: Page number
+      - description: Page number, from 1 (default 1)
         in: query
         name: page
         type: integer
-      - description: Items per page
+      - description: Items per page, default 10 (page_count is a deprecated alias)
         in: query
-        name: page_count
+        name: limit
         type: integer
+      - description: Ledger type
+        enum:
+        - payment
+        - withdrawal
+        - funding
+        - path_payment
+        in: query
+        name: type
+        type: string
+      - description: On-chain status
+        enum:
+        - pending
+        - confirmed
+        - failed
+        - aborted
+        - refunded
+        in: query
+        name: status
+        type: string
+      - description: Created on or after this date, YYYY-MM-DD
+        in: query
+        name: from
+        type: string
+      - description: Created on or before this date, YYYY-MM-DD
+        in: query
+        name: to
+        type: string
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Transactions page
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/transactions.PaginatedTransactions'
+              type: object
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -2360,6 +5035,7 @@ paths:
       - transactions
   /transaction/{id}:
     delete:
+      description: Delete a ledger entry owned by the caller.
       parameters:
       - description: Transaction ID
         in: path
@@ -2370,11 +5046,23 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Deleted
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -2384,6 +5072,7 @@ paths:
       - transactions
   /transaction/id/{id}:
     get:
+      description: One ledger entry owned by the caller.
       parameters:
       - description: Transaction ID
         in: path
@@ -2394,11 +5083,28 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Transaction
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/transactions.GetTransactionDto'
+              type: object
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -2408,6 +5114,8 @@ paths:
       - transactions
   /transaction/inflow:
     get:
+      description: Paid-invoice cash flow grouped by month between `from` and `to`
+        (YYYY-MM-DD). Amounts are integer cents.
       parameters:
       - description: Start date (YYYY-MM-DD)
         in: query
@@ -2421,11 +5129,24 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Cash flow
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/transactions.GetTransactionCashFlowResponse'
+              type: object
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -2435,15 +5156,26 @@ paths:
       - transactions
   /transaction/stats:
     get:
+      description: 'Invoice amounts per bucket, in integer cents: total, pending (draft,
+        sent, viewed, pending, payment_detected), paid, overdue, expired and invalid_payment.'
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Amounts in cents
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/transactions.GetTransactionOverViewResponse'
+              type: object
+        "401":
+          description: Missing or invalid bearer token
           schema:
             $ref: '#/definitions/utils.ApiResponse'
-        "401":
-          description: Unauthorized
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -2453,8 +5185,8 @@ paths:
       - transactions
   /transaction/status/{id}:
     get:
-      description: Returns the current status of a transaction and a Stellar explorer
-        link for the on-chain record
+      description: Look up the on-chain status of a ledger entry and its explorer
+        link.
       parameters:
       - description: Transaction ID
         in: path
@@ -2465,11 +5197,28 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Status
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/transactions.PaymentStatusResult'
+              type: object
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Missing or invalid bearer token
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "404":
-          description: Not Found
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -2479,15 +5228,30 @@ paths:
       - transactions
   /wallet:
     post:
+      description: Create the user's Stellar wallet (one per user). On testnet the
+        account is funded in the background. The secret key is stored encrypted.
       produces:
       - application/json
       responses:
         "201":
-          description: Created
+          description: Wallet created
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/wallet.WalletResponseDto'
+              type: object
+        "401":
+          description: Missing or invalid bearer token
           schema:
             $ref: '#/definitions/utils.ApiResponse'
-        "401":
-          description: Unauthorized
+        "403":
+          description: 'Wallet limit reached: one wallet per user'
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -2497,6 +5261,7 @@ paths:
       - wallet
   /wallet/{id}:
     get:
+      description: Wallet details with live balances.
       parameters:
       - description: Wallet ID
         in: path
@@ -2507,11 +5272,32 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Wallet
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/wallet.WalletResponseDto'
+              type: object
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: 'Access denied: not your wallet'
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -2523,8 +5309,10 @@ paths:
     post:
       consumes:
       - application/json
-      description: Pays invoice using PathPaymentStrictReceive — payer sends source
-        asset, vendor receives exact USDC
+      description: Pay an invoice from this wallet, swapping XLM or USDC to the invoice
+        asset by path payment. The memo is the invoice's payment reference; settlement
+        happens only after the chain payment is verified, so `payment_status` may
+        still be `detected`.
       parameters:
       - description: Wallet ID
         in: path
@@ -2541,7 +5329,7 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Payment submitted
           schema:
             allOf:
             - $ref: '#/definitions/utils.ApiResponse'
@@ -2550,11 +5338,27 @@ paths:
                   $ref: '#/definitions/wallet.PathPaymentResult'
               type: object
         "400":
-          description: Bad Request
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
-        "403":
-          description: Forbidden
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "409":
+          description: Another payment for this invoice is being verified
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "502":
+          description: Stellar rejected the transaction
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -2566,8 +5370,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Sends assets to any Stellar address. Uses path payment if source
-        and dest assets differ
+      description: Transfer XLM or USDC to another address, converting between assets
+        by path payment if needed.
       parameters:
       - description: Wallet ID
         in: path
@@ -2584,7 +5388,7 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Transfer submitted
           schema:
             allOf:
             - $ref: '#/definitions/utils.ApiResponse'
@@ -2593,11 +5397,23 @@ paths:
                   $ref: '#/definitions/wallet.PathPaymentResult'
               type: object
         "400":
-          description: Bad Request
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
-        "403":
-          description: Forbidden
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "502":
+          description: Stellar rejected the transaction
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -2609,7 +5425,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Sets a 4-8 digit numeric PIN required for all payment operations
+      description: Set or replace the 4-8 digit PIN that authorises payments from
+        this wallet.
       parameters:
       - description: Wallet ID
         in: path
@@ -2626,11 +5443,27 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: PIN set
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "400":
-          description: Bad Request
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Not your wallet
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -2640,6 +5473,8 @@ paths:
       - wallet
   /wallet/export/{id}:
     get:
+      description: 'Return the wallet''s secret key. Sensitive: the response must
+        never be logged or cached.'
       parameters:
       - description: Wallet ID
         in: path
@@ -2650,11 +5485,32 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Secret key
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/wallet.WalletExportResult'
+              type: object
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
         "401":
-          description: Unauthorized
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "403":
+          description: Not your wallet
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -2664,8 +5520,7 @@ paths:
       - wallet
   /wallet/lookup:
     get:
-      description: Returns the primary wallet address for a given user email. Used
-        to resolve a recipient before sending payment.
+      description: Find the primary wallet address of a user by email, for transfers.
       parameters:
       - description: Recipient email address
         in: query
@@ -2676,11 +5531,24 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Wallet address
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/wallet.WalletLookupResult'
+              type: object
+        "400":
+          description: Invalid request body or parameters
           schema:
             $ref: '#/definitions/utils.ApiResponse'
-        "404":
-          description: Not Found
+        "401":
+          description: Missing or invalid bearer token
+          schema:
+            $ref: '#/definitions/utils.ApiResponse'
+        "500":
+          description: Unexpected server error
           schema:
             $ref: '#/definitions/utils.ApiResponse'
       security:
@@ -2695,3 +5563,27 @@ securityDefinitions:
     name: Authorization
     type: apiKey
 swagger: "2.0"
+tags:
+- description: Sign-up, sign-in (password and Google), email verification and password
+    reset
+  name: auth
+- description: Profile of the signed-in user and its primary wallet
+  name: profile
+- description: Create, send, review, search and download invoices
+  name: invoices
+- description: Payment requests, detected on-chain payments and their verification
+    results
+  name: payments-v2
+- description: Stellar wallet, PIN, transfers and invoice payments
+  name: wallet
+- description: Ledger of money movements and cash-flow statistics
+  name: transactions
+- description: In-app notifications, including payment outcomes
+  name: notifications
+- description: Invoice comment threads and reactions
+  name: comments
+- description: Recurring invoice schedules
+  name: recurring
+- description: Admin-only management of users, invoices, transactions, payments and
+    network settings
+  name: admin

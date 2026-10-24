@@ -22,12 +22,15 @@ func NewUserHandler(h *UserService) *UserHandler {
 
 // CompleteProfileHandler godoc
 // @Summary      Complete user profile
+// @Description  Finish onboarding by setting name, business name, phone and country.
 // @Tags         user
 // @Accept       json
 // @Produce      json
 // @Param        body  body      CompleteProfileRequestDto  true  "Profile data"
-// @Success      200   {object}  utils.ApiResponse
-// @Failure      400   {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=CompleteProfileResult}  "Profile completed"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /profile [post]
 func (h *UserHandler) CompleteProfileHandler(w http.ResponseWriter, r *http.Request) {
@@ -53,12 +56,15 @@ func (h *UserHandler) CompleteProfileHandler(w http.ResponseWriter, r *http.Requ
 
 // GetProfile godoc
 // @Summary      Get user profile by ID
+// @Description  Profile and primary wallet of a user. Users may read only their own profile; admins may read any.
 // @Tags         user
 // @Produce      json
 // @Param        id   path  string  true  "User ID"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      401  {object}  utils.ApiResponse
-// @Failure      403  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=ProfileResult}  "Profile"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /profile/{id} [get]
 func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
@@ -84,12 +90,15 @@ func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 
 // UpdateProfile godoc
 // @Summary      Update user profile
+// @Description  Update the signed-in user's profile. Returns the profile with the primary wallet, including `wallet.id`.
 // @Tags         user
 // @Accept       json
 // @Produce      json
 // @Param        body  body      UpdateProfileDto  true  "Fields to update"
-// @Success      200   {object}  utils.ApiResponse
-// @Failure      400   {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=UserProfileDto}  "Profile updated"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /profile [put]
 func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
@@ -121,10 +130,12 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 
 // GetMe godoc
 // @Summary      Get current authenticated user
+// @Description  Profile, completion flag and primary wallet (with `wallet.id` and balances) of the signed-in user.
 // @Tags         user
 // @Produce      json
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      401  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=ProfileResult}  "Profile"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /profile/me [get]
 func (h *UserHandler) GetMe(w http.ResponseWriter, r *http.Request) {

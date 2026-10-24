@@ -23,14 +23,17 @@ func NewNotificationHandler(ns *NotificationService) *NotificationHandler {
 
 // GetNotifications godoc
 // @Summary      Get user notifications
+// @Description  Paginated notifications of the signed-in user, with unread and read counts. Merchants are notified when a payment is verified, rejected or arrives unmatched.
 // @Tags         notifications
 // @Produce      json
 // @Param        page     query  int     false  "Page number"
-// @Param        count    query  int     false  "Items per page"
+// @Param        limit    query  int     false  "Items per page, default 15 (count is a deprecated alias)"
 // @Param        order_by query  string  false  "ASC or DESC"
 // @Param        viewed   query  bool    false  "Filter by viewed status"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      401  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=GetNotificationResponse}  "Notifications page"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /notification [get]
 func (h *NotificationHandler) GetNotifications(w http.ResponseWriter, r *http.Request) {
@@ -55,11 +58,8 @@ func (h *NotificationHandler) GetNotifications(w http.ResponseWriter, r *http.Re
 		dto.Page = 1
 	}
 
-	count := r.URL.Query().Get("count")
-	if count != "" {
-		if c, err := strconv.Atoi(count); err == nil {
-			dto.Count = c
-		}
+	if c, ok := utils.PageSizeParam(r, "count"); ok {
+		dto.Count = c
 	} else {
 		dto.Count = 15
 	}
@@ -89,12 +89,16 @@ func (h *NotificationHandler) GetNotifications(w http.ResponseWriter, r *http.Re
 
 // EditNotificationViewStatus godoc
 // @Summary      Mark notification as viewed/unviewed
+// @Description  Mark one notification viewed or unviewed.
 // @Tags         notifications
 // @Produce      json
 // @Param        id      path   string  true  "Notification ID"
 // @Param        viewed  query  bool    true  "Viewed status"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      401  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse  "Updated"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /notification/{id} [patch]
 func (h *NotificationHandler) EditNotificationViewStatus(w http.ResponseWriter, r *http.Request) {
@@ -123,11 +127,15 @@ func (h *NotificationHandler) EditNotificationViewStatus(w http.ResponseWriter, 
 
 // DeleteNotificationById godoc
 // @Summary      Delete a notification
+// @Description  Delete one notification.
 // @Tags         notifications
 // @Produce      json
 // @Param        id  path  string  true  "Notification ID"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      401  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse  "Deleted"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /notification/{id} [delete]
 func (h *NotificationHandler) DeleteNotificationById(w http.ResponseWriter, r *http.Request) {
@@ -147,11 +155,15 @@ func (h *NotificationHandler) DeleteNotificationById(w http.ResponseWriter, r *h
 
 // GetNotificationById godoc
 // @Summary      Get notification by ID
+// @Description  One notification of the signed-in user.
 // @Tags         notifications
 // @Produce      json
 // @Param        id  path  string  true  "Notification ID"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      401  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=Notification}  "Notification"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /notification/{id} [get]
 func (h *NotificationHandler) GetNotificationById(w http.ResponseWriter, r *http.Request) {

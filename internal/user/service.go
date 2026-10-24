@@ -75,7 +75,7 @@ func (s *UserService) FindUserByEmail(ctx context.Context, email string) (*UserP
 		user.Country = &country_.String
 	}
 
-	if password.Valid{
+	if password.Valid {
 		user.Password = &password.String
 	}
 

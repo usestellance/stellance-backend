@@ -30,11 +30,13 @@ func NewAdminHandler(s *AdminService) *AdminHandler {
 
 // GetStats godoc
 // @Summary      Get platform statistics
-// @Description  Returns total users, invoices, revenue, and overdue counts
+// @Description  Platform-wide totals: users, invoices, paid and overdue invoice counts and total revenue. Admin only.
 // @Tags         admin
 // @Produce      json
-// @Success      200  {object}  utils.ApiResponse{data=AdminStats}
-// @Failure      403  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=AdminStats}  "Platform statistics"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      403  {object}  utils.ApiResponse  "Caller is not an admin"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /admin/stats [get]
 func (h *AdminHandler) GetStats(w http.ResponseWriter, r *http.Request) {
@@ -44,14 +46,17 @@ func (h *AdminHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 
 // ListUsers godoc
 // @Summary      List all users
-// @Description  Paginated list of users with optional search
+// @Description  Paginated list of all users, newest first. `search` matches email and name.
 // @Tags         admin
 // @Produce      json
 // @Param        page    query  int     false  "Page number"
 // @Param        limit   query  int     false  "Items per page"
 // @Param        search  query  string  false  "Search by email or name"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      403  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=AdminUserList}  "Users page"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      403  {object}  utils.ApiResponse  "Caller is not an admin"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /admin/users [get]
 func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
@@ -64,12 +69,16 @@ func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 
 // GetUser godoc
 // @Summary      Get user by ID
-// @Description  Returns full user details for admin view
+// @Description  User record plus wallets, the 10 most recent transactions and the 20 most recent activity entries. Empty collections are returned as `[]`, never `null`.
 // @Tags         admin
 // @Produce      json
 // @Param        id   path  string  true  "User ID"
-// @Success      200  {object}  utils.ApiResponse{data=AdminUserRow}
-// @Failure      404  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=AdminUserDetail}  "User detail"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      403  {object}  utils.ApiResponse  "Caller is not an admin"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /admin/users/{id} [get]
 func (h *AdminHandler) GetUser(w http.ResponseWriter, r *http.Request) {
@@ -84,14 +93,17 @@ func (h *AdminHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 
 // SetUserStatus godoc
 // @Summary      Set user active status
-// @Description  Activates or deactivates a user account. Pass ?active=true to activate, ?active=false to deactivate/suspend.
+// @Description  Activate or deactivate a user. A deactivated user's existing tokens are rejected on the next request.
 // @Tags         admin
 // @Produce      json
 // @Param        id      path   string  true  "User ID"
 // @Param        active  query  bool    true  "true = activate, false = deactivate"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      400  {object}  utils.ApiResponse
-// @Failure      404  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse  "Status updated"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      403  {object}  utils.ApiResponse  "Caller is not an admin"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /admin/users/{id}/status [patch]
 func (h *AdminHandler) SetUserStatus(w http.ResponseWriter, r *http.Request) {
@@ -116,12 +128,17 @@ func (h *AdminHandler) SetUserStatus(w http.ResponseWriter, r *http.Request) {
 
 // DeleteUser godoc
 // @Summary      Delete user
-// @Description  Permanently deletes a user account
+// @Description  Permanently delete a user and the data that cascades from it. Users who own invoices cannot be deleted.
 // @Tags         admin
 // @Produce      json
 // @Param        id   path  string  true  "User ID"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      404  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse  "User deleted"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      403  {object}  utils.ApiResponse  "Caller is not an admin"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      409  {object}  utils.ApiResponse  "User owns invoices"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /admin/users/{id} [delete]
 func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
@@ -136,15 +153,18 @@ func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 
 // ListInvoices godoc
 // @Summary      List all invoices
-// @Description  Paginated list of invoices with optional status and search filters
+// @Description  Paginated list of every invoice on the platform, filterable by status and search term.
 // @Tags         admin
 // @Produce      json
 // @Param        page    query  int     false  "Page number"
 // @Param        limit   query  int     false  "Items per page"
 // @Param        status  query  string  false  "Filter by status (draft, paid, overdue, cancelled)"
 // @Param        search  query  string  false  "Search by invoice number or email"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      403  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=AdminInvoiceList}  "Invoices page"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      403  {object}  utils.ApiResponse  "Caller is not an admin"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /admin/invoices [get]
 func (h *AdminHandler) ListInvoices(w http.ResponseWriter, r *http.Request) {
@@ -158,12 +178,16 @@ func (h *AdminHandler) ListInvoices(w http.ResponseWriter, r *http.Request) {
 
 // GetInvoice godoc
 // @Summary      Get invoice by ID (admin)
-// @Description  Returns invoice details for admin view
+// @Description  One invoice with its creator, regardless of owner.
 // @Tags         admin
 // @Produce      json
 // @Param        id   path  string  true  "Invoice ID"
-// @Success      200  {object}  utils.ApiResponse{data=AdminInvoiceRow}
-// @Failure      404  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=AdminInvoiceRow}  "Invoice"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      403  {object}  utils.ApiResponse  "Caller is not an admin"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /admin/invoices/{id} [get]
 func (h *AdminHandler) GetInvoice(w http.ResponseWriter, r *http.Request) {
@@ -178,14 +202,17 @@ func (h *AdminHandler) GetInvoice(w http.ResponseWriter, r *http.Request) {
 
 // ListTransactions godoc
 // @Summary      List all transactions
-// @Description  Paginated list of all platform transactions
+// @Description  Paginated ledger of every transaction. `search` matches user email and invoice number.
 // @Tags         admin
 // @Produce      json
 // @Param        page    query  int     false  "Page number"
 // @Param        limit   query  int     false  "Items per page"
 // @Param        search  query  string  false  "Search by user email or invoice number"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      403  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=AdminTransactionList}  "Transactions page"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      403  {object}  utils.ApiResponse  "Caller is not an admin"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /admin/transactions [get]
 func (h *AdminHandler) ListTransactions(w http.ResponseWriter, r *http.Request) {
@@ -198,14 +225,18 @@ func (h *AdminHandler) ListTransactions(w http.ResponseWriter, r *http.Request) 
 
 // GetUserInvoices godoc
 // @Summary      Get invoices for a user
-// @Description  Returns paginated invoices created by a specific user
+// @Description  Paginated invoices created by one user.
 // @Tags         admin
 // @Produce      json
 // @Param        id     path   string  true   "User ID"
 // @Param        page   query  int     false  "Page number"
 // @Param        limit  query  int     false  "Items per page"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      404  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=AdminInvoiceList}  "Invoices page"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      403  {object}  utils.ApiResponse  "Caller is not an admin"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /admin/users/{id}/invoices [get]
 func (h *AdminHandler) GetUserInvoices(w http.ResponseWriter, r *http.Request) {
@@ -222,14 +253,18 @@ func (h *AdminHandler) GetUserInvoices(w http.ResponseWriter, r *http.Request) {
 
 // GetUserTransactions godoc
 // @Summary      Get transactions for a user
-// @Description  Returns paginated transactions belonging to a specific user
+// @Description  Paginated ledger entries belonging to one user.
 // @Tags         admin
 // @Produce      json
 // @Param        id     path   string  true   "User ID"
 // @Param        page   query  int     false  "Page number"
 // @Param        limit  query  int     false  "Items per page"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      404  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=AdminTransactionList}  "Transactions page"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      403  {object}  utils.ApiResponse  "Caller is not an admin"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /admin/users/{id}/transactions [get]
 func (h *AdminHandler) GetUserTransactions(w http.ResponseWriter, r *http.Request) {
@@ -246,14 +281,18 @@ func (h *AdminHandler) GetUserTransactions(w http.ResponseWriter, r *http.Reques
 
 // GetUserActivity godoc
 // @Summary      Get user activity log
-// @Description  Returns paginated activity log entries for a specific user
+// @Description  Paginated audit trail of one user's actions (logins, invoice and wallet events).
 // @Tags         admin
 // @Produce      json
 // @Param        id     path   string  true   "User ID"
 // @Param        page   query  int     false  "Page number"
 // @Param        limit  query  int     false  "Items per page"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      404  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=AdminActivityList}  "Activity page"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      403  {object}  utils.ApiResponse  "Caller is not an admin"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /admin/users/{id}/activity [get]
 func (h *AdminHandler) GetUserActivity(w http.ResponseWriter, r *http.Request) {
@@ -270,12 +309,16 @@ func (h *AdminHandler) GetUserActivity(w http.ResponseWriter, r *http.Request) {
 
 // AdminResetUserPassword godoc
 // @Summary      Admin-triggered password reset
-// @Description  Generates OTP and sends password reset email to the user
+// @Description  Send the user a password reset email. The admin never sees the new password.
 // @Tags         admin
 // @Produce      json
 // @Param        id  path  string  true  "User ID"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      404  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse  "Reset email sent"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      403  {object}  utils.ApiResponse  "Caller is not an admin"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /admin/users/{id}/reset-password [post]
 func (h *AdminHandler) AdminResetUserPassword(w http.ResponseWriter, r *http.Request) {
@@ -290,10 +333,14 @@ func (h *AdminHandler) AdminResetUserPassword(w http.ResponseWriter, r *http.Req
 
 // GetStellarNetwork godoc
 // @Summary      Get current Stellar network stage
-// @Description  Returns whether the platform is running on testnet or mainnet
+// @Description  Stellar network (testnet or mainnet) used by payment detection and wallet operations. Seeded as `testnet` at server start when unset.
 // @Tags         admin
 // @Produce      json
-// @Success      200  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=NetworkConfig}  "Current network"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      403  {object}  utils.ApiResponse  "Caller is not an admin"
+// @Failure      404  {object}  utils.ApiResponse  "Network config not set"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /admin/config/network [get]
 func (h *AdminHandler) GetStellarNetwork(w http.ResponseWriter, r *http.Request) {
@@ -303,19 +350,20 @@ func (h *AdminHandler) GetStellarNetwork(w http.ResponseWriter, r *http.Request)
 
 // SetStellarNetwork godoc
 // @Summary      Switch Stellar network stage
-// @Description  Switches platform between testnet and mainnet. Value stored encrypted.
+// @Description  Switch the Stellar network. Payment cursors are kept per network, so switching does not replay history.
 // @Tags         admin
 // @Accept       json
 // @Produce      json
-// @Param        body  body  object  true  "stage: testnet or mainnet"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      400  {object}  utils.ApiResponse
+// @Param        body  body  NetworkUpdate  true  "Target network"
+// @Success      200  {object}  utils.ApiResponse  "Network updated"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      403  {object}  utils.ApiResponse  "Caller is not an admin"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /admin/config/network [patch]
 func (h *AdminHandler) SetStellarNetwork(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Stage string `json:"stage"`
-	}
+	var body NetworkUpdate
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Stage == "" {
 		utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "stage is required"})
 		return

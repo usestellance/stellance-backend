@@ -2,11 +2,14 @@ package middleware
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
+	"github.com/The-True-Hooha/stellance-backend/pkg/config"
 	jwt_ "github.com/The-True-Hooha/stellance-backend/pkg/jwt"
 	"github.com/The-True-Hooha/stellance-backend/pkg/logger"
+	"github.com/jackc/pgx/v5"
 )
 
 type AuthMiddleware struct {
@@ -46,6 +49,17 @@ func (authM *AuthMiddleware) Authenticate(h http.Handler) http.Handler {
 			return
 		}
 
+		active, err := userIsActive(r.Context(), claims.UserId)
+		if err != nil {
+			log.Error("failed to check user status", "error", err)
+			http.Error(w, "service unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		if !active {
+			http.Error(w, "kindly login to complete this request", http.StatusUnauthorized)
+			return
+		}
+
 		ctx := context.WithValue(r.Context(), UserIDKey, claims.UserId)
 		ctx = context.WithValue(ctx, UserEmailKey, claims.Email)
 		ctx = context.WithValue(ctx, RoleKey, claims.Role)
@@ -55,6 +69,16 @@ func (authM *AuthMiddleware) Authenticate(h http.Handler) http.Handler {
 
 		h.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// userIsActive revokes the sessions of deleted or deactivated users: tokens are stateless.
+func userIsActive(ctx context.Context, userID string) (bool, error) {
+	var active bool
+	err := config.GetAppContainer().Postgres.QueryRow(ctx, `SELECT is_active FROM users WHERE id = $1`, userID).Scan(&active)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return active, err
 }
 
 func (authM *AuthMiddleware) RequireAdmin(h http.Handler) http.Handler {
@@ -91,6 +115,10 @@ func (authM *AuthMiddleware) IsPublicAccess(h http.Handler) http.Handler {
 		claims, err := jwt_.JwtTokenService().ValidateAccessToken(token)
 		if err != nil {
 			log.Debug("token validation failed", "error", err)
+			h.ServeHTTP(w, r)
+			return
+		}
+		if active, err := userIsActive(r.Context(), claims.UserId); err != nil || !active {
 			h.ServeHTTP(w, r)
 			return
 		}

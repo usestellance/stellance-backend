@@ -92,20 +92,20 @@ const (
 
 // Expected is what the invoice demanded, in the same units as the payment record.
 type Expected struct {
-	Amount           string  `json:"amount"`
-	AssetCode        string  `json:"asset_code"`
-	AssetIssuer      *string `json:"asset_issuer"`
-	Recipient        string  `json:"recipient"`
-	PaymentReference string  `json:"payment_reference"`
+	Amount           string  `json:"amount" example:"100.0000000"`                                                    // Exact amount, 7 decimals
+	AssetCode        string  `json:"asset_code" example:"USDC"`                                                       // Asset code
+	AssetIssuer      *string `json:"asset_issuer" example:"GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"` // Issuer; null for XLM
+	Recipient        string  `json:"recipient" example:"GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"`    // Required recipient
+	PaymentReference string  `json:"payment_reference" example:"STL-B9371BD3A173"`                                    // Required memo
 }
 
 type Checks struct {
-	Recipient string `json:"recipient"`
-	Asset     string `json:"asset"`
-	Amount    string `json:"amount"`
-	Reference string `json:"reference"`
-	Success   string `json:"success"`
-	Invoice   string `json:"invoice"`
+	Recipient string `json:"recipient" enums:"pass,fail,skip"`
+	Asset     string `json:"asset" enums:"pass,fail,skip"`
+	Amount    string `json:"amount" enums:"pass,fail,skip"`
+	Reference string `json:"reference" enums:"pass,fail,skip"`
+	Success   string `json:"success" enums:"pass,fail,skip"`
+	Invoice   string `json:"invoice" enums:"pass,fail,skip"`
 }
 
 type verdict struct {

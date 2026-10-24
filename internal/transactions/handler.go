@@ -24,10 +24,12 @@ func NewTransactionHandler(ts *TransactionService) *TransactionHandler {
 
 // GetTransactionOverviewCard godoc
 // @Summary      Get transaction overview stats
+// @Description  Invoice amounts per bucket, in integer cents: total, pending (draft, sent, viewed, pending, payment_detected), paid, overdue, expired and invalid_payment.
 // @Tags         transactions
 // @Produce      json
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      401  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=GetTransactionOverViewResponse}  "Amounts in cents"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /transaction/stats [get]
 func (h *TransactionHandler) GetTransactionOverviewCard(w http.ResponseWriter, r *http.Request) {
@@ -42,11 +44,15 @@ func (h *TransactionHandler) GetTransactionOverviewCard(w http.ResponseWriter, r
 
 // GetTransactionByIdHandler godoc
 // @Summary      Get transaction by ID
+// @Description  One ledger entry owned by the caller.
 // @Tags         transactions
 // @Produce      json
 // @Param        id  path  string  true  "Transaction ID"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      401  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=GetTransactionDto}  "Transaction"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /transaction/id/{id} [get]
 func (h *TransactionHandler) GetTransactionByIdHandler(w http.ResponseWriter, r *http.Request) {
@@ -63,11 +69,15 @@ func (h *TransactionHandler) GetTransactionByIdHandler(w http.ResponseWriter, r 
 
 // DeleteTransactionByIdHandler godoc
 // @Summary      Delete a transaction
+// @Description  Delete a ledger entry owned by the caller.
 // @Tags         transactions
 // @Produce      json
 // @Param        id  path  string  true  "Transaction ID"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      401  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse  "Deleted"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /transaction/{id} [delete]
 func (h *TransactionHandler) DeleteTransactionByIdHandler(w http.ResponseWriter, r *http.Request) {
@@ -84,13 +94,20 @@ func (h *TransactionHandler) DeleteTransactionByIdHandler(w http.ResponseWriter,
 
 // GetManyTransactionHandler godoc
 // @Summary      List transactions
+// @Description  Paginated ledger of the signed-in user: payments received, funding and outgoing transfers. `status` is the on-chain result; verification results live on /payments.
 // @Tags         transactions
 // @Produce      json
 // @Param        user_id     query  string  false  "Filter by user ID (admin only)"
-// @Param        page        query  int     false  "Page number"
-// @Param        page_count  query  int     false  "Items per page"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      401  {object}  utils.ApiResponse
+// @Param        page        query  int     false  "Page number, from 1 (default 1)"
+// @Param        limit       query  int     false  "Items per page, default 10 (page_count is a deprecated alias)"
+// @Param        type        query  string  false  "Ledger type" Enums(payment, withdrawal, funding, path_payment)
+// @Param        status      query  string  false  "On-chain status" Enums(pending, confirmed, failed, aborted, refunded)
+// @Param        from        query  string  false  "Created on or after this date, YYYY-MM-DD"
+// @Param        to          query  string  false  "Created on or before this date, YYYY-MM-DD"
+// @Success      200  {object}  utils.ApiResponse{data=PaginatedTransactions}  "Transactions page"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /transaction [get]
 func (handler *TransactionHandler) GetManyTransactionHandler(w http.ResponseWriter, r *http.Request) {
@@ -143,11 +160,8 @@ func (handler *TransactionHandler) GetManyTransactionHandler(w http.ResponseWrit
 		dto.Page = 1
 	}
 
-	pageCount := r.URL.Query().Get("page_count")
-	if pageCount != "" {
-		if ps, err := strconv.Atoi(pageCount); err == nil {
-			dto.Count = ps
-		}
+	if ps, ok := utils.PageSizeParam(r, "page_count"); ok {
+		dto.Count = ps
 	} else {
 		dto.Count = 10
 	}
@@ -163,12 +177,15 @@ func (handler *TransactionHandler) GetManyTransactionHandler(w http.ResponseWrit
 
 // CheckPaymentStatus godoc
 // @Summary      Check payment status
-// @Description  Returns the current status of a transaction and a Stellar explorer link for the on-chain record
+// @Description  Look up the on-chain status of a ledger entry and its explorer link.
 // @Tags         transactions
 // @Produce      json
 // @Param        id  path  string  true  "Transaction ID"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      404  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=PaymentStatusResult}  "Status"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /transaction/status/{id} [get]
 func (h *TransactionHandler) CheckPaymentStatus(w http.ResponseWriter, r *http.Request) {
@@ -184,12 +201,15 @@ func (h *TransactionHandler) CheckPaymentStatus(w http.ResponseWriter, r *http.R
 
 // GetTransactionCashFlow godoc
 // @Summary      Get cash flow over a date range
+// @Description  Paid-invoice cash flow grouped by month between `from` and `to` (YYYY-MM-DD). Amounts are integer cents.
 // @Tags         transactions
 // @Produce      json
 // @Param        from  query  string  false  "Start date (YYYY-MM-DD)"
 // @Param        to    query  string  false  "End date (YYYY-MM-DD)"
-// @Success      200   {object}  utils.ApiResponse
-// @Failure      401   {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=GetTransactionCashFlowResponse}  "Cash flow"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /transaction/inflow [get]
 func (th *TransactionHandler) GetTransactionCashFlow(w http.ResponseWriter, r *http.Request) {

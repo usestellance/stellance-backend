@@ -29,7 +29,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns whether the platform is running on testnet or mainnet",
+                "description": "Stellar network (testnet or mainnet) used by payment detection and wallet operations. Seeded as ` + "`" + `testnet` + "`" + ` at server start when unset.",
                 "produces": [
                     "application/json"
                 ],
@@ -39,7 +39,43 @@ const docTemplate = `{
                 "summary": "Get current Stellar network stage",
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Current network",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/admin.NetworkConfig"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Caller is not an admin",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Network config not set",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -52,7 +88,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Switches platform between testnet and mainnet. Value stored encrypted.",
+                "description": "Switch the Stellar network. Payment cursors are kept per network, so switching does not replay history.",
                 "consumes": [
                     "application/json"
                 ],
@@ -65,24 +101,42 @@ const docTemplate = `{
                 "summary": "Switch Stellar network stage",
                 "parameters": [
                     {
-                        "description": "stage: testnet or mainnet",
+                        "description": "Target network",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "type": "object"
+                            "$ref": "#/definitions/admin.NetworkUpdate"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Network updated",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Caller is not an admin",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -97,7 +151,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Paginated list of invoices with optional status and search filters",
+                "description": "Paginated list of every invoice on the platform, filterable by status and search term.",
                 "produces": [
                     "application/json"
                 ],
@@ -133,13 +187,43 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Invoices page",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/admin.AdminInvoiceList"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "403": {
-                        "description": "Forbidden",
+                        "description": "Caller is not an admin",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -154,7 +238,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns invoice details for admin view",
+                "description": "One invoice with its creator, regardless of owner.",
                 "produces": [
                     "application/json"
                 ],
@@ -173,7 +257,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Invoice",
                         "schema": {
                             "allOf": [
                                 {
@@ -190,8 +274,32 @@ const docTemplate = `{
                             ]
                         }
                     },
+                    "400": {
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Caller is not an admin",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
                     "404": {
-                        "description": "Not Found",
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -206,7 +314,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Paginated list of every detected payment, including unmatched, invalid and failed ones",
+                "description": "Every detected payment on the platform, newest first, including unmatched, invalid and failed ones. ` + "`" + `search` + "`" + ` matches transaction hash, payment reference, sender or recipient address and invoice number. Records include ` + "`" + `merchant_email` + "`" + `.",
                 "produces": [
                     "application/json"
                 ],
@@ -242,7 +350,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Payments page",
                         "schema": {
                             "allOf": [
                                 {
@@ -259,8 +367,26 @@ const docTemplate = `{
                             ]
                         }
                     },
+                    "400": {
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
                     "403": {
-                        "description": "Forbidden",
+                        "description": "Caller is not an admin",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -275,7 +401,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns total users, invoices, revenue, and overdue counts",
+                "description": "Platform-wide totals: users, invoices, paid and overdue invoice counts and total revenue. Admin only.",
                 "produces": [
                     "application/json"
                 ],
@@ -285,7 +411,7 @@ const docTemplate = `{
                 "summary": "Get platform statistics",
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Platform statistics",
                         "schema": {
                             "allOf": [
                                 {
@@ -302,8 +428,20 @@ const docTemplate = `{
                             ]
                         }
                     },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
                     "403": {
-                        "description": "Forbidden",
+                        "description": "Caller is not an admin",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -318,7 +456,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Paginated list of all platform transactions",
+                "description": "Paginated ledger of every transaction. ` + "`" + `search` + "`" + ` matches user email and invoice number.",
                 "produces": [
                     "application/json"
                 ],
@@ -348,13 +486,43 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Transactions page",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/admin.AdminTransactionList"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "403": {
-                        "description": "Forbidden",
+                        "description": "Caller is not an admin",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -369,7 +537,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Paginated list of users with optional search",
+                "description": "Paginated list of all users, newest first. ` + "`" + `search` + "`" + ` matches email and name.",
                 "produces": [
                     "application/json"
                 ],
@@ -399,13 +567,43 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Users page",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/admin.AdminUserList"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "403": {
-                        "description": "Forbidden",
+                        "description": "Caller is not an admin",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -420,7 +618,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns full user details for admin view",
+                "description": "User record plus wallets, the 10 most recent transactions and the 20 most recent activity entries. Empty collections are returned as ` + "`" + `[]` + "`" + `, never ` + "`" + `null` + "`" + `.",
                 "produces": [
                     "application/json"
                 ],
@@ -439,7 +637,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "User detail",
                         "schema": {
                             "allOf": [
                                 {
@@ -449,15 +647,39 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/admin.AdminUserRow"
+                                            "$ref": "#/definitions/admin.AdminUserDetail"
                                         }
                                     }
                                 }
                             ]
                         }
                     },
+                    "400": {
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Caller is not an admin",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
                     "404": {
-                        "description": "Not Found",
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -470,7 +692,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Permanently deletes a user account",
+                "description": "Permanently delete a user and the data that cascades from it. Users who own invoices cannot be deleted.",
                 "produces": [
                     "application/json"
                 ],
@@ -489,13 +711,43 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "User deleted",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Caller is not an admin",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "User owns invoices",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -510,7 +762,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns paginated activity log entries for a specific user",
+                "description": "Paginated audit trail of one user's actions (logins, invoice and wallet events).",
                 "produces": [
                     "application/json"
                 ],
@@ -541,13 +793,49 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Activity page",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/admin.AdminActivityList"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Caller is not an admin",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -562,7 +850,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns paginated invoices created by a specific user",
+                "description": "Paginated invoices created by one user.",
                 "produces": [
                     "application/json"
                 ],
@@ -593,13 +881,49 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Invoices page",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/admin.AdminInvoiceList"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Caller is not an admin",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -614,7 +938,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Generates OTP and sends password reset email to the user",
+                "description": "Send the user a password reset email. The admin never sees the new password.",
                 "produces": [
                     "application/json"
                 ],
@@ -633,13 +957,37 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Reset email sent",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Caller is not an admin",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -654,7 +1002,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Activates or deactivates a user account. Pass ?active=true to activate, ?active=false to deactivate/suspend.",
+                "description": "Activate or deactivate a user. A deactivated user's existing tokens are rejected on the next request.",
                 "produces": [
                     "application/json"
                 ],
@@ -680,19 +1028,37 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Status updated",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Caller is not an admin",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -707,7 +1073,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns paginated transactions belonging to a specific user",
+                "description": "Paginated ledger entries belonging to one user.",
                 "produces": [
                     "application/json"
                 ],
@@ -738,13 +1104,49 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Transactions page",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/admin.AdminTransactionList"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Caller is not an admin",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -759,6 +1161,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Change the password of the signed-in user. Requires the old password.",
                 "consumes": [
                     "application/json"
                 ],
@@ -782,13 +1185,43 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Password changed",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/auth.PasswordChangedResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Old password is wrong",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -803,6 +1236,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Flush the Redis cache (invoice and search caches, email tokens). Admin only; use sparingly.",
                 "produces": [
                     "application/json"
                 ],
@@ -812,13 +1246,19 @@ const docTemplate = `{
                 "summary": "Clear Redis cache (admin only)",
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Cache cleared",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
-                    "403": {
-                        "description": "Forbidden",
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -828,6 +1268,7 @@ const docTemplate = `{
         },
         "/auth/login": {
             "post": {
+                "description": "Email and password sign-in. Unverified accounts get 403 with a fresh verification email and no token. Returns an access token valid for 1 hour.",
                 "consumes": [
                     "application/json"
                 ],
@@ -851,19 +1292,43 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Signed in",
                         "schema": {
-                            "$ref": "#/definitions/utils.ApiResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/auth.AuthLoginResponseDto"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
-                    "401": {
-                        "description": "Unauthorized",
+                    "403": {
+                        "description": "Email not verified (data.email_verified=false), or wrong password",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown email",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -873,6 +1338,7 @@ const docTemplate = `{
         },
         "/auth/resend-email": {
             "get": {
+                "description": "Send the verification email again.",
                 "produces": [
                     "application/json"
                 ],
@@ -891,13 +1357,19 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Email sent",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -907,6 +1379,7 @@ const docTemplate = `{
         },
         "/auth/reset": {
             "get": {
+                "description": "Email a password reset link to the address, if an account exists.",
                 "produces": [
                     "application/json"
                 ],
@@ -925,13 +1398,19 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Reset email sent",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -941,6 +1420,7 @@ const docTemplate = `{
         },
         "/auth/reset-password": {
             "post": {
+                "description": "Set a new password using the token from the reset email.",
                 "consumes": [
                     "application/json"
                 ],
@@ -964,13 +1444,19 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Password updated",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -980,6 +1466,7 @@ const docTemplate = `{
         },
         "/auth/signup": {
             "post": {
+                "description": "Create a password account and send a verification email. The user cannot log in until the email is verified.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1003,13 +1490,37 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "201": {
-                        "description": "Created",
+                        "description": "Account created",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/auth.AuthResponseDto"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
-                    "400": {
-                        "description": "Bad Request",
+                    "403": {
+                        "description": "Email already registered",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -1019,6 +1530,7 @@ const docTemplate = `{
         },
         "/auth/social": {
             "post": {
+                "description": "Google sign-in. The server verifies the Google ID token (RS256 signature, issuer, audience = GOOGLE_CLIENT_ID, expiry, verified email) and ignores any email or user id sent by the client. Creates an email-verified account on first use.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1028,7 +1540,7 @@ const docTemplate = `{
                 "tags": [
                     "auth"
                 ],
-                "summary": "Social auth (Google / GitHub)",
+                "summary": "Google sign-in; the server verifies the Google ID token",
                 "parameters": [
                     {
                         "description": "Provider token payload",
@@ -1042,13 +1554,49 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Signed in (new accounts get SocialSignupResult)",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/auth.AuthLoginResponseDto"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
-                    "400": {
-                        "description": "Bad Request",
+                    "401": {
+                        "description": "Invalid Google token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Account uses password login",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Google keys unreachable",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -1063,6 +1611,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Exchange the current access token for a 7-day refresh token.",
                 "produces": [
                     "application/json"
                 ],
@@ -1072,13 +1621,31 @@ const docTemplate = `{
                 "summary": "Refresh access token",
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Refresh token issued",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/auth.RefreshTokenResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
-                    "401": {
-                        "description": "Unauthorized",
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -1088,6 +1655,7 @@ const docTemplate = `{
         },
         "/auth/validate": {
             "get": {
+                "description": "Confirm an email address with the token from the verification email. An expired token triggers a new email.",
                 "produces": [
                     "application/json"
                 ],
@@ -1112,13 +1680,19 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Email verified",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -1128,6 +1702,7 @@ const docTemplate = `{
         },
         "/comments": {
             "get": {
+                "description": "Paginated comments for an invoice with reply threads, reactions and per-viewer edit flags.",
                 "produces": [
                     "application/json"
                 ],
@@ -1170,7 +1745,31 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Comments page",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/invoice_comments.GetCommentsResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -1178,6 +1777,7 @@ const docTemplate = `{
                 }
             },
             "post": {
+                "description": "Comment on an invoice as a signed-in user or a guest holding a valid invoice access token.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1201,13 +1801,31 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "201": {
-                        "description": "Created",
+                        "description": "Comment created",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/invoice_comments.CreateCommentQueryResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
-                    "400": {
-                        "description": "Bad Request",
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -1217,6 +1835,7 @@ const docTemplate = `{
         },
         "/comments/{id}": {
             "get": {
+                "description": "One comment with replies and reactions.",
                 "produces": [
                     "application/json"
                 ],
@@ -1235,7 +1854,37 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Comment",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/invoice_comments.CommentResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -1243,6 +1892,7 @@ const docTemplate = `{
                 }
             },
             "patch": {
+                "description": "Edit your own comment.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1273,13 +1923,43 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Comment updated",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/invoice_comments.CommentResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
-                    "400": {
-                        "description": "Bad Request",
+                    "403": {
+                        "description": "Not the author",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -1289,6 +1969,7 @@ const docTemplate = `{
         },
         "/comments/{id}/react": {
             "post": {
+                "description": "Add an emoji reaction. Returns the updated reaction counts.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1319,7 +2000,40 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Reaction counts",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/invoice_comments.ReactionCount"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -1327,6 +2041,7 @@ const docTemplate = `{
                 }
             },
             "delete": {
+                "description": "Remove your emoji reaction. Returns the updated reaction counts.",
                 "produces": [
                     "application/json"
                 ],
@@ -1358,7 +2073,40 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Reaction counts",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/invoice_comments.ReactionCount"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -1373,6 +2121,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Paginated invoices created by the signed-in user. Each invoice includes ` + "`" + `payment_status` + "`" + ` and ` + "`" + `payment_reference` + "`" + `. Admins may pass ` + "`" + `user_id` + "`" + `.",
                 "produces": [
                     "application/json"
                 ],
@@ -1395,8 +2144,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Items per page",
-                        "name": "page_count",
+                        "description": "Items per page (page_count is a deprecated alias)",
+                        "name": "limit",
                         "in": "query"
                     },
                     {
@@ -1414,13 +2163,37 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Invoices page",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/invoice.InvoiceListResponseDto"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -1433,6 +2206,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Create a draft invoice from a multipart form (optional logo upload). Each invoice gets a unique ` + "`" + `payment_reference` + "`" + ` used as the on-chain memo. Totals are recomputed server-side.",
                 "consumes": [
                     "multipart/form-data"
                 ],
@@ -1488,13 +2262,37 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "201": {
-                        "description": "Created",
+                        "description": "Invoice created",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/invoice.InvoiceResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
-                    "400": {
-                        "description": "Bad Request",
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -1509,6 +2307,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Render the invoice as a PDF file.",
                 "produces": [
                     "application/pdf"
                 ],
@@ -1527,13 +2326,31 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "PDF file",
                         "schema": {
                             "type": "file"
                         }
                     },
+                    "400": {
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
                     "404": {
-                        "description": "Not Found",
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -1548,6 +2365,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Invoice counts per status for one month, shaped for a pie chart. ` + "`" + `month` + "`" + ` is YYYY-MM and defaults to the current month.",
                 "produces": [
                     "application/json"
                 ],
@@ -1565,7 +2383,40 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Chart data",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/invoice.InvoiceStatusDataPoint"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -1580,6 +2431,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Full-text search over the signed-in user's invoices.",
                 "produces": [
                     "application/json"
                 ],
@@ -1610,13 +2462,37 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Matching invoices",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/invoice.InvoiceSearchResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -1626,6 +2502,7 @@ const docTemplate = `{
         },
         "/invoice/review/{id}": {
             "post": {
+                "description": "Payer approves or rejects an invoice. Works signed out (email link) or signed in; creators cannot review their own invoices. Changes state, so it is POST.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1656,13 +2533,31 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Review recorded",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Creator cannot review own invoice",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -1672,6 +2567,7 @@ const docTemplate = `{
         },
         "/invoice/search": {
             "get": {
+                "description": "Public invoice view by id or short url, used by payers. The creator's email and phone number are hidden from everyone except the creator and admins.",
                 "produces": [
                     "application/json"
                 ],
@@ -1695,13 +2591,31 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Invoice",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/invoice.InvoiceResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
-                    "400": {
-                        "description": "Bad Request",
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -1716,6 +2630,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Email the invoice to 1-10 recipients and snapshot the creator's primary wallet as the payment recipient. Only ` + "`" + `draft` + "`" + ` or ` + "`" + `viewed` + "`" + ` invoices can be sent.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1746,13 +2661,49 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Invoice sent",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/invoice.InvoiceSendResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid email, or invoice already sent or paid",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
-                    "400": {
-                        "description": "Bad Request",
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Access denied",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -1767,6 +2718,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Invoice counts per status for the signed-in user.",
                 "produces": [
                     "application/json"
                 ],
@@ -1776,7 +2728,31 @@ const docTemplate = `{
                 "summary": "Get invoice statistics for current user",
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Counts",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/invoice.InvoiceStatsResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -1791,6 +2767,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "One invoice owned by the caller (or any invoice for admins).",
                 "produces": [
                     "application/json"
                 ],
@@ -1809,13 +2786,49 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Invoice",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/invoice.InvoiceResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Not the owner",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -1828,6 +2841,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Update an invoice from a multipart form (items, logo, fields). Invoices that are sent, viewed, paid, overdue, payment_detected, invalid_payment or expired are locked and reported as 404 'Invoice not found'.",
                 "consumes": [
                     "multipart/form-data"
                 ],
@@ -1861,13 +2875,49 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Invoice updated",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/invoice.InvoiceUpdateResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
-                    "400": {
-                        "description": "Bad Request",
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Not the owner",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -1880,6 +2930,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Edit a draft invoice with a JSON body. Only invoices in ` + "`" + `draft` + "`" + ` status can be edited; any other status returns 400.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1910,13 +2961,37 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Invoice updated",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invoice is not a draft",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Not the owner",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -1929,6 +3004,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Delete an unpaid invoice you own. Invoices that have payment records return 409.",
                 "produces": [
                     "application/json"
                 ],
@@ -1947,13 +3023,43 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Invoice deleted",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invoice is paid",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Not the owner",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Invoice has payment records",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -1968,6 +3074,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Re-verify a Stellar transaction hash against the invoice and mark it paid only if the chain confirms it. The caller's claim alone never marks anything paid. 404 when the hash is unknown, 422 when the transaction does not satisfy the invoice, 502 when Stellar is unreachable.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1998,13 +3105,61 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Verified and paid",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/invoice.MarkPaidResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
-                    "400": {
-                        "description": "Bad Request",
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Not the owner",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Transaction not found on Stellar",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Transaction does not satisfy this invoice",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Stellar unreachable",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -2019,6 +3174,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Paginated notifications of the signed-in user, with unread and read counts. Merchants are notified when a payment is verified, rejected or arrives unmatched.",
                 "produces": [
                     "application/json"
                 ],
@@ -2035,8 +3191,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Items per page",
-                        "name": "count",
+                        "description": "Items per page, default 15 (count is a deprecated alias)",
+                        "name": "limit",
                         "in": "query"
                     },
                     {
@@ -2054,13 +3210,37 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Notifications page",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/notifications.GetNotificationResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -2075,6 +3255,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "One notification of the signed-in user.",
                 "produces": [
                     "application/json"
                 ],
@@ -2093,13 +3274,43 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Notification",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/notifications.Notification"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -2112,6 +3323,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Delete one notification.",
                 "produces": [
                     "application/json"
                 ],
@@ -2130,13 +3342,31 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Deleted",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -2149,6 +3379,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Mark one notification viewed or unviewed.",
                 "produces": [
                     "application/json"
                 ],
@@ -2174,13 +3405,31 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Updated",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -2195,6 +3444,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Payments received on the signed-in user's wallets, newest first: verified, invalid, unmatched and failed. Filter with ` + "`" + `status` + "`" + `. ` + "`" + `limit` + "`" + ` above 100 falls back to 20.",
                 "produces": [
                     "application/json"
                 ],
@@ -2224,7 +3474,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Payments page",
                         "schema": {
                             "allOf": [
                                 {
@@ -2240,6 +3490,24 @@ const docTemplate = `{
                                 }
                             ]
                         }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
                     }
                 }
             }
@@ -2251,6 +3519,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Owner view of one invoice's payment request: recipient, memo reference, expected amount and asset, derived ` + "`" + `payment_status` + "`" + `, and every payment recorded against it. Fixes the recipient to the creator's primary wallet on first use.",
                 "produces": [
                     "application/json"
                 ],
@@ -2269,7 +3538,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Payment request with records",
                         "schema": {
                             "allOf": [
                                 {
@@ -2285,12 +3554,49 @@ const docTemplate = `{
                                 }
                             ]
                         }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Not the owner",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Invoice not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Creator has no active Stellar wallet",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
                     }
                 }
             }
         },
         "/payments/request/{invoice_url}": {
             "get": {
+                "description": "Public payer view by invoice short url: what to send, to whom and with which memo. Draft invoices return 404. See docs/payment-status-model.md for status values.",
                 "produces": [
                     "application/json"
                 ],
@@ -2309,7 +3615,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Payment request",
                         "schema": {
                             "allOf": [
                                 {
@@ -2325,6 +3631,30 @@ const docTemplate = `{
                                 }
                             ]
                         }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Invoice not found or still a draft",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Invoice cannot accept payment yet",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
                     }
                 }
             }
@@ -2336,7 +3666,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns 404 when the hash is unknown to Stellar. Status values and transitions: docs/payment-status-model.md (v2)",
+                "description": "Re-check a Stellar transaction hash against invoices. The caller never supplies the outcome: the chain is read and every payment operation is evaluated. Only payments on the caller's own wallets are returned. 404 when the hash is unknown to Stellar; 502 only when Stellar is unreachable.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2360,7 +3690,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Payments found in the transaction",
                         "schema": {
                             "allOf": [
                                 {
@@ -2379,6 +3709,36 @@ const docTemplate = `{
                                 }
                             ]
                         }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Transaction not found on Stellar",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Stellar unreachable",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
                     }
                 }
             }
@@ -2390,6 +3750,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "One payment received on the signed-in user's wallets, with ` + "`" + `failure_code` + "`" + `, per-check results (` + "`" + `checks` + "`" + `) and the invoice's ` + "`" + `expected` + "`" + ` values. 404 for payments on other users' wallets.",
                 "produces": [
                     "application/json"
                 ],
@@ -2408,7 +3769,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Payment",
                         "schema": {
                             "allOf": [
                                 {
@@ -2425,8 +3786,26 @@ const docTemplate = `{
                             ]
                         }
                     },
+                    "400": {
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
                     "404": {
-                        "description": "Not Found",
+                        "description": "Payment not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -2441,6 +3820,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Update the signed-in user's profile. Returns the profile with the primary wallet, including ` + "`" + `wallet.id` + "`" + `.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2464,13 +3844,37 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Profile updated",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/user.UserProfileDto"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
-                    "400": {
-                        "description": "Bad Request",
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -2483,6 +3887,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Finish onboarding by setting name, business name, phone and country.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2506,13 +3911,37 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Profile completed",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/user.CompleteProfileResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
-                    "400": {
-                        "description": "Bad Request",
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -2527,6 +3956,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Profile, completion flag and primary wallet (with ` + "`" + `wallet.id` + "`" + ` and balances) of the signed-in user.",
                 "produces": [
                     "application/json"
                 ],
@@ -2536,13 +3966,31 @@ const docTemplate = `{
                 "summary": "Get current authenticated user",
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Profile",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/user.ProfileResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
-                    "401": {
-                        "description": "Unauthorized",
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -2557,6 +4005,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Profile and primary wallet of a user. Users may read only their own profile; admins may read any.",
                 "produces": [
                     "application/json"
                 ],
@@ -2575,19 +4024,43 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Profile",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/user.ProfileResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid bearer token",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
-                    "403": {
-                        "description": "Forbidden",
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -2602,6 +4075,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "All recurring schedules of the signed-in user.",
                 "produces": [
                     "application/json"
                 ],
@@ -2611,13 +4085,34 @@ const docTemplate = `{
                 "summary": "List recurring invoice schedules",
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Schedules",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/recurring.RecurringInvoice"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
-                    "401": {
-                        "description": "Unauthorized",
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -2630,6 +4125,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Create a schedule that generates an invoice at each interval.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2653,13 +4149,37 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "201": {
-                        "description": "Created",
+                        "description": "Schedule created",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/recurring.RecurringCreated"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
-                    "400": {
-                        "description": "Bad Request",
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -2674,6 +4194,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "One recurring schedule.",
                 "produces": [
                     "application/json"
                 ],
@@ -2692,13 +4213,43 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Schedule",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/recurring.RecurringInvoice"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -2711,6 +4262,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Delete a schedule. Invoices it already generated are kept.",
                 "produces": [
                     "application/json"
                 ],
@@ -2729,13 +4281,31 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Schedule deleted",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -2748,6 +4318,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Pause or resume a schedule (` + "`" + `is_active` + "`" + `), change its ` + "`" + `interval` + "`" + ` or reset its next run date (` + "`" + `start_date` + "`" + `).",
                 "consumes": [
                     "application/json"
                 ],
@@ -2778,13 +4349,31 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Schedule updated",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -2799,6 +4388,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Paginated ledger of the signed-in user: payments received, funding and outgoing transfers. ` + "`" + `status` + "`" + ` is the on-chain result; verification results live on /payments.",
                 "produces": [
                     "application/json"
                 ],
@@ -2815,26 +4405,87 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Page number",
+                        "description": "Page number, from 1 (default 1)",
                         "name": "page",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Items per page",
-                        "name": "page_count",
+                        "description": "Items per page, default 10 (page_count is a deprecated alias)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "payment",
+                            "withdrawal",
+                            "funding",
+                            "path_payment"
+                        ],
+                        "type": "string",
+                        "description": "Ledger type",
+                        "name": "type",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "pending",
+                            "confirmed",
+                            "failed",
+                            "aborted",
+                            "refunded"
+                        ],
+                        "type": "string",
+                        "description": "On-chain status",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Created on or after this date, YYYY-MM-DD",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Created on or before this date, YYYY-MM-DD",
+                        "name": "to",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Transactions page",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/transactions.PaginatedTransactions"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -2849,6 +4500,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "One ledger entry owned by the caller.",
                 "produces": [
                     "application/json"
                 ],
@@ -2867,13 +4519,43 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Transaction",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/transactions.GetTransactionDto"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -2888,6 +4570,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Paid-invoice cash flow grouped by month between ` + "`" + `from` + "`" + ` and ` + "`" + `to` + "`" + ` (YYYY-MM-DD). Amounts are integer cents.",
                 "produces": [
                     "application/json"
                 ],
@@ -2911,13 +4594,37 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Cash flow",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/transactions.GetTransactionCashFlowResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -2932,6 +4639,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Invoice amounts per bucket, in integer cents: total, pending (draft, sent, viewed, pending, payment_detected), paid, overdue, expired and invalid_payment.",
                 "produces": [
                     "application/json"
                 ],
@@ -2941,13 +4649,31 @@ const docTemplate = `{
                 "summary": "Get transaction overview stats",
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Amounts in cents",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/transactions.GetTransactionOverViewResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
-                    "401": {
-                        "description": "Unauthorized",
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -2962,7 +4688,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the current status of a transaction and a Stellar explorer link for the on-chain record",
+                "description": "Look up the on-chain status of a ledger entry and its explorer link.",
                 "produces": [
                     "application/json"
                 ],
@@ -2981,13 +4707,43 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Status",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/transactions.PaymentStatusResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -3002,6 +4758,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Delete a ledger entry owned by the caller.",
                 "produces": [
                     "application/json"
                 ],
@@ -3020,13 +4777,31 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Deleted",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -3041,6 +4816,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Create the user's Stellar wallet (one per user). On testnet the account is funded in the background. The secret key is stored encrypted.",
                 "produces": [
                     "application/json"
                 ],
@@ -3050,13 +4826,37 @@ const docTemplate = `{
                 "summary": "Create a Stellar wallet",
                 "responses": {
                     "201": {
-                        "description": "Created",
+                        "description": "Wallet created",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/wallet.WalletResponseDto"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
-                    "401": {
-                        "description": "Unauthorized",
+                    "403": {
+                        "description": "Wallet limit reached: one wallet per user",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -3071,6 +4871,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Return the wallet's secret key. Sensitive: the response must never be logged or cached.",
                 "produces": [
                     "application/json"
                 ],
@@ -3089,13 +4890,49 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Secret key",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/wallet.WalletExportResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Not your wallet",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -3110,7 +4947,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the primary wallet address for a given user email. Used to resolve a recipient before sending payment.",
+                "description": "Find the primary wallet address of a user by email, for transfers.",
                 "produces": [
                     "application/json"
                 ],
@@ -3129,13 +4966,37 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Wallet address",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/wallet.WalletLookupResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
-                    "404": {
-                        "description": "Not Found",
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -3150,6 +5011,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Wallet details with live balances.",
                 "produces": [
                     "application/json"
                 ],
@@ -3168,13 +5030,49 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Wallet",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/wallet.WalletResponseDto"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Access denied: not your wallet",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -3189,7 +5087,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Pays invoice using PathPaymentStrictReceive — payer sends source asset, vendor receives exact USDC",
+                "description": "Pay an invoice from this wallet, swapping XLM or USDC to the invoice asset by path payment. The memo is the invoice's payment reference; settlement happens only after the chain payment is verified, so ` + "`" + `payment_status` + "`" + ` may still be ` + "`" + `detected` + "`" + `.",
                 "consumes": [
                     "application/json"
                 ],
@@ -3220,7 +5118,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Payment submitted",
                         "schema": {
                             "allOf": [
                                 {
@@ -3238,13 +5136,37 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
-                    "403": {
-                        "description": "Forbidden",
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Another payment for this invoice is being verified",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Stellar rejected the transaction",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -3259,7 +5181,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Sends assets to any Stellar address. Uses path payment if source and dest assets differ",
+                "description": "Transfer XLM or USDC to another address, converting between assets by path payment if needed.",
                 "consumes": [
                     "application/json"
                 ],
@@ -3290,7 +5212,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Transfer submitted",
                         "schema": {
                             "allOf": [
                                 {
@@ -3308,13 +5230,31 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid request body or parameters",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
-                    "403": {
-                        "description": "Forbidden",
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Stellar rejected the transaction",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -3329,7 +5269,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Sets a 4-8 digit numeric PIN required for all payment operations",
+                "description": "Set or replace the 4-8 digit PIN that authorises payments from this wallet.",
                 "consumes": [
                     "application/json"
                 ],
@@ -3360,13 +5300,37 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "PIN set",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid request body or parameters",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Not your wallet",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected server error",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -3376,32 +5340,142 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "admin.ActivityLog": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "description": "Action name",
+                    "type": "string",
+                    "example": "login"
+                },
+                "created_at": {
+                    "description": "When it happened",
+                    "type": "string",
+                    "example": "2026-10-22T14:03:26Z"
+                },
+                "entity_id": {
+                    "description": "Id of the object acted on",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
+                },
+                "entity_type": {
+                    "description": "Kind of object acted on",
+                    "type": "string",
+                    "example": "invoice"
+                },
+                "id": {
+                    "description": "Entry id",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
+                },
+                "ip_address": {
+                    "description": "Client IP",
+                    "type": "string",
+                    "example": "203.0.113.7"
+                },
+                "metadata": {},
+                "user_id": {
+                    "description": "Acting user",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
+                }
+            }
+        },
+        "admin.AdminActivityList": {
+            "type": "object",
+            "properties": {
+                "logs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/admin.ActivityLog"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/admin.AdminPaginationMeta"
+                }
+            }
+        },
+        "admin.AdminInvoiceList": {
+            "type": "object",
+            "properties": {
+                "invoices": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/admin.AdminInvoiceRow"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/admin.AdminPaginationMeta"
+                }
+            }
+        },
         "admin.AdminInvoiceRow": {
             "type": "object",
             "properties": {
                 "created_at": {
-                    "type": "string"
+                    "description": "Created",
+                    "type": "string",
+                    "example": "2026-10-20T09:00:00Z"
                 },
                 "creator_email": {
-                    "type": "string"
+                    "description": "Creator",
+                    "type": "string",
+                    "example": "jane@example.com"
                 },
                 "currency": {
-                    "type": "string"
+                    "description": "Currency",
+                    "type": "string",
+                    "example": "usdc"
                 },
                 "id": {
-                    "type": "string"
+                    "description": "Invoice id",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
                 },
                 "invoice_number": {
-                    "type": "string"
+                    "description": "Number",
+                    "type": "string",
+                    "example": "INV-20261020-0019"
                 },
                 "payer_email": {
-                    "type": "string"
+                    "description": "Client",
+                    "type": "string",
+                    "example": "billing@acme.com"
                 },
                 "status": {
-                    "type": "string"
+                    "description": "Invoice status",
+                    "type": "string",
+                    "example": "paid"
                 },
                 "total": {
-                    "type": "number"
+                    "description": "Amount due",
+                    "type": "number",
+                    "example": 454
+                }
+            }
+        },
+        "admin.AdminPaginationMeta": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "description": "Page size",
+                    "type": "integer",
+                    "example": 20
+                },
+                "page": {
+                    "description": "Current page",
+                    "type": "integer",
+                    "example": 1
+                },
+                "total": {
+                    "description": "Total matching rows",
+                    "type": "integer",
+                    "example": 57
+                },
+                "total_pages": {
+                    "description": "Total pages",
+                    "type": "integer",
+                    "example": 3
                 }
             }
         },
@@ -3409,22 +5483,138 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "active_users": {
-                    "type": "integer"
+                    "description": "Active users",
+                    "type": "integer",
+                    "example": 112
                 },
                 "overdue_count": {
-                    "type": "integer"
+                    "description": "Invoices in overdue status",
+                    "type": "integer",
+                    "example": 12
                 },
                 "paid_invoices": {
-                    "type": "integer"
+                    "description": "Paid invoices",
+                    "type": "integer",
+                    "example": 310
                 },
                 "total_invoices": {
-                    "type": "integer"
+                    "description": "All invoices",
+                    "type": "integer",
+                    "example": 560
                 },
                 "total_revenue": {
-                    "type": "number"
+                    "description": "Sum of paid invoice totals",
+                    "type": "number",
+                    "example": 48210.5
                 },
                 "total_users": {
-                    "type": "integer"
+                    "description": "All users",
+                    "type": "integer",
+                    "example": 120
+                }
+            }
+        },
+        "admin.AdminTransactionList": {
+            "type": "object",
+            "properties": {
+                "meta": {
+                    "$ref": "#/definitions/admin.AdminPaginationMeta"
+                },
+                "transactions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/admin.AdminTransactionRow"
+                    }
+                }
+            }
+        },
+        "admin.AdminTransactionRow": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "description": "Amount",
+                    "type": "number",
+                    "example": 2.03
+                },
+                "created_at": {
+                    "description": "Created",
+                    "type": "string",
+                    "example": "2026-10-22T14:03:26Z"
+                },
+                "id": {
+                    "description": "Ledger entry id",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
+                },
+                "invoice_number": {
+                    "description": "Related invoice",
+                    "type": "string",
+                    "example": "INV-20261020-0019"
+                },
+                "source_amount": {
+                    "description": "Amount spent",
+                    "type": "string",
+                    "example": "12.3456789"
+                },
+                "source_asset": {
+                    "description": "Asset spent for path payments",
+                    "type": "string",
+                    "example": "XLM"
+                },
+                "status": {
+                    "description": "On-chain result",
+                    "type": "string",
+                    "example": "confirmed"
+                },
+                "type": {
+                    "description": "payment, withdrawal, funding or path_payment",
+                    "type": "string",
+                    "example": "payment"
+                },
+                "user_email": {
+                    "description": "Owner",
+                    "type": "string",
+                    "example": "jane@example.com"
+                }
+            }
+        },
+        "admin.AdminUserDetail": {
+            "type": "object",
+            "properties": {
+                "recent_activity": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/admin.ActivityLog"
+                    }
+                },
+                "recent_transactions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/admin.AdminTransactionRow"
+                    }
+                },
+                "user": {
+                    "$ref": "#/definitions/admin.AdminUserRow"
+                },
+                "wallets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/admin.AdminWalletRow"
+                    }
+                }
+            }
+        },
+        "admin.AdminUserList": {
+            "type": "object",
+            "properties": {
+                "meta": {
+                    "$ref": "#/definitions/admin.AdminPaginationMeta"
+                },
+                "users": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/admin.AdminUserRow"
+                    }
                 }
             }
         },
@@ -3432,28 +5622,138 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "created_at": {
-                    "type": "string"
+                    "description": "Created",
+                    "type": "string",
+                    "example": "2026-10-20T09:00:00Z"
                 },
                 "email": {
-                    "type": "string"
+                    "description": "Email",
+                    "type": "string",
+                    "example": "jane@example.com"
                 },
                 "email_verified": {
-                    "type": "boolean"
+                    "description": "Verified",
+                    "type": "boolean",
+                    "example": true
                 },
                 "first_name": {
-                    "type": "string"
+                    "description": "First name",
+                    "type": "string",
+                    "example": "Jane"
                 },
                 "id": {
-                    "type": "string"
+                    "description": "User id",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
                 },
                 "is_active": {
-                    "type": "boolean"
+                    "description": "Active",
+                    "type": "boolean",
+                    "example": true
                 },
                 "last_name": {
-                    "type": "string"
+                    "description": "Last name",
+                    "type": "string",
+                    "example": "Doe"
                 },
                 "role": {
-                    "type": "string"
+                    "description": "user or admin",
+                    "type": "string",
+                    "example": "user"
+                }
+            }
+        },
+        "admin.AdminWalletRow": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "description": "Stellar account id",
+                    "type": "string",
+                    "example": "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
+                },
+                "id": {
+                    "description": "Wallet id",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
+                },
+                "is_primary": {
+                    "description": "Receives invoice payments",
+                    "type": "boolean",
+                    "example": true
+                },
+                "tag": {
+                    "description": "Label",
+                    "type": "string",
+                    "example": "Main"
+                },
+                "usdc_balance": {
+                    "description": "Cached USDC balance",
+                    "type": "number",
+                    "example": 5.03
+                },
+                "xlm_balance": {
+                    "description": "Cached XLM balance",
+                    "type": "number",
+                    "example": 10002
+                }
+            }
+        },
+        "admin.NetworkConfig": {
+            "type": "object",
+            "properties": {
+                "stage": {
+                    "type": "string",
+                    "enum": [
+                        "testnet",
+                        "mainnet"
+                    ]
+                },
+                "updated_at": {
+                    "description": "When the setting last changed",
+                    "type": "string",
+                    "example": "2026-10-22T14:03:26Z"
+                }
+            }
+        },
+        "admin.NetworkUpdate": {
+            "type": "object",
+            "properties": {
+                "stage": {
+                    "description": "Network used by wallets and payment detection",
+                    "type": "string",
+                    "enum": [
+                        "testnet",
+                        "mainnet"
+                    ],
+                    "example": "testnet"
+                }
+            }
+        },
+        "auth.AuthLoginResponseDto": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "description": "Bearer token, valid for 1 hour",
+                    "type": "string",
+                    "example": "eyJhbGciOi..."
+                },
+                "email_verified": {
+                    "description": "Always true on a successful login",
+                    "type": "boolean",
+                    "example": true
+                },
+                "expires_in": {
+                    "description": "Unix time the token expires",
+                    "type": "integer",
+                    "example": 1793000000
+                },
+                "profile_complete": {
+                    "description": "False until POST /profile has been called",
+                    "type": "boolean",
+                    "example": false
+                },
+                "user": {
+                    "$ref": "#/definitions/user.User"
                 }
             }
         },
@@ -3465,10 +5765,51 @@ const docTemplate = `{
             ],
             "properties": {
                 "email": {
-                    "type": "string"
+                    "description": "Account email, case-insensitive",
+                    "type": "string",
+                    "example": "jane@example.com"
                 },
                 "password": {
+                    "description": "Password; must satisfy the password policy",
+                    "type": "string",
+                    "example": "S3cure!pass"
+                }
+            }
+        },
+        "auth.AuthResponseDto": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "description": "Bearer token, valid for 1 hour",
+                    "type": "string",
+                    "example": "eyJhbGciOi..."
+                },
+                "email_verified": {
+                    "description": "New accounts start unverified",
+                    "type": "boolean",
+                    "example": false
+                },
+                "expires_in": {
+                    "description": "Unix time the access token expires",
+                    "type": "integer",
+                    "example": 1793000000
+                },
+                "profile_complete": {
+                    "description": "Profile onboarding done",
+                    "type": "boolean",
+                    "example": false
+                },
+                "refresh_token": {
+                    "description": "Only on the refresh endpoint",
                     "type": "string"
+                },
+                "refresh_token_expiry": {
+                    "description": "Unix time the refresh token expires",
+                    "type": "integer",
+                    "example": 1793600000
+                },
+                "user": {
+                    "$ref": "#/definitions/user.UserProfileDto"
                 }
             }
         },
@@ -3480,27 +5821,53 @@ const docTemplate = `{
             ],
             "properties": {
                 "new_password": {
+                    "description": "New password, 8-100 characters",
                     "type": "string",
                     "maxLength": 100,
-                    "minLength": 8
+                    "minLength": 8,
+                    "example": "N3w!password"
                 },
                 "old_password": {
-                    "type": "string"
+                    "description": "Current password",
+                    "type": "string",
+                    "example": "S3cure!pass"
+                }
+            }
+        },
+        "auth.PasswordChangedResult": {
+            "type": "object",
+            "properties": {
+                "changedAt": {
+                    "description": "When the password changed",
+                    "type": "string",
+                    "example": "2026-10-22T14:03:26Z"
                 }
             }
         },
         "auth.ProviderLogin": {
             "type": "object",
             "required": [
-                "email",
-                "provider_id"
+                "id_token"
             ],
             "properties": {
-                "email": {
-                    "type": "string"
+                "id_token": {
+                    "description": "Google ID token (JWT) from Google Sign-In; verified server-side",
+                    "type": "string",
+                    "example": "eyJhbGciOiJSUzI1NiIs..."
+                }
+            }
+        },
+        "auth.RefreshTokenResult": {
+            "type": "object",
+            "properties": {
+                "refresh_token": {
+                    "description": "7-day refresh token",
+                    "type": "string",
+                    "example": "eyJhbGciOi..."
                 },
-                "provider_id": {
-                    "type": "string"
+                "refresh_token_expiry": {
+                    "type": "integer",
+                    "example": 1793000000
                 }
             }
         },
@@ -3514,18 +5881,26 @@ const docTemplate = `{
             ],
             "properties": {
                 "confirm_password": {
-                    "type": "string"
+                    "description": "Must equal password",
+                    "type": "string",
+                    "example": "N3w!password"
                 },
                 "email": {
-                    "type": "string"
+                    "description": "Email the reset link was sent to",
+                    "type": "string",
+                    "example": "jane@example.com"
                 },
                 "otp": {
+                    "description": "Code from the reset email",
                     "type": "string",
                     "maxLength": 6,
-                    "minLength": 2
+                    "minLength": 2,
+                    "example": "48213"
                 },
                 "password": {
-                    "type": "string"
+                    "description": "New password",
+                    "type": "string",
+                    "example": "N3w!password"
                 }
             }
         },
@@ -3542,12 +5917,17 @@ const docTemplate = `{
             ],
             "properties": {
                 "country": {
-                    "type": "string"
+                    "description": "Client country",
+                    "type": "string",
+                    "example": "NG"
                 },
                 "due_date": {
-                    "type": "string"
+                    "description": "YYYY-MM-DD. Payments are accepted until the end of this day (UTC) plus PAYMENT_EXPIRY_GRACE_DAYS",
+                    "type": "string",
+                    "example": "2026-12-31"
                 },
                 "invoice_items": {
+                    "description": "At least one line item",
                     "type": "array",
                     "minItems": 1,
                     "items": {
@@ -3555,27 +5935,45 @@ const docTemplate = `{
                     }
                 },
                 "make_default": {
-                    "type": "boolean"
+                    "description": "Save this template as the default",
+                    "type": "boolean",
+                    "example": false
                 },
                 "note": {
-                    "type": "string"
+                    "description": "Optional note shown on the invoice",
+                    "type": "string",
+                    "example": "Thanks for your business"
                 },
                 "payer_email": {
-                    "type": "string"
+                    "description": "Client email the invoice is sent to",
+                    "type": "string",
+                    "example": "billing@acme.com"
                 },
                 "payer_name": {
-                    "type": "string"
+                    "description": "Client name",
+                    "type": "string",
+                    "example": "Acme Ltd"
                 },
                 "service_fee": {
+                    "description": "Extra fee added to the subtotal, \u003e= 0",
                     "type": "number",
-                    "minimum": 0
+                    "minimum": 0,
+                    "example": 2.5
                 },
                 "template_id": {
-                    "$ref": "#/definitions/invoice.TemplateIDType"
+                    "description": "One of template_001..template_005",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/invoice.TemplateIDType"
+                        }
+                    ],
+                    "example": "template_001"
                 },
                 "title": {
+                    "description": "Invoice title, min 3 characters",
                     "type": "string",
-                    "minLength": 3
+                    "minLength": 3,
+                    "example": "Website redesign"
                 }
             }
         },
@@ -3590,18 +5988,27 @@ const docTemplate = `{
             ],
             "properties": {
                 "amount": {
-                    "type": "number"
+                    "description": "Line total; the server checks it against quantity x unit_price",
+                    "type": "number",
+                    "example": 451.5
                 },
                 "created_at": {
-                    "type": "string"
+                    "description": "When the item was added",
+                    "type": "string",
+                    "example": "2026-10-20T09:00:00Z"
                 },
                 "description": {
-                    "type": "string"
+                    "description": "What was delivered",
+                    "type": "string",
+                    "example": "Design work"
                 },
                 "discount": {
-                    "type": "integer"
+                    "description": "Discount percent",
+                    "type": "integer",
+                    "example": 0
                 },
                 "invoice_type": {
+                    "description": "per_hour or per_unit",
                     "enum": [
                         "per_hour",
                         "per_unit"
@@ -3610,16 +6017,293 @@ const docTemplate = `{
                         {
                             "$ref": "#/definitions/invoice.InvoiceType"
                         }
-                    ]
+                    ],
+                    "example": "per_unit"
                 },
                 "item_id": {
+                    "description": "Existing item id when editing; omit for new items",
                     "type": "string"
                 },
                 "quantity": {
-                    "type": "integer"
+                    "description": "Hours or units, \u003e 0",
+                    "type": "integer",
+                    "example": 3
                 },
                 "unit_price": {
-                    "type": "number"
+                    "description": "Price per hour or unit, \u003e 0",
+                    "type": "number",
+                    "example": 150.5
+                }
+            }
+        },
+        "invoice.InvoiceListResponseDto": {
+            "type": "object",
+            "properties": {
+                "invoice": {
+                    "description": "deprecated: use items",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/invoice.InvoiceResponse"
+                    }
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/invoice.InvoiceResponse"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/invoice.PaginationMeta"
+                }
+            }
+        },
+        "invoice.InvoiceResponse": {
+            "type": "object",
+            "required": [
+                "template_id"
+            ],
+            "properties": {
+                "approved": {
+                    "description": "Payer review result; null before review",
+                    "type": "boolean",
+                    "example": true
+                },
+                "country": {
+                    "description": "Client country",
+                    "type": "string",
+                    "example": "NG"
+                },
+                "createdBy": {
+                    "$ref": "#/definitions/invoice.InvoiceSenderDetails"
+                },
+                "created_at": {
+                    "description": "Creation time",
+                    "type": "string",
+                    "example": "2026-10-20T09:00:00Z"
+                },
+                "currency": {
+                    "description": "usdc or xlm",
+                    "type": "string",
+                    "example": "usdc"
+                },
+                "due_date": {
+                    "description": "Due date",
+                    "type": "string",
+                    "example": "2026-12-31T00:00:00Z"
+                },
+                "id": {
+                    "description": "Invoice id",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
+                },
+                "invoice_number": {
+                    "description": "Human-readable number",
+                    "type": "string",
+                    "example": "INV-20261020-0019"
+                },
+                "invoice_url": {
+                    "description": "Short public url used by /invoice/search and /payments/request",
+                    "type": "string",
+                    "example": "aB3dE9"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/invoice.InvoiceItems"
+                    }
+                },
+                "logo_url": {
+                    "description": "Signed logo url",
+                    "type": "string"
+                },
+                "note": {
+                    "description": "Note shown on the invoice",
+                    "type": "string"
+                },
+                "paid_at": {
+                    "description": "Set once paid",
+                    "type": "string",
+                    "example": "2026-10-22T14:03:26Z"
+                },
+                "payer_email": {
+                    "description": "Client email",
+                    "type": "string",
+                    "example": "billing@acme.com"
+                },
+                "payer_name": {
+                    "description": "Client name",
+                    "type": "string",
+                    "example": "Acme Ltd"
+                },
+                "payer_wallet_address": {
+                    "description": "Account that paid; set once paid",
+                    "type": "string",
+                    "example": "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
+                },
+                "payment_reference": {
+                    "description": "Memo to attach to the on-chain payment",
+                    "type": "string",
+                    "example": "STL-B9371BD3A173"
+                },
+                "payment_status": {
+                    "description": "Derived from status; see docs/payment-status-model.md",
+                    "type": "string",
+                    "example": "awaiting_payment"
+                },
+                "review_date": {
+                    "description": "When the payer approved or rejected",
+                    "type": "string",
+                    "example": "2026-10-21T10:00:00Z"
+                },
+                "service_fee": {
+                    "description": "Fee added to the subtotal",
+                    "type": "number",
+                    "example": 2.5
+                },
+                "status": {
+                    "description": "draft, sent, viewed, pending, overdue, payment_detected, invalid_payment, paid, expired, cancelled or refunded",
+                    "type": "string",
+                    "example": "sent"
+                },
+                "sub_total": {
+                    "description": "Sum of line items",
+                    "type": "number",
+                    "example": 451.5
+                },
+                "template_id": {
+                    "description": "Template",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/invoice.TemplateIDType"
+                        }
+                    ],
+                    "example": "template_001"
+                },
+                "title": {
+                    "description": "Title",
+                    "type": "string",
+                    "example": "Website redesign"
+                },
+                "total": {
+                    "description": "Amount due",
+                    "type": "number",
+                    "example": 454
+                },
+                "updated_at": {
+                    "description": "Last change",
+                    "type": "string",
+                    "example": "2026-10-22T14:03:26Z"
+                }
+            }
+        },
+        "invoice.InvoiceSearchResult": {
+            "type": "object",
+            "properties": {
+                "invoice": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/invoice.InvoiceResponse"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/invoice.SearchPaginationMeta"
+                }
+            }
+        },
+        "invoice.InvoiceSendResult": {
+            "type": "object",
+            "properties": {
+                "invoice_url": {
+                    "type": "string",
+                    "example": "aB3dE9"
+                },
+                "total_recipients": {
+                    "type": "integer",
+                    "example": 2
+                }
+            }
+        },
+        "invoice.InvoiceSenderDetails": {
+            "type": "object",
+            "properties": {
+                "business_name": {
+                    "description": "Business name",
+                    "type": "string",
+                    "example": "Doe Studio"
+                },
+                "email": {
+                    "description": "Hidden on the public view",
+                    "type": "string",
+                    "example": "jane@example.com"
+                },
+                "location": {
+                    "description": "Creator country",
+                    "type": "string",
+                    "example": "NG"
+                },
+                "name": {
+                    "description": "Creator name",
+                    "type": "string",
+                    "example": "Jane Doe"
+                },
+                "phone_number": {
+                    "description": "Hidden on the public view",
+                    "type": "string",
+                    "example": "+2348012345678"
+                },
+                "user_id": {
+                    "description": "Creator id",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
+                },
+                "wallet_address": {
+                    "description": "Creator primary wallet",
+                    "type": "string",
+                    "example": "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
+                }
+            }
+        },
+        "invoice.InvoiceStatsResponse": {
+            "type": "object",
+            "properties": {
+                "expired_count": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "invalid_payment_count": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "overdue_count": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "paid_count": {
+                    "type": "integer",
+                    "example": 12
+                },
+                "pending_count": {
+                    "type": "integer",
+                    "example": 4
+                },
+                "total_count": {
+                    "type": "integer",
+                    "example": 19
+                }
+            }
+        },
+        "invoice.InvoiceStatusDataPoint": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "description": "Capitalised status name",
+                    "type": "string",
+                    "example": "Paid"
+                },
+                "value": {
+                    "description": "Invoices in this status",
+                    "type": "integer",
+                    "example": 12
                 }
             }
         },
@@ -3634,6 +6318,21 @@ const docTemplate = `{
                 "PerHour"
             ]
         },
+        "invoice.InvoiceUpdateResult": {
+            "type": "object",
+            "properties": {
+                "invoice_id": {
+                    "description": "Updated invoice",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
+                },
+                "updated_at": {
+                    "description": "Update time",
+                    "type": "string",
+                    "example": "2026-10-22T14:03:26Z"
+                }
+            }
+        },
         "invoice.MarkInvoicePaidDTO": {
             "type": "object",
             "required": [
@@ -3641,7 +6340,59 @@ const docTemplate = `{
             ],
             "properties": {
                 "transaction_hash": {
-                    "type": "string"
+                    "description": "64-character hex Stellar transaction hash. The server re-verifies it on-chain",
+                    "type": "string",
+                    "example": "a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7"
+                }
+            }
+        },
+        "invoice.MarkPaidResult": {
+            "type": "object",
+            "properties": {
+                "invoice_id": {
+                    "description": "Invoice id",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
+                },
+                "payment": {
+                    "description": "The verified payment record"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "paid"
+                }
+            }
+        },
+        "invoice.PaginationMeta": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "description": "Page size",
+                    "type": "integer",
+                    "example": 10
+                },
+                "page": {
+                    "description": "Current page",
+                    "type": "integer",
+                    "example": 1
+                },
+                "page_count": {
+                    "description": "deprecated: use limit",
+                    "type": "integer"
+                },
+                "total": {
+                    "description": "Total matching invoices",
+                    "type": "integer",
+                    "example": 57
+                },
+                "total_invoice_count": {
+                    "description": "deprecated: use total",
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "description": "Total pages",
+                    "type": "integer",
+                    "example": 6
                 }
             }
         },
@@ -3649,7 +6400,39 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "approve": {
-                    "type": "boolean"
+                    "description": "true approves, false rejects (cancels) the invoice",
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "invoice.SearchPaginationMeta": {
+            "type": "object",
+            "properties": {
+                "has_next": {
+                    "description": "More rows after this page",
+                    "type": "boolean",
+                    "example": true
+                },
+                "has_prev": {
+                    "description": "Rows before this page",
+                    "type": "boolean",
+                    "example": false
+                },
+                "limit": {
+                    "description": "Page size",
+                    "type": "integer",
+                    "example": 10
+                },
+                "offset": {
+                    "description": "Rows skipped",
+                    "type": "integer",
+                    "example": 0
+                },
+                "total": {
+                    "description": "Total matches",
+                    "type": "integer",
+                    "example": 57
                 }
             }
         },
@@ -3660,6 +6443,7 @@ const docTemplate = `{
             ],
             "properties": {
                 "emails": {
+                    "description": "1-10 recipient emails; the first is the primary recipient, the rest are CC",
                     "type": "array",
                     "maxItems": 10,
                     "minItems": 1,
@@ -3686,6 +6470,99 @@ const docTemplate = `{
                 "TemplateID5"
             ]
         },
+        "invoice_comments.CommentResponse": {
+            "type": "object",
+            "properties": {
+                "can_delete": {
+                    "description": "Viewer may delete",
+                    "type": "boolean",
+                    "example": true
+                },
+                "can_edit": {
+                    "description": "Viewer may edit",
+                    "type": "boolean",
+                    "example": true
+                },
+                "comment_text": {
+                    "description": "Comment body",
+                    "type": "string",
+                    "example": "Looks good"
+                },
+                "commenter_email": {
+                    "description": "Author email",
+                    "type": "string",
+                    "example": "jane@example.com"
+                },
+                "commenter_name": {
+                    "description": "Display name",
+                    "type": "string",
+                    "example": "Jane Doe"
+                },
+                "created_at": {
+                    "description": "Posted",
+                    "type": "string",
+                    "example": "2026-10-22T14:03:26Z"
+                },
+                "edited": {
+                    "description": "Edited after posting",
+                    "type": "boolean",
+                    "example": false
+                },
+                "edited_at": {
+                    "description": "When last edited",
+                    "type": "object"
+                },
+                "id": {
+                    "description": "Comment id",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
+                },
+                "invoice_id": {
+                    "description": "Invoice id",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
+                },
+                "is_guest": {
+                    "description": "Author commented with a guest token",
+                    "type": "boolean",
+                    "example": false
+                },
+                "is_verified": {
+                    "description": "Author is a verified account",
+                    "type": "boolean",
+                    "example": true
+                },
+                "parent_comment_id": {
+                    "description": "Parent comment when this is a reply",
+                    "type": "object"
+                },
+                "parent_id": {
+                    "description": "Same as parent_comment_id",
+                    "type": "object"
+                },
+                "reactions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/invoice_comments.ReactionCount"
+                    }
+                },
+                "replies": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/invoice_comments.CommentResponse"
+                    }
+                },
+                "updated_at": {
+                    "description": "Last change",
+                    "type": "string",
+                    "example": "2026-10-22T14:03:26Z"
+                },
+                "user_id": {
+                    "description": "Author id; empty for guests",
+                    "type": "object"
+                }
+            }
+        },
         "invoice_comments.CreateCommentDTO": {
             "type": "object",
             "required": [
@@ -3694,18 +6571,115 @@ const docTemplate = `{
             ],
             "properties": {
                 "comment_text": {
+                    "description": "1-2000 characters",
                     "type": "string",
                     "maxLength": 2000,
-                    "minLength": 1
+                    "minLength": 1,
+                    "example": "Can you split this into two payments?"
                 },
                 "invoice_id": {
-                    "type": "string"
+                    "description": "Invoice being discussed",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
                 },
                 "parent_id": {
+                    "description": "Comment id to reply to; omit for a top-level comment",
                     "type": "string"
                 },
                 "token": {
+                    "description": "Invoice access token for guests; omit when signed in",
                     "type": "string"
+                }
+            }
+        },
+        "invoice_comments.CreateCommentQueryResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "guest": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "verified": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "invoice_comments.GetCommentsResponse": {
+            "type": "object",
+            "properties": {
+                "comments": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/invoice_comments.CommentResponse"
+                    }
+                },
+                "limit": {
+                    "description": "Page size",
+                    "type": "integer",
+                    "example": 20
+                },
+                "page": {
+                    "description": "Current page",
+                    "type": "integer",
+                    "example": 1
+                },
+                "stats": {
+                    "$ref": "#/definitions/invoice_comments.InvoiceCommentStats"
+                },
+                "total": {
+                    "description": "Total top-level comments",
+                    "type": "integer",
+                    "example": 8
+                },
+                "total_pages": {
+                    "description": "Total pages",
+                    "type": "integer",
+                    "example": 1
+                }
+            }
+        },
+        "invoice_comments.InvoiceCommentStats": {
+            "type": "object",
+            "properties": {
+                "guest_comments": {
+                    "description": "By guests",
+                    "type": "integer",
+                    "example": 3
+                },
+                "invoice_id": {
+                    "description": "Invoice id",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
+                },
+                "latest_comment_at": {
+                    "description": "Most recent comment",
+                    "type": "string",
+                    "example": "2026-10-22T14:03:26Z"
+                },
+                "reply_comments": {
+                    "description": "Replies",
+                    "type": "integer",
+                    "example": 2
+                },
+                "top_level_comments": {
+                    "description": "Not replies",
+                    "type": "integer",
+                    "example": 6
+                },
+                "total_comments": {
+                    "description": "All comments",
+                    "type": "integer",
+                    "example": 8
+                },
+                "verified_comments": {
+                    "description": "By verified accounts",
+                    "type": "integer",
+                    "example": 5
                 }
             }
         },
@@ -3716,15 +6690,38 @@ const docTemplate = `{
             ],
             "properties": {
                 "email": {
+                    "description": "Guest email",
                     "type": "string"
                 },
                 "emoji": {
+                    "description": "1-10 characters",
                     "type": "string",
                     "maxLength": 10,
-                    "minLength": 1
+                    "minLength": 1,
+                    "example": "👍"
                 },
                 "token": {
+                    "description": "Guest invoice access token",
                     "type": "string"
+                }
+            }
+        },
+        "invoice_comments.ReactionCount": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "description": "Reactions with this emoji",
+                    "type": "integer",
+                    "example": 3
+                },
+                "emoji": {
+                    "description": "Emoji",
+                    "type": "string",
+                    "example": "👍"
+                },
+                "reacted": {
+                    "description": "Reacted is true if the current viewer has reacted with this emoji",
+                    "type": "boolean"
                 }
             }
         },
@@ -3735,15 +6732,110 @@ const docTemplate = `{
             ],
             "properties": {
                 "comment_text": {
+                    "description": "1-2000 characters",
                     "type": "string",
                     "maxLength": 2000,
-                    "minLength": 1
+                    "minLength": 1,
+                    "example": "Updated text"
                 },
                 "email": {
+                    "description": "Guest email, required for guests",
                     "type": "string"
                 },
                 "token": {
+                    "description": "Guest invoice access token",
                     "type": "string"
+                }
+            }
+        },
+        "notifications.GetNotificationResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/notifications.Notification"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/notifications.PaginationMeta"
+                },
+                "notifications": {
+                    "description": "deprecated: use items",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/notifications.Notification"
+                    }
+                }
+            }
+        },
+        "notifications.Notification": {
+            "type": "object",
+            "properties": {
+                "body": {
+                    "description": "Message",
+                    "type": "string",
+                    "example": "Payment for invoice INV-1 was verified on Stellar."
+                },
+                "id": {
+                    "description": "Notification id",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
+                },
+                "title": {
+                    "description": "Short title",
+                    "type": "string",
+                    "example": "Invoice Paid"
+                },
+                "viewed": {
+                    "description": "Read flag",
+                    "type": "boolean",
+                    "example": false
+                },
+                "viewed_at": {
+                    "description": "When it was read",
+                    "type": "string",
+                    "example": "2026-10-22T14:10:00Z"
+                }
+            }
+        },
+        "notifications.PaginationMeta": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "description": "Page size",
+                    "type": "integer",
+                    "example": 15
+                },
+                "page": {
+                    "description": "Current page",
+                    "type": "integer",
+                    "example": 1
+                },
+                "page_count": {
+                    "description": "Deprecated: items on this page",
+                    "type": "integer",
+                    "example": 15
+                },
+                "read_count": {
+                    "description": "All read notifications",
+                    "type": "integer",
+                    "example": 37
+                },
+                "total": {
+                    "description": "Notifications matching the viewed filter",
+                    "type": "integer",
+                    "example": 42
+                },
+                "total_pages": {
+                    "description": "Total pages",
+                    "type": "integer",
+                    "example": 3
+                },
+                "unread_count": {
+                    "description": "All unread notifications",
+                    "type": "integer",
+                    "example": 5
                 }
             }
         },
@@ -3751,22 +6843,52 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "amount": {
-                    "type": "string"
+                    "type": "string",
+                    "enum": [
+                        "pass",
+                        "fail",
+                        "skip"
+                    ]
                 },
                 "asset": {
-                    "type": "string"
+                    "type": "string",
+                    "enum": [
+                        "pass",
+                        "fail",
+                        "skip"
+                    ]
                 },
                 "invoice": {
-                    "type": "string"
+                    "type": "string",
+                    "enum": [
+                        "pass",
+                        "fail",
+                        "skip"
+                    ]
                 },
                 "recipient": {
-                    "type": "string"
+                    "type": "string",
+                    "enum": [
+                        "pass",
+                        "fail",
+                        "skip"
+                    ]
                 },
                 "reference": {
-                    "type": "string"
+                    "type": "string",
+                    "enum": [
+                        "pass",
+                        "fail",
+                        "skip"
+                    ]
                 },
                 "success": {
-                    "type": "string"
+                    "type": "string",
+                    "enum": [
+                        "pass",
+                        "fail",
+                        "skip"
+                    ]
                 }
             }
         },
@@ -3774,19 +6896,29 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "amount": {
-                    "type": "string"
+                    "description": "Exact amount, 7 decimals",
+                    "type": "string",
+                    "example": "100.0000000"
                 },
                 "asset_code": {
-                    "type": "string"
+                    "description": "Asset code",
+                    "type": "string",
+                    "example": "USDC"
                 },
                 "asset_issuer": {
-                    "type": "string"
+                    "description": "Issuer; null for XLM",
+                    "type": "string",
+                    "example": "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
                 },
                 "payment_reference": {
-                    "type": "string"
+                    "description": "Required memo",
+                    "type": "string",
+                    "example": "STL-B9371BD3A173"
                 },
                 "recipient": {
-                    "type": "string"
+                    "description": "Required recipient",
+                    "type": "string",
+                    "example": "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
                 }
             }
         },
@@ -3794,26 +6926,41 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "limit": {
-                    "type": "integer"
+                    "description": "Page size",
+                    "type": "integer",
+                    "example": 20
                 },
                 "page": {
-                    "type": "integer"
+                    "description": "Current page, from 1",
+                    "type": "integer",
+                    "example": 1
                 },
                 "total": {
-                    "type": "integer"
+                    "description": "Total matching rows",
+                    "type": "integer",
+                    "example": 57
                 },
                 "total_pages": {
-                    "type": "integer"
+                    "description": "Total pages",
+                    "type": "integer",
+                    "example": 3
                 }
             }
         },
         "payments.PaymentList": {
             "type": "object",
             "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/payments.PaymentRecord"
+                    }
+                },
                 "meta": {
                     "$ref": "#/definitions/payments.PageMeta"
                 },
                 "payments": {
+                    "description": "deprecated: use items",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/payments.PaymentRecord"
@@ -3825,64 +6972,128 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "amount": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "2.0300000"
                 },
                 "asset_code": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "USDC"
                 },
                 "asset_issuer": {
-                    "type": "string"
+                    "description": "Issuer account; null for XLM",
+                    "type": "string",
+                    "example": "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
                 },
                 "checks": {
-                    "$ref": "#/definitions/payments.Checks"
+                    "description": "Per-check result: pass, fail or skip",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/payments.Checks"
+                        }
+                    ]
                 },
                 "detected_at": {
-                    "type": "string"
+                    "description": "When the server first saw the payment",
+                    "type": "string",
+                    "example": "2026-10-22T14:03:25Z"
                 },
                 "expected": {
-                    "$ref": "#/definitions/payments.Expected"
+                    "description": "What the invoice demanded; null when no invoice matched",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/payments.Expected"
+                        }
+                    ]
                 },
                 "explorer_url": {
-                    "type": "string"
+                    "description": "Block explorer link",
+                    "type": "string",
+                    "example": "https://stellar.expert/explorer/testnet/tx/a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7"
                 },
                 "failure_code": {
-                    "type": "string"
+                    "description": "Machine-readable reason; null when verified",
+                    "type": "string",
+                    "enum": [
+                        "insufficient_amount",
+                        "amount_mismatch",
+                        "wrong_asset",
+                        "wrong_recipient",
+                        "missing_reference",
+                        "unknown_reference",
+                        "transaction_failed",
+                        "duplicate",
+                        "invoice_not_payable",
+                        "expired",
+                        "invalid_invoice_total"
+                    ],
+                    "example": "insufficient_amount"
                 },
                 "failure_reason": {
-                    "type": "string"
+                    "description": "Human-readable reason; null when verified",
+                    "type": "string",
+                    "example": "insufficient amount: expected 100.0000000, received 99.0000000"
                 },
                 "id": {
-                    "type": "string"
+                    "description": "Payment id",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
                 },
                 "invoice_id": {
-                    "type": "string"
+                    "description": "Invoice the payment was matched to; null for unmatched payments",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
                 },
                 "invoice_number": {
-                    "type": "string"
+                    "description": "Number of the matched invoice; null when unmatched",
+                    "type": "string",
+                    "example": "INV-20261020-0019"
                 },
                 "ledger_closed_at": {
-                    "type": "string"
+                    "description": "When Stellar closed the ledger containing the payment",
+                    "type": "string",
+                    "example": "2026-10-22T14:03:11Z"
                 },
                 "merchant_email": {
-                    "type": "string"
+                    "description": "Receiving merchant; only on /admin/payments",
+                    "type": "string",
+                    "example": "merchant@example.com"
                 },
                 "payment_reference": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "STL-B9371BD3A173"
                 },
                 "recipient": {
-                    "type": "string"
+                    "description": "Receiving account",
+                    "type": "string",
+                    "example": "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
                 },
                 "sender": {
-                    "type": "string"
+                    "description": "Paying account",
+                    "type": "string",
+                    "example": "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
                 },
                 "transaction_hash": {
-                    "type": "string"
+                    "description": "Stellar transaction hash",
+                    "type": "string",
+                    "example": "a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7"
                 },
                 "verification_status": {
-                    "type": "string"
+                    "description": "Outcome of the check; see docs/payment-status-model.md",
+                    "type": "string",
+                    "enum": [
+                        "pending",
+                        "detected",
+                        "verified",
+                        "invalid",
+                        "unmatched",
+                        "failed"
+                    ],
+                    "example": "verified"
                 },
                 "verified_at": {
-                    "type": "string"
+                    "description": "When the payment was verified; null otherwise",
+                    "type": "string",
+                    "example": "2026-10-22T14:03:26Z"
                 }
             }
         },
@@ -3890,61 +7101,96 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "amount": {
-                    "type": "string"
+                    "description": "Exact amount to send, 7 decimals. Over- and underpayments are rejected",
+                    "type": "string",
+                    "example": "2.0300000"
                 },
                 "asset_code": {
-                    "type": "string"
+                    "description": "Asset to send",
+                    "type": "string",
+                    "example": "USDC"
                 },
                 "asset_issuer": {
-                    "type": "string"
+                    "description": "Issuer of the asset; null for XLM",
+                    "type": "string",
+                    "example": "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
                 },
                 "expires_at": {
-                    "type": "string"
+                    "description": "Payments closed at or after this time are rejected",
+                    "type": "string",
+                    "example": "2026-12-01T00:00:00Z"
                 },
                 "explorer_url": {
-                    "type": "string"
+                    "description": "Explorer link for the verified payment",
+                    "type": "string",
+                    "example": "https://stellar.expert/explorer/testnet/tx/a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7"
                 },
                 "invoice_id": {
-                    "type": "string"
+                    "description": "Invoice id",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
                 },
                 "invoice_number": {
-                    "type": "string"
+                    "description": "Invoice number",
+                    "type": "string",
+                    "example": "INV-20261020-0019"
                 },
                 "invoice_status": {
-                    "type": "string"
+                    "description": "Invoice status",
+                    "type": "string",
+                    "example": "sent"
                 },
                 "network": {
-                    "type": "string"
+                    "description": "Stellar network",
+                    "type": "string",
+                    "example": "testnet"
                 },
                 "paid_at": {
-                    "type": "string"
+                    "description": "When the invoice was marked paid",
+                    "type": "string",
+                    "example": "2026-10-22T14:03:26Z"
                 },
                 "payment_detected_at": {
-                    "type": "string"
+                    "description": "When a payment was first detected",
+                    "type": "string",
+                    "example": "2026-10-22T14:03:25Z"
                 },
                 "payment_reference": {
-                    "type": "string"
+                    "description": "Text memo that must be attached to the payment",
+                    "type": "string",
+                    "example": "STL-B9371BD3A173"
                 },
                 "payment_status": {
-                    "type": "string"
+                    "description": "Derived: awaiting_payment for sent, viewed, pending and overdue; otherwise the invoice status",
+                    "type": "string",
+                    "example": "awaiting_payment"
                 },
                 "payments": {
+                    "description": "All payments recorded for the invoice; owner view only",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/payments.PaymentRecord"
                     }
                 },
                 "recipient": {
-                    "type": "string"
+                    "description": "Account to pay",
+                    "type": "string",
+                    "example": "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
                 },
                 "transaction_hash": {
-                    "type": "string"
+                    "description": "Hash of the verified payment; only set once verified",
+                    "type": "string",
+                    "example": "a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7"
                 },
                 "verification_status": {
-                    "type": "string"
+                    "description": "Status of the most relevant payment",
+                    "type": "string",
+                    "example": "verified"
                 },
                 "verified_at": {
-                    "type": "string"
+                    "description": "When it was verified",
+                    "type": "string",
+                    "example": "2026-10-22T14:03:26Z"
                 }
             }
         },
@@ -3955,7 +7201,9 @@ const docTemplate = `{
             ],
             "properties": {
                 "transaction_hash": {
-                    "type": "string"
+                    "description": "64-character hex Stellar transaction hash",
+                    "type": "string",
+                    "example": "a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7"
                 }
             }
         },
@@ -3973,9 +7221,12 @@ const docTemplate = `{
             ],
             "properties": {
                 "country": {
-                    "type": "string"
+                    "description": "Client country",
+                    "type": "string",
+                    "example": "NG"
                 },
                 "interval": {
+                    "description": "weekly, biweekly, monthly, quarterly or yearly",
                     "enum": [
                         "weekly",
                         "biweekly",
@@ -3987,9 +7238,11 @@ const docTemplate = `{
                         {
                             "$ref": "#/definitions/recurring.RecurringInterval"
                         }
-                    ]
+                    ],
+                    "example": "monthly"
                 },
                 "invoice_items": {
+                    "description": "Line items copied to each invoice",
                     "type": "array",
                     "minItems": 1,
                     "items": {
@@ -3997,27 +7250,55 @@ const docTemplate = `{
                     }
                 },
                 "note": {
+                    "description": "Optional note",
                     "type": "string"
                 },
                 "payer_email": {
-                    "type": "string"
+                    "description": "Client email",
+                    "type": "string",
+                    "example": "billing@acme.com"
                 },
                 "payer_name": {
-                    "type": "string"
+                    "description": "Client name",
+                    "type": "string",
+                    "example": "Acme Ltd"
                 },
                 "service_fee": {
+                    "description": "\u003e= 0",
                     "type": "number",
-                    "minimum": 0
+                    "minimum": 0,
+                    "example": 0
                 },
                 "start_date": {
-                    "type": "string"
+                    "description": "YYYY-MM-DD of the first generated invoice",
+                    "type": "string",
+                    "example": "2026-11-01"
                 },
                 "template_id": {
-                    "type": "string"
+                    "description": "Invoice template",
+                    "type": "string",
+                    "example": "template_001"
                 },
                 "title": {
+                    "description": "Title copied to each generated invoice",
                     "type": "string",
-                    "minLength": 3
+                    "minLength": 3,
+                    "example": "Monthly retainer"
+                }
+            }
+        },
+        "recurring.RecurringCreated": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "description": "Schedule id",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
+                },
+                "next_run_at": {
+                    "description": "First run",
+                    "type": "string",
+                    "example": "2026-11-01T00:00:00Z"
                 }
             }
         },
@@ -4038,10 +7319,115 @@ const docTemplate = `{
                 "IntervalYearly"
             ]
         },
+        "recurring.RecurringInvoice": {
+            "type": "object",
+            "properties": {
+                "country": {
+                    "description": "Country",
+                    "type": "string",
+                    "example": "NG"
+                },
+                "created_at": {
+                    "description": "Created",
+                    "type": "string",
+                    "example": "2026-09-01T00:00:00Z"
+                },
+                "currency": {
+                    "description": "Currency",
+                    "type": "string",
+                    "example": "usdc"
+                },
+                "id": {
+                    "description": "Schedule id",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
+                },
+                "interval": {
+                    "description": "Schedule interval",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/recurring.RecurringInterval"
+                        }
+                    ],
+                    "example": "monthly"
+                },
+                "invoice_items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/invoice.InvoiceItems"
+                    }
+                },
+                "is_active": {
+                    "description": "False when paused",
+                    "type": "boolean",
+                    "example": true
+                },
+                "last_run_at": {
+                    "description": "Last invoice time",
+                    "type": "string",
+                    "example": "2026-10-01T00:00:00Z"
+                },
+                "next_run_at": {
+                    "description": "Next invoice time",
+                    "type": "string",
+                    "example": "2026-11-01T00:00:00Z"
+                },
+                "note": {
+                    "description": "Note",
+                    "type": "string"
+                },
+                "payer_email": {
+                    "description": "Client email",
+                    "type": "string",
+                    "example": "billing@acme.com"
+                },
+                "payer_name": {
+                    "description": "Client",
+                    "type": "string",
+                    "example": "Acme Ltd"
+                },
+                "service_fee": {
+                    "description": "Fee",
+                    "type": "number",
+                    "example": 0
+                },
+                "sub_total": {
+                    "description": "Sum of items",
+                    "type": "number",
+                    "example": 451.5
+                },
+                "template_id": {
+                    "description": "Template",
+                    "type": "string",
+                    "example": "template_001"
+                },
+                "title": {
+                    "description": "Title",
+                    "type": "string",
+                    "example": "Monthly retainer"
+                },
+                "total": {
+                    "description": "Total per invoice",
+                    "type": "number",
+                    "example": 451.5
+                },
+                "updated_at": {
+                    "description": "Updated",
+                    "type": "string",
+                    "example": "2026-10-01T00:00:00Z"
+                },
+                "user_id": {
+                    "description": "Owner",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
+                }
+            }
+        },
         "recurring.UpdateRecurringDTO": {
             "type": "object",
             "properties": {
                 "interval": {
+                    "description": "New interval",
                     "enum": [
                         "weekly",
                         "biweekly",
@@ -4053,13 +7439,228 @@ const docTemplate = `{
                         {
                             "$ref": "#/definitions/recurring.RecurringInterval"
                         }
-                    ]
+                    ],
+                    "example": "monthly"
                 },
                 "is_active": {
-                    "type": "boolean"
+                    "description": "false pauses the schedule, true resumes it",
+                    "type": "boolean",
+                    "example": false
                 },
                 "start_date": {
-                    "type": "string"
+                    "description": "YYYY-MM-DD, resets the next run date",
+                    "type": "string",
+                    "example": "2026-12-01"
+                }
+            }
+        },
+        "transactions.CashFlowDataPoint": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "description": "Integer cents",
+                    "type": "integer",
+                    "example": 45000
+                },
+                "date": {
+                    "description": "Month start, YYYY-MM-DD",
+                    "type": "string",
+                    "example": "2026-10-01"
+                },
+                "invoices": {
+                    "description": "Paid invoices",
+                    "type": "integer",
+                    "example": 3
+                }
+            }
+        },
+        "transactions.GetTransactionCashFlowResponse": {
+            "type": "object",
+            "properties": {
+                "cash_flow": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/transactions.CashFlowDataPoint"
+                    }
+                }
+            }
+        },
+        "transactions.GetTransactionDto": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "description": "Amount in the entry currency",
+                    "type": "number",
+                    "example": 2.03
+                },
+                "confirmed_at": {
+                    "description": "Ledger close time",
+                    "type": "string",
+                    "example": "2026-10-22T14:03:11Z"
+                },
+                "created_at": {
+                    "description": "Created",
+                    "type": "string",
+                    "example": "2026-10-22T14:03:26Z"
+                },
+                "currency": {
+                    "description": "usdc or xlm",
+                    "type": "string",
+                    "example": "usdc"
+                },
+                "id": {
+                    "description": "Ledger entry id",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
+                },
+                "invoice_id": {
+                    "description": "Related invoice; null for transfers",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
+                },
+                "network_fee": {
+                    "description": "Fee in XLM",
+                    "type": "number",
+                    "example": 0.00001
+                },
+                "source_amount": {
+                    "description": "Amount spent for path payments",
+                    "type": "string",
+                    "example": "12.3456789"
+                },
+                "source_asset": {
+                    "description": "Asset spent for path payments",
+                    "type": "string",
+                    "example": "XLM"
+                },
+                "status": {
+                    "description": "On-chain result: pending, confirmed, failed, aborted or refunded",
+                    "type": "string",
+                    "example": "confirmed"
+                },
+                "token_type": {
+                    "description": "Token",
+                    "type": "string",
+                    "example": "usdc"
+                },
+                "transaction_hash": {
+                    "description": "Stellar transaction hash",
+                    "type": "string",
+                    "example": "a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7"
+                },
+                "transaction_type": {
+                    "description": "payment, withdrawal, funding or path_payment",
+                    "type": "string",
+                    "example": "payment"
+                },
+                "wallet_id": {
+                    "description": "Wallet involved",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
+                }
+            }
+        },
+        "transactions.GetTransactionOverViewResponse": {
+            "type": "object",
+            "properties": {
+                "expired_amount": {
+                    "$ref": "#/definitions/transactions.TransactionCard"
+                },
+                "invalid_payment_amount": {
+                    "$ref": "#/definitions/transactions.TransactionCard"
+                },
+                "overdue_amount": {
+                    "$ref": "#/definitions/transactions.TransactionCard"
+                },
+                "paid_amount": {
+                    "$ref": "#/definitions/transactions.TransactionCard"
+                },
+                "pending_amount": {
+                    "$ref": "#/definitions/transactions.TransactionCard"
+                },
+                "total_amount": {
+                    "$ref": "#/definitions/transactions.TransactionCard"
+                }
+            }
+        },
+        "transactions.PaginatedTransactions": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "description": "deprecated: use items",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/transactions.GetTransactionDto"
+                    }
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/transactions.GetTransactionDto"
+                    }
+                },
+                "limit": {
+                    "description": "Deprecated: use meta.limit",
+                    "type": "integer",
+                    "example": 10
+                },
+                "meta": {
+                    "$ref": "#/definitions/utils.PageMeta"
+                },
+                "page": {
+                    "description": "Deprecated: use meta.page",
+                    "type": "integer",
+                    "example": 1
+                },
+                "total_count": {
+                    "description": "Deprecated: use meta.total",
+                    "type": "integer",
+                    "example": 57
+                }
+            }
+        },
+        "transactions.PaymentStatusResult": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "pending",
+                        "confirmed",
+                        "failed",
+                        "aborted",
+                        "refunded"
+                    ]
+                },
+                "stellar_url": {
+                    "description": "Explorer link",
+                    "type": "string",
+                    "example": "https://stellar.expert/explorer/testnet/tx/a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7"
+                },
+                "transaction_hash": {
+                    "description": "Stellar transaction hash",
+                    "type": "string",
+                    "example": "a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7"
+                },
+                "transaction_id": {
+                    "description": "Ledger entry id",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
+                }
+            }
+        },
+        "transactions.TransactionCard": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "description": "Integer cents",
+                    "type": "integer",
+                    "example": 45000
+                },
+                "invoice_count": {
+                    "description": "Invoices in this bucket",
+                    "type": "integer",
+                    "example": 3
                 }
             }
         },
@@ -4071,26 +7672,94 @@ const docTemplate = `{
             ],
             "properties": {
                 "business_name": {
+                    "description": "Optional, max 50",
                     "type": "string",
-                    "maxLength": 50
+                    "maxLength": 50,
+                    "example": "Doe Studio"
                 },
                 "country": {
+                    "description": "Optional, max 25",
                     "type": "string",
-                    "maxLength": 25
+                    "maxLength": 25,
+                    "example": "Nigeria"
                 },
                 "first_name": {
+                    "description": "2-15 characters",
                     "type": "string",
                     "maxLength": 15,
-                    "minLength": 2
+                    "minLength": 2,
+                    "example": "Jane"
                 },
                 "last_name": {
+                    "description": "2-15 characters",
                     "type": "string",
                     "maxLength": 15,
-                    "minLength": 2
+                    "minLength": 2,
+                    "example": "Doe"
                 },
                 "phone_number": {
+                    "description": "Optional, max 15",
                     "type": "string",
-                    "maxLength": 15
+                    "maxLength": 15,
+                    "example": "+2348012345678"
+                }
+            }
+        },
+        "user.CompleteProfileResult": {
+            "type": "object",
+            "properties": {
+                "business_name": {
+                    "description": "Business",
+                    "type": "string",
+                    "example": "Doe Studio"
+                },
+                "country": {
+                    "description": "Country",
+                    "type": "string",
+                    "example": "Nigeria"
+                },
+                "email": {
+                    "description": "Email",
+                    "type": "string",
+                    "example": "jane@example.com"
+                },
+                "first_name": {
+                    "description": "First name",
+                    "type": "string",
+                    "example": "Jane"
+                },
+                "id": {
+                    "description": "User id",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
+                },
+                "last_name": {
+                    "description": "Last name",
+                    "type": "string",
+                    "example": "Doe"
+                },
+                "phone_number": {
+                    "description": "Phone",
+                    "type": "string",
+                    "example": "+2348012345678"
+                },
+                "profile_completed": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "user.ProfileResult": {
+            "type": "object",
+            "properties": {
+                "profile": {
+                    "$ref": "#/definitions/user.UserProfileDto"
+                },
+                "profile_complete": {
+                    "type": "boolean"
+                },
+                "wallet": {
+                    "$ref": "#/definitions/user.UserWallet"
                 }
             }
         },
@@ -4098,26 +7767,220 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "business_name": {
+                    "description": "Max 50",
                     "type": "string",
-                    "maxLength": 50
+                    "maxLength": 50,
+                    "example": "Doe Studio"
                 },
                 "country": {
+                    "description": "Max 25",
                     "type": "string",
-                    "maxLength": 25
+                    "maxLength": 25,
+                    "example": "Nigeria"
                 },
                 "first_name": {
+                    "description": "2-15 characters",
                     "type": "string",
                     "maxLength": 15,
-                    "minLength": 2
+                    "minLength": 2,
+                    "example": "Jane"
                 },
                 "last_name": {
+                    "description": "2-15 characters",
                     "type": "string",
                     "maxLength": 15,
-                    "minLength": 2
+                    "minLength": 2,
+                    "example": "Doe"
                 },
                 "phone_number": {
+                    "description": "Max 15",
                     "type": "string",
-                    "maxLength": 15
+                    "maxLength": 15,
+                    "example": "+2348012345678"
+                }
+            }
+        },
+        "user.User": {
+            "type": "object",
+            "properties": {
+                "business_name": {
+                    "description": "Business",
+                    "type": "string",
+                    "example": "Doe Studio"
+                },
+                "country": {
+                    "description": "Country",
+                    "type": "string",
+                    "example": "Nigeria"
+                },
+                "email": {
+                    "description": "Email",
+                    "type": "string",
+                    "example": "jane@example.com"
+                },
+                "email_verified": {
+                    "description": "Email verified",
+                    "type": "boolean",
+                    "example": true
+                },
+                "first_name": {
+                    "description": "First name",
+                    "type": "string",
+                    "example": "Jane"
+                },
+                "id": {
+                    "description": "User id",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
+                },
+                "last_name": {
+                    "description": "Last name",
+                    "type": "string",
+                    "example": "Doe"
+                },
+                "phone_number": {
+                    "description": "Phone",
+                    "type": "string",
+                    "example": "+2348012345678"
+                },
+                "wallet": {
+                    "$ref": "#/definitions/user.UserWallet"
+                }
+            }
+        },
+        "user.UserProfileDto": {
+            "type": "object",
+            "properties": {
+                "auth_type": {
+                    "description": "password or google",
+                    "type": "string",
+                    "example": "password"
+                },
+                "business_name": {
+                    "description": "Business",
+                    "type": "string",
+                    "example": "Doe Studio"
+                },
+                "country": {
+                    "description": "Country",
+                    "type": "string",
+                    "example": "Nigeria"
+                },
+                "created_at": {
+                    "description": "Created",
+                    "type": "string",
+                    "example": "2026-10-20T09:00:00Z"
+                },
+                "email": {
+                    "description": "Email",
+                    "type": "string",
+                    "example": "jane@example.com"
+                },
+                "email_verified": {
+                    "description": "Email verified",
+                    "type": "boolean",
+                    "example": true
+                },
+                "email_verified_at": {
+                    "description": "When verified",
+                    "type": "string",
+                    "example": "2026-10-20T09:00:00Z"
+                },
+                "first_name": {
+                    "description": "First name",
+                    "type": "string",
+                    "example": "Jane"
+                },
+                "id": {
+                    "description": "User id",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
+                },
+                "is_active": {
+                    "description": "Active flag",
+                    "type": "boolean",
+                    "example": true
+                },
+                "last_name": {
+                    "description": "Last name",
+                    "type": "string",
+                    "example": "Doe"
+                },
+                "phone_number": {
+                    "description": "Phone",
+                    "type": "string",
+                    "example": "+2348012345678"
+                },
+                "role": {
+                    "description": "user or admin",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/user.UserRole"
+                        }
+                    ],
+                    "example": "user"
+                },
+                "updated_at": {
+                    "description": "Updated",
+                    "type": "string",
+                    "example": "2026-10-22T09:00:00Z"
+                },
+                "wallet": {
+                    "description": "Primary wallet",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/user.UserWallet"
+                        }
+                    ]
+                }
+            }
+        },
+        "user.UserRole": {
+            "type": "string",
+            "enum": [
+                "user",
+                "admin"
+            ],
+            "x-enum-varnames": [
+                "RoleUser",
+                "RoleAdmin"
+            ]
+        },
+        "user.UserWallet": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "description": "Stellar account id",
+                    "type": "string",
+                    "example": "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
+                },
+                "balance": {
+                    "description": "USDC and XLM balances",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/user.WalletBalance"
+                        }
+                    ]
+                },
+                "id": {
+                    "description": "Wallet id, needed by PIN, transfer and export endpoints",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
+                }
+            }
+        },
+        "user.WalletBalance": {
+            "type": "object",
+            "properties": {
+                "usdc": {
+                    "description": "USDC",
+                    "type": "number",
+                    "example": 5.03
+                },
+                "xlm": {
+                    "description": "XLM",
+                    "type": "number",
+                    "example": 10002
                 }
             }
         },
@@ -4136,32 +7999,73 @@ const docTemplate = `{
                 }
             }
         },
+        "utils.PageMeta": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "description": "Page size",
+                    "type": "integer",
+                    "example": 20
+                },
+                "page": {
+                    "description": "Current page, from 1",
+                    "type": "integer",
+                    "example": 1
+                },
+                "total": {
+                    "description": "Total matching rows",
+                    "type": "integer",
+                    "example": 57
+                },
+                "total_pages": {
+                    "description": "Total pages",
+                    "type": "integer",
+                    "example": 3
+                }
+            }
+        },
         "wallet.PathPaymentResult": {
             "type": "object",
             "properties": {
                 "dest_amount": {
-                    "type": "string"
+                    "description": "Amount delivered",
+                    "type": "string",
+                    "example": "10.5"
                 },
                 "dest_asset": {
-                    "type": "string"
+                    "description": "Asset delivered",
+                    "type": "string",
+                    "example": "USDC"
                 },
                 "destination": {
-                    "type": "string"
+                    "description": "Recipient account",
+                    "type": "string",
+                    "example": "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
                 },
                 "fee_xlm": {
-                    "type": "number"
+                    "description": "Network fee in XLM",
+                    "type": "number",
+                    "example": 0.00001
                 },
                 "payment_status": {
-                    "type": "string"
+                    "description": "Invoice payments only: detected until the chain data is verified, then verified, invalid or failed",
+                    "type": "string",
+                    "example": "detected"
                 },
                 "source_amount": {
-                    "type": "string"
+                    "description": "Amount spent, 7 decimals",
+                    "type": "string",
+                    "example": "12.3456789"
                 },
                 "source_asset": {
-                    "type": "string"
+                    "description": "Asset spent",
+                    "type": "string",
+                    "example": "XLM"
                 },
                 "transaction_hash": {
-                    "type": "string"
+                    "description": "Stellar transaction hash",
+                    "type": "string",
+                    "example": "a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7"
                 }
             }
         },
@@ -4174,17 +8078,23 @@ const docTemplate = `{
             ],
             "properties": {
                 "invoice_id": {
-                    "type": "string"
+                    "description": "Invoice to pay",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
                 },
                 "pin": {
-                    "type": "string"
+                    "description": "Wallet PIN",
+                    "type": "string",
+                    "example": "4821"
                 },
                 "source_asset": {
+                    "description": "Asset spent from this wallet: XLM or USDC",
                     "type": "string",
                     "enum": [
                         "XLM",
                         "USDC"
-                    ]
+                    ],
+                    "example": "XLM"
                 }
             }
         },
@@ -4195,9 +8105,26 @@ const docTemplate = `{
             ],
             "properties": {
                 "pin": {
+                    "description": "4-8 digits",
                     "type": "string",
                     "maxLength": 8,
-                    "minLength": 4
+                    "minLength": 4,
+                    "example": "4821"
+                }
+            }
+        },
+        "wallet.StellarWalletBalance": {
+            "type": "object",
+            "properties": {
+                "usdc": {
+                    "description": "USDC balance",
+                    "type": "number",
+                    "example": 5.03
+                },
+                "xlm": {
+                    "description": "XLM balance",
+                    "type": "number",
+                    "example": 10002
                 }
             }
         },
@@ -4212,27 +8139,119 @@ const docTemplate = `{
             ],
             "properties": {
                 "amount": {
-                    "type": "string"
+                    "description": "Amount the recipient receives, in dest_asset",
+                    "type": "string",
+                    "example": "10.5"
                 },
                 "dest_asset": {
+                    "description": "Asset received: XLM or USDC",
                     "type": "string",
                     "enum": [
                         "XLM",
                         "USDC"
-                    ]
+                    ],
+                    "example": "USDC"
                 },
                 "destination_address": {
-                    "type": "string"
+                    "description": "Stellar account id (G...)",
+                    "type": "string",
+                    "example": "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
                 },
                 "pin": {
-                    "type": "string"
+                    "description": "Wallet PIN",
+                    "type": "string",
+                    "example": "4821"
                 },
                 "source_asset": {
+                    "description": "Asset spent: XLM or USDC",
                     "type": "string",
                     "enum": [
                         "XLM",
                         "USDC"
-                    ]
+                    ],
+                    "example": "XLM"
+                }
+            }
+        },
+        "wallet.WalletExportResult": {
+            "type": "object",
+            "properties": {
+                "private_key": {
+                    "description": "Secret key. Never log or cache",
+                    "type": "string",
+                    "example": "S..."
+                },
+                "wallet_address": {
+                    "description": "Stellar account id",
+                    "type": "string",
+                    "example": "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
+                }
+            }
+        },
+        "wallet.WalletLookupResult": {
+            "type": "object",
+            "properties": {
+                "user_id": {
+                    "description": "Wallet owner",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
+                },
+                "wallet_address": {
+                    "description": "Recipient account",
+                    "type": "string",
+                    "example": "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
+                }
+            }
+        },
+        "wallet.WalletResponseDto": {
+            "type": "object",
+            "properties": {
+                "balance": {
+                    "$ref": "#/definitions/wallet.StellarWalletBalance"
+                },
+                "chain": {
+                    "description": "Chain",
+                    "type": "string",
+                    "example": "stellar"
+                },
+                "created_at": {
+                    "description": "Created",
+                    "type": "string",
+                    "example": "2026-10-20T09:00:00Z"
+                },
+                "id": {
+                    "description": "Wallet id",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
+                },
+                "is_active": {
+                    "description": "Active flag",
+                    "type": "boolean",
+                    "example": true
+                },
+                "is_primary": {
+                    "description": "Receives invoice payments",
+                    "type": "boolean",
+                    "example": true
+                },
+                "private_key": {
+                    "description": "Only returned once, at creation",
+                    "type": "string"
+                },
+                "tag": {
+                    "description": "Label",
+                    "type": "string",
+                    "example": "Main"
+                },
+                "user_id": {
+                    "description": "Owner",
+                    "type": "string",
+                    "example": "3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"
+                },
+                "wallet_address": {
+                    "description": "Stellar account id",
+                    "type": "string",
+                    "example": "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
                 }
             }
         }
@@ -4244,7 +8263,49 @@ const docTemplate = `{
             "name": "Authorization",
             "in": "header"
         }
-    }
+    },
+    "tags": [
+        {
+            "description": "Sign-up, sign-in (password and Google), email verification and password reset",
+            "name": "auth"
+        },
+        {
+            "description": "Profile of the signed-in user and its primary wallet",
+            "name": "profile"
+        },
+        {
+            "description": "Create, send, review, search and download invoices",
+            "name": "invoices"
+        },
+        {
+            "description": "Payment requests, detected on-chain payments and their verification results",
+            "name": "payments-v2"
+        },
+        {
+            "description": "Stellar wallet, PIN, transfers and invoice payments",
+            "name": "wallet"
+        },
+        {
+            "description": "Ledger of money movements and cash-flow statistics",
+            "name": "transactions"
+        },
+        {
+            "description": "In-app notifications, including payment outcomes",
+            "name": "notifications"
+        },
+        {
+            "description": "Invoice comment threads and reactions",
+            "name": "comments"
+        },
+        {
+            "description": "Recurring invoice schedules",
+            "name": "recurring"
+        },
+        {
+            "description": "Admin-only management of users, invoices, transactions, payments and network settings",
+            "name": "admin"
+        }
+    ]
 }`
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
@@ -4254,7 +8315,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/api/v1",
 	Schemes:          []string{},
 	Title:            "Stellance API",
-	Description:      "Invoice management and payment platform API",
+	Description:      "Invoice management and Stellar payment platform API.\n\n**Envelope.** Every JSON response is `{status_code, message, data?, error?}`; the types below describe `data`.\n**Auth.** Send `Authorization: Bearer <access_token>`. Tokens last 1 hour; deleted or deactivated users are rejected immediately. Unverified emails cannot sign in.\n**Pagination.** List endpoints take `page` (from 1) and `limit`, and return `{items, meta:{page, limit, total, total_pages}}`. Old names (`page_count`, `count`, `payments`, `invoice`, `data`, `notifications`) still work and are deprecated.\n**Amounts.** Payment records and requests use 7-decimal strings (`\"2.0300000\"`). Invoice and ledger fields are JSON numbers in the invoice currency. `/transaction/stats` and `/transaction/inflow` are integer cents. See docs/api-conventions.md.\n**Payments (v2).** Invoices are paid with a text memo equal to the invoice's `payment_reference`. The server detects and verifies the on-chain payment; only a verified payment marks an invoice paid. Status values and transitions are in docs/payment-status-model.md.\n**Errors.** 400 invalid input, 401 missing or invalid token, 403 not allowed, 404 not found, 409 state conflict, 422 valid request that fails a business rule, 502 Stellar unreachable, 500 unexpected.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

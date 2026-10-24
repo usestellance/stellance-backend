@@ -6,8 +6,8 @@ Three value lists exist. Verification status lives on a payment record. Invoice 
 
 | Value | Meaning |
 | --- | --- |
-| `pending` | Reserved. Never returned today. |
-| `detected` | Payment seen on chain and awaiting its settlement check. Transient: settled in the same poll pass, so it is returned only if the server stops mid-settlement. Recovered within 30 seconds. |
+| `pending` | In flight: accepted by the API, not yet checked against its invoice. Clients must accept it. The poller currently stores in-flight payments as `detected`. |
+| `detected` | Payment seen on chain and being checked. Short lived: settled in the same poll pass, and recovered within 30 seconds if the server stops mid-settlement. |
 | `verified` | All checks passed. The invoice is paid. |
 | `invalid` | Matched an invoice but failed a check (see `failure_code`). |
 | `unmatched` | No invoice for the reference, or the recipient is not the invoice recipient. |
@@ -19,7 +19,7 @@ Three value lists exist. Verification status lives on a payment record. Invoice 
 
 ## checks
 
-Each of `recipient`, `asset`, `amount`, `reference`, `success`, `invoice` is `pass`, `fail` or `skip`. `skip` means the check could not run, for example every invoice check when no invoice matches the reference. Records stored before this field existed return `checks: null` and `expected: null`.
+Each of `recipient`, `asset`, `amount`, `reference`, `success`, `invoice` is `pass`, `fail` or `skip`. `skip` means the check could not run, for example every invoice check when no invoice matches the reference. Records stored before this field existed were backfilled by migration 000033 from the stored record and its invoice. `checks` is never null after that migration. `expected` is null only when no invoice matches the reference. For backfilled rows the asset issuer and expected recipient are best effort.
 
 ## invoice status
 

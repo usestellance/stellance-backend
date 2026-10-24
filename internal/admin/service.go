@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math"
@@ -16,6 +17,7 @@ import (
 	"github.com/The-True-Hooha/stellance-backend/pkg/config"
 	jwt_ "github.com/The-True-Hooha/stellance-backend/pkg/jwt"
 	"github.com/The-True-Hooha/stellance-backend/pkg/utils"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
@@ -37,41 +39,50 @@ func NewAdminService() *AdminService {
 }
 
 type AdminUserRow struct {
-	ID            string     `json:"id"`
-	Email         string     `json:"email"`
-	FirstName     string     `json:"first_name"`
-	LastName      string     `json:"last_name"`
-	Role          string     `json:"role"`
-	EmailVerified bool       `json:"email_verified"`
-	IsActive      bool       `json:"is_active"`
-	CreatedAt     time.Time  `json:"created_at"`
+	ID            string    `json:"id" example:"3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"` // User id
+	Email         string    `json:"email" example:"jane@example.com"`                  // Email
+	FirstName     string    `json:"first_name" example:"Jane"`                         // First name
+	LastName      string    `json:"last_name" example:"Doe"`                           // Last name
+	Role          string    `json:"role" example:"user"`                               // user or admin
+	EmailVerified bool      `json:"email_verified" example:"true"`                     // Verified
+	IsActive      bool      `json:"is_active" example:"true"`                          // Active
+	CreatedAt     time.Time `json:"created_at" example:"2026-10-20T09:00:00Z"`         // Created
 }
 
 type AdminInvoiceRow struct {
-	ID            string    `json:"id"`
-	InvoiceNumber string    `json:"invoice_number"`
-	CreatorEmail  string    `json:"creator_email"`
-	PayerEmail    string    `json:"payer_email"`
-	Total         float64   `json:"total"`
-	Currency      string    `json:"currency"`
-	Status        string    `json:"status"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID            string    `json:"id" example:"3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"` // Invoice id
+	InvoiceNumber string    `json:"invoice_number" example:"INV-20261020-0019"`        // Number
+	CreatorEmail  string    `json:"creator_email" example:"jane@example.com"`          // Creator
+	PayerEmail    string    `json:"payer_email" example:"billing@acme.com"`            // Client
+	Total         float64   `json:"total" example:"454"`                               // Amount due
+	Currency      string    `json:"currency" example:"usdc"`                           // Currency
+	Status        string    `json:"status" example:"paid"`                             // Invoice status
+	CreatedAt     time.Time `json:"created_at" example:"2026-10-20T09:00:00Z"`         // Created
 }
 
 type AdminStats struct {
-	TotalUsers    int     `json:"total_users"`
-	ActiveUsers   int     `json:"active_users"`
-	TotalInvoices int     `json:"total_invoices"`
-	PaidInvoices  int     `json:"paid_invoices"`
-	OverdueCount  int     `json:"overdue_count"`
-	TotalRevenue  float64 `json:"total_revenue"`
+	TotalUsers    int     `json:"total_users" example:"120"`       // All users
+	ActiveUsers   int     `json:"active_users" example:"112"`      // Active users
+	TotalInvoices int     `json:"total_invoices" example:"560"`    // All invoices
+	PaidInvoices  int     `json:"paid_invoices" example:"310"`     // Paid invoices
+	OverdueCount  int     `json:"overdue_count" example:"12"`      // Invoices in overdue status
+	TotalRevenue  float64 `json:"total_revenue" example:"48210.5"` // Sum of paid invoice totals
+}
+
+type AdminWalletRow struct {
+	ID      string  `json:"id" example:"3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"`                          // Wallet id
+	Address string  `json:"address" example:"GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"` // Stellar account id
+	Tag     string  `json:"tag" example:"Main"`                                                         // Label
+	USDC    float64 `json:"usdc_balance" example:"5.03"`                                                // Cached USDC balance
+	XLM     float64 `json:"xlm_balance" example:"10002"`                                                // Cached XLM balance
+	Primary bool    `json:"is_primary" example:"true"`                                                  // Receives invoice payments
 }
 
 type AdminPaginationMeta struct {
-	Page       int `json:"page"`
-	Limit      int `json:"limit"`
-	Total      int `json:"total"`
-	TotalPages int `json:"total_pages"`
+	Page       int `json:"page" example:"1"`        // Current page
+	Limit      int `json:"limit" example:"20"`      // Page size
+	Total      int `json:"total" example:"57"`      // Total matching rows
+	TotalPages int `json:"total_pages" example:"3"` // Total pages
 }
 
 func (as *AdminService) GetStats(ctx context.Context) *utils.ApiResponse {
@@ -140,7 +151,7 @@ func (as *AdminService) ListUsers(ctx context.Context, page, limit int, search s
 	}
 	defer rows.Close()
 
-	var users []AdminUserRow
+	users := []AdminUserRow{}
 	for rows.Next() {
 		var u AdminUserRow
 		if err := rows.Scan(&u.ID, &u.Email, &u.FirstName, &u.LastName, &u.Role, &u.EmailVerified, &u.IsActive, &u.CreatedAt); err != nil {
@@ -181,7 +192,7 @@ func (as *AdminService) GetUser(ctx context.Context, userID string) *utils.ApiRe
 		 LEFT JOIN invoice i ON i.id = t.invoice_id
 		 WHERE t.user_id = $1 ORDER BY t.created_at DESC LIMIT 10`, userID,
 	)
-	var recentTx []AdminTransactionRow
+	recentTx := []AdminTransactionRow{}
 	if txRows != nil {
 		defer txRows.Close()
 		for txRows.Next() {
@@ -196,7 +207,7 @@ func (as *AdminService) GetUser(ctx context.Context, userID string) *utils.ApiRe
 		`SELECT id, user_id, action, COALESCE(entity_type,''), COALESCE(entity_id::text,''), COALESCE(ip_address,''), created_at
 		 FROM user_activity_logs WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`, userID,
 	)
-	var recentActivity []ActivityLog
+	recentActivity := []ActivityLog{}
 	if logRows != nil {
 		defer logRows.Close()
 		for logRows.Next() {
@@ -207,19 +218,11 @@ func (as *AdminService) GetUser(ctx context.Context, userID string) *utils.ApiRe
 		}
 	}
 
-	type AdminWalletRow struct {
-		ID      string  `json:"id"`
-		Address string  `json:"address"`
-		Tag     string  `json:"tag"`
-		USDC    float64 `json:"usdc_balance"`
-		XLM     float64 `json:"xlm_balance"`
-		Primary bool    `json:"is_primary"`
-	}
 	wRows, _ := as.postgres.Query(ctx,
 		`SELECT id, address, COALESCE(tag,''), COALESCE(usdc_balance,0), COALESCE(xlm_balance,0), is_primary
 		 FROM wallets WHERE user_id = $1 ORDER BY is_primary DESC`, userID,
 	)
-	var wallets []AdminWalletRow
+	wallets := []AdminWalletRow{}
 	if wRows != nil {
 		defer wRows.Close()
 		for wRows.Next() {
@@ -259,6 +262,10 @@ func (as *AdminService) SetUserActive(ctx context.Context, userID string, active
 
 func (as *AdminService) DeleteUser(ctx context.Context, userID string, adminID, ip string) *utils.ApiResponse {
 	tag, err := as.postgres.Exec(ctx, `DELETE FROM users WHERE id = $1`, userID)
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+		return &utils.ApiResponse{StatusCode: http.StatusConflict, Message: "user owns invoices and cannot be deleted"}
+	}
 	if err != nil || tag.RowsAffected() == 0 {
 		return &utils.ApiResponse{StatusCode: http.StatusNotFound, Message: "user not found"}
 	}
@@ -279,15 +286,15 @@ func (as *AdminService) GetInvoice(ctx context.Context, invoiceID string) *utils
 }
 
 type AdminTransactionRow struct {
-	ID            string    `json:"id"`
-	InvoiceNumber string    `json:"invoice_number"`
-	UserEmail     string    `json:"user_email"`
-	Amount        float64   `json:"amount"`
-	Type          string    `json:"type"`
-	Status        string    `json:"status"`
-	SourceAsset   *string   `json:"source_asset,omitempty"`
-	SourceAmount  *string   `json:"source_amount,omitempty"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID            string    `json:"id" example:"3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"` // Ledger entry id
+	InvoiceNumber string    `json:"invoice_number" example:"INV-20261020-0019"`        // Related invoice
+	UserEmail     string    `json:"user_email" example:"jane@example.com"`             // Owner
+	Amount        float64   `json:"amount" example:"2.03"`                             // Amount
+	Type          string    `json:"type" example:"payment"`                            // payment, withdrawal, funding or path_payment
+	Status        string    `json:"status" example:"confirmed"`                        // On-chain result
+	SourceAsset   *string   `json:"source_asset,omitempty" example:"XLM"`              // Asset spent for path payments
+	SourceAmount  *string   `json:"source_amount,omitempty" example:"12.3456789"`      // Amount spent
+	CreatedAt     time.Time `json:"created_at" example:"2026-10-22T14:03:26Z"`         // Created
 }
 
 func (as *AdminService) ListTransactions(ctx context.Context, page, limit int, search string) *utils.ApiResponse {
@@ -328,7 +335,7 @@ func (as *AdminService) ListTransactions(ctx context.Context, page, limit int, s
 	}
 	defer rows.Close()
 
-	var txs []AdminTransactionRow
+	txs := []AdminTransactionRow{}
 	for rows.Next() {
 		var tx AdminTransactionRow
 		if err := rows.Scan(&tx.ID, &tx.InvoiceNumber, &tx.UserEmail, &tx.Amount, &tx.Type, &tx.Status, &tx.SourceAsset, &tx.SourceAmount, &tx.CreatedAt); err != nil {
@@ -353,14 +360,14 @@ func (as *AdminService) ListTransactions(ctx context.Context, page, limit int, s
 }
 
 type ActivityLog struct {
-	ID         string    `json:"id"`
-	UserID     string    `json:"user_id"`
-	Action     string    `json:"action"`
-	EntityType string    `json:"entity_type,omitempty"`
-	EntityID   string    `json:"entity_id,omitempty"`
+	ID         string    `json:"id" example:"3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"`                  // Entry id
+	UserID     string    `json:"user_id" example:"3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"`             // Acting user
+	Action     string    `json:"action" example:"login"`                                             // Action name
+	EntityType string    `json:"entity_type,omitempty" example:"invoice"`                            // Kind of object acted on
+	EntityID   string    `json:"entity_id,omitempty" example:"3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"` // Id of the object acted on
 	Metadata   any       `json:"metadata,omitempty"`
-	IPAddress  string    `json:"ip_address,omitempty"`
-	CreatedAt  time.Time `json:"created_at"`
+	IPAddress  string    `json:"ip_address,omitempty" example:"203.0.113.7"` // Client IP
+	CreatedAt  time.Time `json:"created_at" example:"2026-10-22T14:03:26Z"`  // When it happened
 }
 
 func (as *AdminService) log_(ctx context.Context, userID, action, entityType, entityID, ip string) {
@@ -393,7 +400,7 @@ func (as *AdminService) GetUserInvoices(ctx context.Context, userID string, page
 	}
 	defer rows.Close()
 
-	var invoices []AdminInvoiceRow
+	invoices := []AdminInvoiceRow{}
 	for rows.Next() {
 		var inv AdminInvoiceRow
 		if err := rows.Scan(&inv.ID, &inv.InvoiceNumber, &inv.CreatorEmail, &inv.PayerEmail, &inv.Total, &inv.Currency, &inv.Status, &inv.CreatedAt); err != nil {
@@ -445,7 +452,7 @@ func (as *AdminService) GetUserTransactions(ctx context.Context, userID string, 
 	}
 	defer rows.Close()
 
-	var txs []AdminTransactionRow
+	txs := []AdminTransactionRow{}
 	for rows.Next() {
 		var tx AdminTransactionRow
 		if err := rows.Scan(&tx.ID, &tx.InvoiceNumber, &tx.UserEmail, &tx.Amount, &tx.Type, &tx.Status, &tx.SourceAsset, &tx.SourceAmount, &tx.CreatedAt); err != nil {
@@ -468,7 +475,6 @@ func (as *AdminService) GetUserTransactions(ctx context.Context, userID string, 
 		},
 	}
 }
-
 
 func (as *AdminService) GetUserActivity(ctx context.Context, userID string, page, limit int) *utils.ApiResponse {
 	if page < 1 {
@@ -495,7 +501,7 @@ func (as *AdminService) GetUserActivity(ctx context.Context, userID string, page
 	}
 	defer rows.Close()
 
-	var logs []ActivityLog
+	logs := []ActivityLog{}
 	for rows.Next() {
 		var l ActivityLog
 		if err := rows.Scan(&l.ID, &l.UserID, &l.Action, &l.EntityType, &l.EntityID, &l.IPAddress, &l.CreatedAt); err != nil {
@@ -651,7 +657,7 @@ func (as *AdminService) ListInvoices(ctx context.Context, page, limit int, statu
 	}
 	defer rows.Close()
 
-	var invoices []AdminInvoiceRow
+	invoices := []AdminInvoiceRow{}
 	for rows.Next() {
 		var inv AdminInvoiceRow
 		if err := rows.Scan(&inv.ID, &inv.InvoiceNumber, &inv.CreatorEmail, &inv.PayerEmail, &inv.Total, &inv.Currency, &inv.Status, &inv.CreatedAt); err != nil {

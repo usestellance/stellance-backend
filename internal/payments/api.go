@@ -92,7 +92,7 @@ func (s *PaymentService) ListPayments(ctx context.Context, userID, status string
 	if err != nil {
 		return s.internalError("list payments", err, "user_id", userID)
 	}
-	return &utils.ApiResponse{StatusCode: http.StatusOK, Message: "payments", Data: PaymentList{Payments: records, Meta: pageMeta(page, limit, total)}}
+	return &utils.ApiResponse{StatusCode: http.StatusOK, Message: "payments", Data: PaymentList{Items: records, Payments: records, Meta: pageMeta(page, limit, total)}}
 }
 
 // GetPayment returns one payment received on a wallet of the user.
@@ -126,7 +126,7 @@ func pageArgs(page, limit int) (int, int) {
 }
 
 func pageMeta(page, limit, total int) PageMeta {
-	return PageMeta{Page: page, Limit: limit, Total: total, TotalPages: (total + limit - 1) / limit}
+	return utils.NewPageMeta(page, limit, total)
 }
 
 // AdminListPayments lists every payment on the platform, newest first.
@@ -151,7 +151,7 @@ func (s *PaymentService) AdminListPayments(ctx context.Context, status, search s
 	if err != nil {
 		return s.internalError("list all payments", err)
 	}
-	return &utils.ApiResponse{StatusCode: http.StatusOK, Message: "payments", Data: PaymentList{Payments: records, Meta: pageMeta(page, limit, total)}}
+	return &utils.ApiResponse{StatusCode: http.StatusOK, Message: "payments", Data: PaymentList{Items: records, Payments: records, Meta: pageMeta(page, limit, total)}}
 }
 
 // VerifyTransactionForUser re-checks a transaction on chain. It reports the payments found and never

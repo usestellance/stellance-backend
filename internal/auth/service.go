@@ -2,12 +2,12 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
-	"crypto/rand"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -144,7 +144,7 @@ func (config *AuthServiceConfig) CreateNewUser(ctx context.Context, dto AuthRequ
 	log.Debug(fmt.Sprintf("new user with ID %s created successfully", user.ID))
 	return &utils.ApiResponse{
 		StatusCode: http.StatusCreated,
-		Message:    "account has successfully been created, and email sent for verification",
+		Message:    "account has successfully been created",
 		Data: &AuthResponseDto{
 			User:        user,
 			AccessToken: accessToken,
@@ -651,7 +651,16 @@ func (as *AuthServiceConfig) ResetPassword(ctx context.Context, dto ResetPasswor
 }
 
 func (as *AuthServiceConfig) HandleSocialAuth(ctx context.Context, dto ProviderLogin) *utils.ApiResponse {
-	dto.Email = strings.ToLower(strings.TrimSpace(dto.Email))
+	claims, err := verifyGoogleIDToken(ctx, dto.IDToken, time.Now())
+	if errors.Is(err, errInvalidGoogleToken) {
+		return &utils.ApiResponse{StatusCode: http.StatusUnauthorized, Message: "invalid google token"}
+	}
+	if err != nil {
+		as.log.Error("failed to verify google token", "error", err)
+		return &utils.ApiResponse{StatusCode: http.StatusServiceUnavailable, Message: "could not verify google token, try again shortly"}
+	}
+	dto.Email = strings.ToLower(strings.TrimSpace(claims.Email))
+	dto.ProviderID = claims.Sub
 
 	existingUser, err := user.NewUserService().FindUserByEmail(ctx, dto.Email)
 	if err != nil {
@@ -672,6 +681,9 @@ func (as *AuthServiceConfig) HandleSocialAuth(ctx context.Context, dto ProviderL
 		}
 
 		if existingUser.AuthType != "password" && existingUser.ProviderID != nil {
+			if *existingUser.ProviderID != dto.ProviderID {
+				return &utils.ApiResponse{StatusCode: http.StatusUnauthorized, Message: "invalid google token"}
+			}
 
 			accessToken, err := as.jwt.GenerateNewAccessToken(existingUser.ID, existingUser.Email, string("user"))
 			if err != nil {
@@ -712,8 +724,8 @@ func (as *AuthServiceConfig) HandleSocialAuth(ctx context.Context, dto ProviderL
 	newUser := &user.User{}
 
 	const createUserQ = `
-		INSERT INTO users (email, provider_id, auth_type) 
-		VALUES ($1, $2, $3) 
+		INSERT INTO users (email, provider_id, auth_type, email_verified, email_verified_at) 
+		VALUES ($1, $2, $3, TRUE, NOW()) 
 		RETURNING id, email
 	`
 
@@ -747,20 +759,11 @@ func (as *AuthServiceConfig) HandleSocialAuth(ctx context.Context, dto ProviderL
 		}
 	}
 
-	err = as.GenerateAndSendEmail(ctx, dto.Email, newUser.Id, as.log)
-	if err != nil {
-		as.log.Error("failed to send verification email", "error", err)
-		return &utils.ApiResponse{
-			StatusCode: http.StatusInternalServerError,
-			Message:    "Server currently unavailable",
-		}
-	}
-
 	as.log.Debug(fmt.Sprintf("new user with ID %s created successfully", newUser.Id))
 
 	return &utils.ApiResponse{
 		StatusCode: http.StatusCreated,
-		Message:    "account has successfully been created, and email sent for verification",
+		Message:    "account has successfully been created",
 		Data: map[string]interface{}{
 			"access_token": accessToken,
 			"expires_in":   time.Now().Add(1 * time.Hour).Unix(),

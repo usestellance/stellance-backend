@@ -1,12 +1,40 @@
 // @title Stellance API
 // @version 1.0
-// @description Invoice management and payment platform API
+// @description Invoice management and Stellar payment platform API.
+// @description
+// @description **Envelope.** Every JSON response is `{status_code, message, data?, error?}`; the types below describe `data`.
+// @description **Auth.** Send `Authorization: Bearer <access_token>`. Tokens last 1 hour; deleted or deactivated users are rejected immediately. Unverified emails cannot sign in.
+// @description **Pagination.** List endpoints take `page` (from 1) and `limit`, and return `{items, meta:{page, limit, total, total_pages}}`. Old names (`page_count`, `count`, `payments`, `invoice`, `data`, `notifications`) still work and are deprecated.
+// @description **Amounts.** Payment records and requests use 7-decimal strings (`"2.0300000"`). Invoice and ledger fields are JSON numbers in the invoice currency. `/transaction/stats` and `/transaction/inflow` are integer cents. See docs/api-conventions.md.
+// @description **Payments (v2).** Invoices are paid with a text memo equal to the invoice's `payment_reference`. The server detects and verifies the on-chain payment; only a verified payment marks an invoice paid. Status values and transitions are in docs/payment-status-model.md.
+// @description **Errors.** 400 invalid input, 401 missing or invalid token, 403 not allowed, 404 not found, 409 state conflict, 422 valid request that fails a business rule, 502 Stellar unreachable, 500 unexpected.
 // @termsOfService http://swagger.io/terms/
 
 // @contact.name API Support
 // @contact.email davidhero125@gmail.com
 
 // @license.name MIT
+
+// @tag.name auth
+// @tag.description Sign-up, sign-in (password and Google), email verification and password reset
+// @tag.name profile
+// @tag.description Profile of the signed-in user and its primary wallet
+// @tag.name invoices
+// @tag.description Create, send, review, search and download invoices
+// @tag.name payments-v2
+// @tag.description Payment requests, detected on-chain payments and their verification results
+// @tag.name wallet
+// @tag.description Stellar wallet, PIN, transfers and invoice payments
+// @tag.name transactions
+// @tag.description Ledger of money movements and cash-flow statistics
+// @tag.name notifications
+// @tag.description In-app notifications, including payment outcomes
+// @tag.name comments
+// @tag.description Invoice comment threads and reactions
+// @tag.name recurring
+// @tag.description Recurring invoice schedules
+// @tag.name admin
+// @tag.description Admin-only management of users, invoices, transactions, payments and network settings
 
 // @host localhost:4000
 // @BasePath /api/v1

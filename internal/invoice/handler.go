@@ -47,6 +47,7 @@ func RegisterInvoiceFiltersValidation(v *validator.Validate) {
 
 // CreateNewInvoiceHandler godoc
 // @Summary      Create a new invoice
+// @Description  Create a draft invoice from a multipart form (optional logo upload). Each invoice gets a unique `payment_reference` used as the on-chain memo. Totals are recomputed server-side.
 // @Tags         invoices
 // @Accept       mpfd
 // @Produce      json
@@ -56,8 +57,10 @@ func RegisterInvoiceFiltersValidation(v *validator.Validate) {
 // @Param        due_date       formData  string  true   "Due date (YYYY-MM-DD)"
 // @Param        invoice_items  formData  string  true   "JSON array of invoice items"
 // @Param        logo           formData  file    false  "Logo image (PNG/JPEG, max 2MB)"
-// @Success      201  {object}  utils.ApiResponse
-// @Failure      400  {object}  utils.ApiResponse
+// @Success      201  {object}  utils.ApiResponse{data=InvoiceResponse}  "Invoice created"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /invoice [post]
 func (handler *InvoiceHandler) CreateNewInvoiceHandler(w http.ResponseWriter, r *http.Request) {
@@ -190,15 +193,18 @@ func (handler *InvoiceHandler) CreateNewInvoiceHandler(w http.ResponseWriter, r 
 
 // GetManyInvoiceHandler godoc
 // @Summary      List invoices
+// @Description  Paginated invoices created by the signed-in user. Each invoice includes `payment_status` and `payment_reference`. Admins may pass `user_id`.
 // @Tags         invoices
 // @Produce      json
 // @Param        status      query  string  false  "Filter by status"
 // @Param        page        query  int     false  "Page number"
-// @Param        page_count  query  int     false  "Items per page"
+// @Param        limit       query  int     false  "Items per page (page_count is a deprecated alias)"
 // @Param        order_by    query  string  false  "ASC or DESC"
 // @Param        search      query  string  false  "Search term"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      401  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=InvoiceListResponseDto}  "Invoices page"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /invoice [get]
 func (handler *InvoiceHandler) GetManyInvoiceHandler(w http.ResponseWriter, r *http.Request) {
@@ -250,11 +256,8 @@ func (handler *InvoiceHandler) GetManyInvoiceHandler(w http.ResponseWriter, r *h
 		dto.Page = 1
 	}
 
-	pageCount := r.URL.Query().Get("page_count")
-	if pageCount != "" {
-		if ps, err := strconv.Atoi(pageCount); err == nil {
-			dto.Count = ps
-		}
+	if ps, ok := utils.PageSizeParam(r, "page_count"); ok {
+		dto.Count = ps
 	} else {
 		dto.Count = 10
 	}
@@ -283,11 +286,16 @@ func (handler *InvoiceHandler) GetManyInvoiceHandler(w http.ResponseWriter, r *h
 
 // GetInvoiceByIDHandler godoc
 // @Summary      Get invoice by ID
+// @Description  One invoice owned by the caller (or any invoice for admins).
 // @Tags         invoices
 // @Produce      json
 // @Param        id  path  string  true  "Invoice ID"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      401  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=InvoiceResponse}  "Invoice"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      403  {object}  utils.ApiResponse  "Not the owner"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /invoice/{id} [get]
 func (h *InvoiceHandler) GetInvoiceByIDHandler(w http.ResponseWriter, r *http.Request) {
@@ -310,12 +318,14 @@ func (h *InvoiceHandler) GetInvoiceByIDHandler(w http.ResponseWriter, r *http.Re
 
 // GetInvoiceSearchHandler godoc
 // @Summary      Search invoice by ID or URL (public)
+// @Description  Public invoice view by id or short url, used by payers. The creator's email and phone number are hidden from everyone except the creator and admins.
 // @Tags         invoices
 // @Produce      json
 // @Param        id   query  string  false  "Invoice ID"
 // @Param        url  query  string  false  "Invoice URL"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      400  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=InvoiceResponse}  "Invoice"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Router       /invoice/search [get]
 func (h *InvoiceHandler) GetInvoiceSearchHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -343,13 +353,16 @@ func (h *InvoiceHandler) GetInvoiceSearchHandler(w http.ResponseWriter, r *http.
 
 // QueryInvoiceBySearch godoc
 // @Summary      Full-text search invoices for current user
+// @Description  Full-text search over the signed-in user's invoices.
 // @Tags         invoices
 // @Produce      json
 // @Param        search  query  string  true  "Search term"
 // @Param        page    query  int     false "Page number, from 1"
 // @Param        limit   query  int     false "Page size, default 10, max 50"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      401  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=InvoiceSearchResult}  "Matching invoices"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /invoice/query [get]
 func (h *InvoiceHandler) QueryInvoiceBySearch(w http.ResponseWriter, r *http.Request) {
@@ -377,11 +390,17 @@ func (h *InvoiceHandler) QueryInvoiceBySearch(w http.ResponseWriter, r *http.Req
 
 // DeleteInvoiceHandler godoc
 // @Summary      Delete invoice
+// @Description  Delete an unpaid invoice you own. Invoices that have payment records return 409.
 // @Tags         invoices
 // @Produce      json
 // @Param        id  path  string  true  "Invoice ID"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      401  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse  "Invoice deleted"
+// @Failure      400  {object}  utils.ApiResponse  "Invoice is paid"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      403  {object}  utils.ApiResponse  "Not the owner"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      409  {object}  utils.ApiResponse  "Invoice has payment records"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /invoice/{id} [delete]
 func (h *InvoiceHandler) DeleteInvoiceHandler(w http.ResponseWriter, r *http.Request) {
@@ -400,13 +419,18 @@ func (h *InvoiceHandler) DeleteInvoiceHandler(w http.ResponseWriter, r *http.Req
 
 // EditInvoiceHandler godoc
 // @Summary      Edit invoice (JSON body)
+// @Description  Edit a draft invoice with a JSON body. Only invoices in `draft` status can be edited; any other status returns 400.
 // @Tags         invoices
 // @Accept       json
 // @Produce      json
 // @Param        id    path  string           true  "Invoice ID"
 // @Param        body  body  CreateInvoiceDTO  true  "Invoice data"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      400  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse  "Invoice updated"
+// @Failure      400  {object}  utils.ApiResponse  "Invoice is not a draft"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      403  {object}  utils.ApiResponse  "Not the owner"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /invoice/{id} [post]
 func (h *InvoiceHandler) EditInvoiceHandler(w http.ResponseWriter, r *http.Request) {
@@ -451,13 +475,18 @@ func (h *InvoiceHandler) EditInvoiceHandler(w http.ResponseWriter, r *http.Reque
 
 // SendInvoice godoc
 // @Summary      Send invoice via email
+// @Description  Email the invoice to 1-10 recipients and snapshot the creator's primary wallet as the payment recipient. Only `draft` or `viewed` invoices can be sent.
 // @Tags         invoices
 // @Accept       json
 // @Produce      json
 // @Param        id    path  string          true  "Invoice ID"
 // @Param        body  body  SendInvoiceDto  true  "Recipient emails"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      400  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=InvoiceSendResult}  "Invoice sent"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid email, or invoice already sent or paid"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      403  {object}  utils.ApiResponse  "Access denied"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /invoice/send/{id} [post]
 func (h *InvoiceHandler) SendInvoice(w http.ResponseWriter, r *http.Request) {
@@ -494,13 +523,17 @@ func (h *InvoiceHandler) SendInvoice(w http.ResponseWriter, r *http.Request) {
 
 // ReviewInvoiceHandler godoc
 // @Summary      Approve or reject invoice (payer action)
+// @Description  Payer approves or rejects an invoice. Works signed out (email link) or signed in; creators cannot review their own invoices. Changes state, so it is POST.
 // @Tags         invoices
+// @Accept       json
 // @Produce      json
 // @Param        id       path   string  true  "Invoice ID"
-// @Accept       json
 // @Param        body     body   ReviewInvoiceDTO  true  "Decision"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      400  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse  "Review recorded"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      403  {object}  utils.ApiResponse  "Creator cannot review own invoice"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Router       /invoice/review/{id} [post]
 func (h *InvoiceHandler) ReviewInvoiceHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -529,9 +562,12 @@ func (h *InvoiceHandler) ReviewInvoiceHandler(w http.ResponseWriter, r *http.Req
 
 // GetInvoiceStatsHandler godoc
 // @Summary      Get invoice statistics for current user
+// @Description  Invoice counts per status for the signed-in user.
 // @Tags         invoices
 // @Produce      json
-// @Success      200  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=InvoiceStatsResponse}  "Counts"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /invoice/stats [get]
 func (h *InvoiceHandler) GetInvoiceStatsHandler(w http.ResponseWriter, r *http.Request) {
@@ -547,10 +583,14 @@ func (h *InvoiceHandler) GetInvoiceStatsHandler(w http.ResponseWriter, r *http.R
 
 // GetInvoicesByStatus godoc
 // @Summary      Get invoice breakdown by status (pie chart data)
+// @Description  Invoice counts per status for one month, shaped for a pie chart. `month` is YYYY-MM and defaults to the current month.
 // @Tags         invoices
 // @Produce      json
 // @Param        month  query  string  false  "Month filter (YYYY-MM)"
-// @Success      200  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=[]InvoiceStatusDataPoint}  "Chart data"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /invoice/overview [get]
 func (ih *InvoiceHandler) GetInvoicesByStatus(w http.ResponseWriter, r *http.Request) {
@@ -574,14 +614,19 @@ func (ih *InvoiceHandler) GetInvoicesByStatus(w http.ResponseWriter, r *http.Req
 
 // UpdateInvoiceHandler godoc
 // @Summary      Update invoice (multipart form)
+// @Description  Update an invoice from a multipart form (items, logo, fields). Invoices that are sent, viewed, paid, overdue, payment_detected, invalid_payment or expired are locked and reported as 404 'Invoice not found'.
 // @Tags         invoices
 // @Accept       mpfd
 // @Produce      json
 // @Param        id             path      string  true   "Invoice ID"
 // @Param        invoice_items  formData  string  false  "JSON array of invoice items"
 // @Param        logo           formData  file    false  "Logo image"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      400  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=InvoiceUpdateResult}  "Invoice updated"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      403  {object}  utils.ApiResponse  "Not the owner"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /invoice/{id} [put]
 func (handler *InvoiceHandler) UpdateInvoiceHandler(w http.ResponseWriter, r *http.Request) {
@@ -699,11 +744,15 @@ func (handler *InvoiceHandler) UpdateInvoiceHandler(w http.ResponseWriter, r *ht
 
 // GetInvoicePDFHandler godoc
 // @Summary      Download invoice as PDF
+// @Description  Render the invoice as a PDF file.
 // @Tags         invoices
 // @Produce      application/pdf
 // @Param        id  path  string  true  "Invoice ID"
-// @Success      200  {file}    binary
-// @Failure      404  {object}  utils.ApiResponse
+// @Success      200  {file}  binary  "PDF file"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /invoice/download/{id}/pdf [get]
 func (h *InvoiceHandler) GetInvoicePDFHandler(w http.ResponseWriter, r *http.Request) {
@@ -736,13 +785,20 @@ func (h *InvoiceHandler) GetInvoicePDFHandler(w http.ResponseWriter, r *http.Req
 
 // MarkInvoicePaidHandler godoc
 // @Summary      Mark invoice as paid
+// @Description  Re-verify a Stellar transaction hash against the invoice and mark it paid only if the chain confirms it. The caller's claim alone never marks anything paid. 404 when the hash is unknown, 422 when the transaction does not satisfy the invoice, 502 when Stellar is unreachable.
 // @Tags         invoices
 // @Accept       json
 // @Produce      json
 // @Param        id    path  string             true  "Invoice ID"
 // @Param        body  body  MarkInvoicePaidDTO  true  "Payment details"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      400  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=MarkPaidResult}  "Verified and paid"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      403  {object}  utils.ApiResponse  "Not the owner"
+// @Failure      404  {object}  utils.ApiResponse  "Transaction not found on Stellar"
+// @Failure      422  {object}  utils.ApiResponse  "Transaction does not satisfy this invoice"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
+// @Failure      502  {object}  utils.ApiResponse  "Stellar unreachable"
 // @Security     BearerAuth
 // @Router       /invoice/{id}/mark-paid [patch]
 func (h *InvoiceHandler) MarkInvoicePaidHandler(w http.ResponseWriter, r *http.Request) {

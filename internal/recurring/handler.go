@@ -19,12 +19,15 @@ func NewRecurringHandler(s *RecurringService) *RecurringHandler {
 
 // Create godoc
 // @Summary      Create recurring invoice schedule
+// @Description  Create a schedule that generates an invoice at each interval.
 // @Tags         recurring
 // @Accept       json
 // @Produce      json
 // @Param        body  body      CreateRecurringDTO  true  "Recurring invoice config"
-// @Success      201   {object}  utils.ApiResponse
-// @Failure      400   {object}  utils.ApiResponse
+// @Success      201  {object}  utils.ApiResponse{data=RecurringCreated}  "Schedule created"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /recurring [post]
 func (h *RecurringHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -48,10 +51,12 @@ func (h *RecurringHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 // List godoc
 // @Summary      List recurring invoice schedules
+// @Description  All recurring schedules of the signed-in user.
 // @Tags         recurring
 // @Produce      json
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      401  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=[]RecurringInvoice}  "Schedules"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /recurring [get]
 func (h *RecurringHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -66,11 +71,15 @@ func (h *RecurringHandler) List(w http.ResponseWriter, r *http.Request) {
 
 // Get godoc
 // @Summary      Get recurring schedule by ID
+// @Description  One recurring schedule.
 // @Tags         recurring
 // @Produce      json
 // @Param        id  path  string  true  "Recurring ID"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      401  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse{data=RecurringInvoice}  "Schedule"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /recurring/{id} [get]
 func (h *RecurringHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -86,13 +95,17 @@ func (h *RecurringHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 // Update godoc
 // @Summary      Update recurring schedule
+// @Description  Pause or resume a schedule (`is_active`), change its `interval` or reset its next run date (`start_date`).
 // @Tags         recurring
 // @Accept       json
 // @Produce      json
 // @Param        id    path  string             true  "Recurring ID"
 // @Param        body  body  UpdateRecurringDTO  true  "Fields to update"
-// @Success      200   {object}  utils.ApiResponse
-// @Failure      400   {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse  "Schedule updated"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /recurring/{id} [patch]
 func (h *RecurringHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -113,11 +126,15 @@ func (h *RecurringHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 // Delete godoc
 // @Summary      Delete recurring schedule
+// @Description  Delete a schedule. Invoices it already generated are kept.
 // @Tags         recurring
 // @Produce      json
 // @Param        id  path  string  true  "Recurring ID"
-// @Success      200  {object}  utils.ApiResponse
-// @Failure      401  {object}  utils.ApiResponse
+// @Success      200  {object}  utils.ApiResponse  "Schedule deleted"
+// @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
+// @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
+// @Failure      404  {object}  utils.ApiResponse  "Not found"
+// @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /recurring/{id} [delete]
 func (h *RecurringHandler) Delete(w http.ResponseWriter, r *http.Request) {

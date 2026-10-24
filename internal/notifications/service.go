@@ -173,12 +173,12 @@ func (ns *NotificationService) GetUserNotifications(ctx context.Context, userID 
 		}
 	}
 	defer rows.Close()
-	
+
 	var result []Notification
 	for rows.Next() {
 		var notif Notification
 		var viewedAt sql.NullTime
-		
+
 		err := rows.Scan(&notif.Id, &notif.Title, &notif.Body, &notif.Viewed, &viewedAt)
 		if err != nil {
 			ns.log.Error("failed to scan into results for notifications")
@@ -209,7 +209,7 @@ func (ns *NotificationService) GetUserNotifications(ctx context.Context, userID 
 	if dto.Viewed != nil {
 		if *dto.Viewed {
 			filteredCount = readCount
-		}else{
+		} else {
 			filteredCount = unreadCount
 		}
 	}
@@ -220,14 +220,16 @@ func (ns *NotificationService) GetUserNotifications(ctx context.Context, userID 
 		StatusCode: http.StatusOK,
 		Message:    "successful",
 		Data: GetNotificationResponse{
+			Items:         result,
 			Notifications: result,
 			Meta: PaginationMeta{
-				Page: dto.Page,
-				PageCount: len(result),
+				Page:        dto.Page,
+				Limit:       dto.Count,
+				Total:       filteredCount,
+				PageCount:   len(result),
 				UnreadCount: unreadCount,
-				ReadCount: readCount,
-				TotalPages: totalPages,
-
+				ReadCount:   readCount,
+				TotalPages:  totalPages,
 			},
 		},
 	}

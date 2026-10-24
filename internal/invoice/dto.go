@@ -32,76 +32,79 @@ const (
 )
 
 type CreateInvoiceDTO struct {
-	Title         string         `json:"title" validate:"required,min=3"`
-	RecipientName string         `json:"payer_name" validate:"required"`
-	Email         string         `json:"payer_email" validate:"required,email"`
-	Country       string         `json:"country" validate:"required"`
-	InvoiceItems  []InvoiceItems `json:"invoice_items" validate:"required,min=1"`
-	ServiceFee    float64        `json:"service_fee" validate:"gte=0"`
-	DueDate       string         `json:"due_date" validate:"required,datetime=2006-01-02"`
-	TemplateID    TemplateIDType `json:"template_id" validate:"required"`
-	MakeDefault   bool           `json:"make_default,omitempty"`
-	Note          string         `json:"note,omitempty"`
+	Title         string         `json:"title" validate:"required,min=3" example:"Website redesign"`            // Invoice title, min 3 characters
+	RecipientName string         `json:"payer_name" validate:"required" example:"Acme Ltd"`                     // Client name
+	Email         string         `json:"payer_email" validate:"required,email" example:"billing@acme.com"`      // Client email the invoice is sent to
+	Country       string         `json:"country" validate:"required" example:"NG"`                              // Client country
+	InvoiceItems  []InvoiceItems `json:"invoice_items" validate:"required,min=1"`                               // At least one line item
+	ServiceFee    float64        `json:"service_fee" validate:"gte=0" example:"2.5"`                            // Extra fee added to the subtotal, >= 0
+	DueDate       string         `json:"due_date" validate:"required,datetime=2006-01-02" example:"2026-12-31"` // YYYY-MM-DD. Payments are accepted until the end of this day (UTC) plus PAYMENT_EXPIRY_GRACE_DAYS
+	TemplateID    TemplateIDType `json:"template_id" validate:"required" example:"template_001"`                // One of template_001..template_005
+	MakeDefault   bool           `json:"make_default,omitempty" example:"false"`                                // Save this template as the default
+	Note          string         `json:"note,omitempty" example:"Thanks for your business"`                     // Optional note shown on the invoice
 }
 
 type InvoiceItems struct {
-	ItemId      string      `json:"item_id,omitempty"`
-	InvoiceType InvoiceType `json:"invoice_type" validate:"required,oneof=per_hour per_unit"`
-	Description string      `json:"description" validate:"required"`
-	Quantity    int64       `json:"quantity" validate:"required,gt=0"`
-	UnitPrice   float64     `json:"unit_price" validate:"required,gt=0"`
-	Discount    int64       `json:"discount,omitempty"`
-	Amount      float64     `json:"amount" validate:"required,gt=0"`
-	CreatedAt   *time.Time  `json:"created_at,omitempty"`
+	ItemId      string      `json:"item_id,omitempty"`                                                           // Existing item id when editing; omit for new items
+	InvoiceType InvoiceType `json:"invoice_type" validate:"required,oneof=per_hour per_unit" example:"per_unit"` // per_hour or per_unit
+	Description string      `json:"description" validate:"required" example:"Design work"`                       // What was delivered
+	Quantity    int64       `json:"quantity" validate:"required,gt=0" example:"3"`                               // Hours or units, > 0
+	UnitPrice   float64     `json:"unit_price" validate:"required,gt=0" example:"150.5"`                         // Price per hour or unit, > 0
+	Discount    int64       `json:"discount,omitempty" example:"0"`                                              // Discount percent
+	Amount      float64     `json:"amount" validate:"required,gt=0" example:"451.5"`                             // Line total; the server checks it against quantity x unit_price
+	CreatedAt   *time.Time  `json:"created_at,omitempty" example:"2026-10-20T09:00:00Z"`                         // When the item was added
 }
 
 type InvoiceResponse struct {
-	ID                 string               `json:"id"`
-	InvoiceNumber      string               `json:"invoice_number"`
-	InvoiceURL         string               `json:"invoice_url"`
-	Title              string               `json:"title,omitempty"`
-	PayerEmail         string               `json:"payer_email"`
-	PayerName          string               `json:"payer_name,omitempty"`
-	PayerWalletAddress string               `json:"payer_wallet_address,omitempty"`
-	Country            string               `json:"country,omitempty"`
-	SubTotal           float64              `json:"sub_total"`
-	ServiceFee         float64              `json:"service_fee"`
-	Total              float64              `json:"total"`
-	Currency           string               `json:"currency"`
-	Status             string               `json:"status"`
-	DueDate            time.Time            `json:"due_date"`
-	CreatedAt          time.Time            `json:"created_at"`
-	UpdatedAt          time.Time            `json:"updated_at,omitempty"`
-	PaidAt             *time.Time           `json:"paid_at,omitempty"`
+	ID                 string               `json:"id" example:"3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"`                                                 // Invoice id
+	InvoiceNumber      string               `json:"invoice_number" example:"INV-20261020-0019"`                                                        // Human-readable number
+	InvoiceURL         string               `json:"invoice_url" example:"aB3dE9"`                                                                      // Short public url used by /invoice/search and /payments/request
+	Title              string               `json:"title,omitempty" example:"Website redesign"`                                                        // Title
+	PayerEmail         string               `json:"payer_email" example:"billing@acme.com"`                                                            // Client email
+	PayerName          string               `json:"payer_name,omitempty" example:"Acme Ltd"`                                                           // Client name
+	PayerWalletAddress string               `json:"payer_wallet_address,omitempty" example:"GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"` // Account that paid; set once paid
+	Country            string               `json:"country,omitempty" example:"NG"`                                                                    // Client country
+	SubTotal           float64              `json:"sub_total" example:"451.5"`                                                                         // Sum of line items
+	ServiceFee         float64              `json:"service_fee" example:"2.5"`                                                                         // Fee added to the subtotal
+	Total              float64              `json:"total" example:"454"`                                                                               // Amount due
+	Currency           string               `json:"currency" example:"usdc"`                                                                           // usdc or xlm
+	Status             string               `json:"status" example:"sent"`                                                                             // draft, sent, viewed, pending, overdue, payment_detected, invalid_payment, paid, expired, cancelled or refunded
+	DueDate            time.Time            `json:"due_date" example:"2026-12-31T00:00:00Z"`                                                           // Due date
+	CreatedAt          time.Time            `json:"created_at" example:"2026-10-20T09:00:00Z"`                                                         // Creation time
+	UpdatedAt          time.Time            `json:"updated_at,omitempty" example:"2026-10-22T14:03:26Z"`                                               // Last change
+	PaidAt             *time.Time           `json:"paid_at,omitempty" example:"2026-10-22T14:03:26Z"`                                                  // Set once paid
 	Items              []InvoiceItems       `json:"items"`
 	CreatedBy          InvoiceSenderDetails `json:"createdBy"`
-	Approved           *bool                `json:"approved"`
-	ReviewDate         *time.Time           `json:"review_date"`
-	TemplateID         TemplateIDType       `json:"template_id" validate:"required"`
-	LogoURL            string               `json:"logo_url,omitempty"`
-	Note               string               `json:"note,omitempty"`
-	PaymentStatus      string               `json:"payment_status"`
-	PaymentReference   string               `json:"payment_reference"`
+	Approved           *bool                `json:"approved" example:"true"`                                // Payer review result; null before review
+	ReviewDate         *time.Time           `json:"review_date" example:"2026-10-21T10:00:00Z"`             // When the payer approved or rejected
+	TemplateID         TemplateIDType       `json:"template_id" validate:"required" example:"template_001"` // Template
+	LogoURL            string               `json:"logo_url,omitempty"`                                     // Signed logo url
+	Note               string               `json:"note,omitempty"`                                         // Note shown on the invoice
+	PaymentStatus      string               `json:"payment_status" example:"awaiting_payment"`              // Derived from status; see docs/payment-status-model.md
+	PaymentReference   string               `json:"payment_reference" example:"STL-B9371BD3A173"`           // Memo to attach to the on-chain payment
 }
 
 type InvoiceListResponseDto struct {
-	Invoice []InvoiceResponse `json:"invoice"`
+	Items   []InvoiceResponse `json:"items"`
+	Invoice []InvoiceResponse `json:"invoice"` // deprecated: use items
 	Meta    PaginationMeta    `json:"meta"`
 }
 
 type PaginationMeta struct {
-	Page              int `json:"page"`
-	PageCount         int `json:"page_count,omitempty"`
-	TotalInvoiceCount int `json:"total_invoice_count"`
-	TotalPages        int `json:"total_pages"`
+	Page              int `json:"page" example:"1"`        // Current page
+	Limit             int `json:"limit" example:"10"`      // Page size
+	Total             int `json:"total" example:"57"`      // Total matching invoices
+	TotalPages        int `json:"total_pages" example:"6"` // Total pages
+	PageCount         int `json:"page_count,omitempty"`    // deprecated: use limit
+	TotalInvoiceCount int `json:"total_invoice_count"`     // deprecated: use total
 }
 
 type SearchPaginationMeta struct {
-	Total   int  `json:"total"`
-	Limit   int  `json:"limit"`
-	Offset  int  `json:"offset"`
-	HasNext bool `json:"has_next"`
-	HasPrev bool `json:"has_prev"`
+	Total   int  `json:"total" example:"57"`       // Total matches
+	Limit   int  `json:"limit" example:"10"`       // Page size
+	Offset  int  `json:"offset" example:"0"`       // Rows skipped
+	HasNext bool `json:"has_next" example:"true"`  // More rows after this page
+	HasPrev bool `json:"has_prev" example:"false"` // Rows before this page
 }
 
 type InvoiceFiltersDto struct {
@@ -114,13 +117,13 @@ type InvoiceFiltersDto struct {
 }
 
 type InvoiceSenderDetails struct {
-	UserId         string  `json:"user_id"`
-	Name           string  `json:"name"`
-	Email          string  `json:"email,omitempty"`
-	Location       string  `json:"location"`
-	BusinessName   *string `json:"business_name,omitempty"`
-	PhoneNumber    *string `json:"phone_number,omitempty"`
-	Wallet_address *string `json:"wallet_address,omitempty"`
+	UserId         string  `json:"user_id" example:"3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"`                                      // Creator id
+	Name           string  `json:"name" example:"Jane Doe"`                                                                     // Creator name
+	Email          string  `json:"email,omitempty" example:"jane@example.com"`                                                  // Hidden on the public view
+	Location       string  `json:"location" example:"NG"`                                                                       // Creator country
+	BusinessName   *string `json:"business_name,omitempty" example:"Doe Studio"`                                                // Business name
+	PhoneNumber    *string `json:"phone_number,omitempty" example:"+2348012345678"`                                             // Hidden on the public view
+	Wallet_address *string `json:"wallet_address,omitempty" example:"GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"` // Creator primary wallet
 }
 
 type InvoiceStatusQuery struct {
@@ -128,8 +131,8 @@ type InvoiceStatusQuery struct {
 }
 
 type InvoiceStatusDataPoint struct {
-	Status string `json:"status"`
-	Value  int    `json:"value"`
+	Status string `json:"status" example:"Paid"` // Capitalised status name
+	Value  int    `json:"value" example:"12"`    // Invoices in this status
 }
 
 type GetInvoiceByStatusResponse struct {
@@ -150,11 +153,11 @@ type SendInvoiceEmailData struct {
 }
 
 type SendInvoiceDto struct {
-	Emails []string `json:"emails" validate:"required,min=1,max=10,dive,email"`
+	Emails []string `json:"emails" validate:"required,min=1,max=10,dive,email"` // 1-10 recipient emails; the first is the primary recipient, the rest are CC
 }
 
 type MarkInvoicePaidDTO struct {
-	TransactionHash string `json:"transaction_hash" validate:"required,len=64,hexadecimal"`
+	TransactionHash string `json:"transaction_hash" validate:"required,len=64,hexadecimal" example:"a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7a9f9fde3c0e1d5b7"` // 64-character hex Stellar transaction hash. The server re-verifies it on-chain
 }
 
 type PDFInvoiceData struct {
@@ -181,16 +184,16 @@ type PDFInvoiceData struct {
 }
 
 type UpdateInvoiceDTO struct {
-	Title         string         `json:"title" validate:"omitempty,min=3"`
-	RecipientName string         `json:"payer_name" validate:"omitempty"`
-	Email         string         `json:"payer_email" validate:"omitempty,email"`
-	Country       string         `json:"country" validate:"omitempty"`
-	InvoiceItems  []InvoiceItems `json:"invoice_items" validate:"omitempty,min=1"`
-	ServiceFee    *float64       `json:"service_fee" validate:"omitempty,gte=0"`
-	DueDate       string         `json:"due_date" validate:"omitempty,datetime=2006-01-02"`
-	TemplateID    TemplateIDType `json:"template_id" validate:"omitempty"`
+	Title         string         `json:"title" validate:"omitempty,min=3" example:"Website redesign"`            // Min 3 characters
+	RecipientName string         `json:"payer_name" validate:"omitempty" example:"Acme Ltd"`                     // Client name
+	Email         string         `json:"payer_email" validate:"omitempty,email" example:"billing@acme.com"`      // Client email
+	Country       string         `json:"country" validate:"omitempty" example:"NG"`                              // Client country
+	InvoiceItems  []InvoiceItems `json:"invoice_items" validate:"omitempty,min=1"`                               // Replaces the item list
+	ServiceFee    *float64       `json:"service_fee" validate:"omitempty,gte=0" example:"2.5"`                   // >= 0
+	DueDate       string         `json:"due_date" validate:"omitempty,datetime=2006-01-02" example:"2026-12-31"` // YYYY-MM-DD
+	TemplateID    TemplateIDType `json:"template_id" validate:"omitempty" example:"template_002"`                // One of template_001..template_005
 }
 
 type ReviewInvoiceDTO struct {
-	Approve *bool `json:"approve"`
+	Approve *bool `json:"approve" example:"true"` // true approves, false rejects (cancels) the invoice
 }

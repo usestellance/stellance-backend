@@ -210,7 +210,7 @@ func (s *TransactionService) GetTransactionsPaginated(ctx context.Context, page,
 	}
 	defer rows.Close()
 
-	var transactions []GetTransactionDto
+	transactions := []GetTransactionDto{}
 	for rows.Next() {
 		var t GetTransactionDto
 		if err := rows.Scan(
@@ -229,6 +229,8 @@ func (s *TransactionService) GetTransactionsPaginated(ctx context.Context, page,
 		StatusCode: http.StatusOK,
 		Message:    "successful",
 		Data: &PaginatedTransactions{
+			Items:      transactions,
+			Meta:       utils.NewPageMeta(page, limit, totalCount),
 			Data:       transactions,
 			Page:       page,
 			Limit:      limit,
@@ -313,10 +315,12 @@ func (ts *TransactionService) GetTransactionCardForUser(ctx context.Context, use
 	}
 
 	response := GetTransactionOverViewResponse{
-		TotalAmount:   TransactionCard{Amount: 0, InvoiceCount: 0},
-		PendingAmount: TransactionCard{Amount: 0, InvoiceCount: 0},
-		PaidAmount:    TransactionCard{Amount: 0, InvoiceCount: 0},
-		OverdueAmount: TransactionCard{Amount: 0, InvoiceCount: 0},
+		TotalAmount:          TransactionCard{Amount: 0, InvoiceCount: 0},
+		PendingAmount:        TransactionCard{Amount: 0, InvoiceCount: 0},
+		PaidAmount:           TransactionCard{Amount: 0, InvoiceCount: 0},
+		OverdueAmount:        TransactionCard{Amount: 0, InvoiceCount: 0},
+		ExpiredAmount:        TransactionCard{Amount: 0, InvoiceCount: 0},
+		InvalidPaymentAmount: TransactionCard{Amount: 0, InvoiceCount: 0},
 	}
 
 	for _, row := range overviewData {
@@ -330,7 +334,7 @@ func (ts *TransactionService) GetTransactionCardForUser(ctx context.Context, use
 		response.TotalAmount.InvoiceCount += row.InvoiceCount
 
 		switch row.InvoiceStatus {
-		case "pending", "draft", "sent", "viewed":
+		case "pending", "draft", "sent", "viewed", "payment_detected":
 			response.PendingAmount.Amount += amountInCents
 			response.PendingAmount.InvoiceCount += row.InvoiceCount
 		case "paid":
@@ -339,6 +343,12 @@ func (ts *TransactionService) GetTransactionCardForUser(ctx context.Context, use
 		case "overdue":
 			response.OverdueAmount.Amount += amountInCents
 			response.OverdueAmount.InvoiceCount += row.InvoiceCount
+		case "expired":
+			response.ExpiredAmount.Amount += amountInCents
+			response.ExpiredAmount.InvoiceCount += row.InvoiceCount
+		case "invalid_payment":
+			response.InvalidPaymentAmount.Amount += amountInCents
+			response.InvalidPaymentAmount.InvoiceCount += row.InvoiceCount
 		}
 	}
 
