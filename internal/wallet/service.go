@@ -866,7 +866,7 @@ func (ws *WalletService) PayInvoice(ctx context.Context, walletID, userID string
 	case errors.Is(err, pgx.ErrNoRows):
 		return &utils.ApiResponse{StatusCode: http.StatusNotFound, Message: "invoice not found"}
 	case errors.Is(err, payments.ErrNoRecipientWallet):
-		return &utils.ApiResponse{StatusCode: http.StatusNotFound, Message: "vendor has no wallet"}
+		return &utils.ApiResponse{StatusCode: http.StatusConflict, Message: payments.MsgMerchantNoWallet, Error: payments.CodeWalletRequired}
 	case errors.Is(err, payments.ErrInvoiceNotPayable):
 		return &utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "invoice cannot be paid in its current state"}
 	case err != nil:

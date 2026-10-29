@@ -35,6 +35,15 @@ var (
 	ErrTransactionNotFound = errors.New("transaction not found on Stellar")
 )
 
+const (
+	CodeWalletRequired     = "wallet_required"
+	MsgOwnerWalletRequired = "You have not created a wallet yet. Create a Stellar wallet to receive payment for this invoice."
+	MsgMerchantNoWallet    = "The merchant has not created a wallet yet, so this invoice cannot receive payment. Please contact the merchant."
+	MsgSendWalletRequired  = "Create a Stellar wallet before sending invoices, otherwise nobody can pay them."
+)
+
+var ()
+
 type PaymentService struct {
 	log      *slog.Logger
 	postgres *pgxpool.Pool

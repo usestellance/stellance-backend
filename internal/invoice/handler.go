@@ -483,6 +483,7 @@ func (h *InvoiceHandler) EditInvoiceHandler(w http.ResponseWriter, r *http.Reque
 // @Param        body  body  SendInvoiceDto  true  "Recipient emails"
 // @Success      200  {object}  utils.ApiResponse{data=InvoiceSendResult}  "Invoice sent"
 // @Failure      400  {object}  utils.ApiResponse  "Invalid email, or invoice already sent or paid"
+// @Failure      409  {object}  utils.ApiResponse  "No wallet: create a Stellar wallet first (error=wallet_required)"
 // @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
 // @Failure      403  {object}  utils.ApiResponse  "Access denied"
 // @Failure      404  {object}  utils.ApiResponse  "Not found"

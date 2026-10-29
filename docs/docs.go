@@ -2702,6 +2702,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
                     },
+                    "409": {
+                        "description": "No wallet: create a Stellar wallet first (error=wallet_required)",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ApiResponse"
+                        }
+                    },
                     "500": {
                         "description": "Unexpected server error",
                         "schema": {
@@ -3580,7 +3586,7 @@ const docTemplate = `{
                         }
                     },
                     "409": {
-                        "description": "Creator has no active Stellar wallet",
+                        "description": "Merchant has no wallet (error=wallet_required)",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -3645,7 +3651,7 @@ const docTemplate = `{
                         }
                     },
                     "409": {
-                        "description": "Invoice cannot accept payment yet",
+                        "description": "Merchant has not created a wallet yet (error=wallet_required)",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }
@@ -5154,7 +5160,7 @@ const docTemplate = `{
                         }
                     },
                     "409": {
-                        "description": "Another payment for this invoice is being verified",
+                        "description": "Another payment is being verified, or the merchant has no wallet (error=wallet_required)",
                         "schema": {
                             "$ref": "#/definitions/utils.ApiResponse"
                         }

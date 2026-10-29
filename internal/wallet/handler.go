@@ -184,7 +184,7 @@ func (h *WalletHandler) SetPinHandler(w http.ResponseWriter, r *http.Request) {
 // @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
 // @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
 // @Failure      404  {object}  utils.ApiResponse  "Not found"
-// @Failure      409  {object}  utils.ApiResponse  "Another payment for this invoice is being verified"
+// @Failure      409  {object}  utils.ApiResponse  "Another payment is being verified, or the merchant has no wallet (error=wallet_required)"
 // @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Failure      502  {object}  utils.ApiResponse  "Stellar rejected the transaction"
 // @Security     BearerAuth

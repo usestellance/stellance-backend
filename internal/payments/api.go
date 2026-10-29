@@ -32,7 +32,7 @@ func (s *PaymentService) GetInvoicePayments(ctx context.Context, userID, invoice
 
 	req, err := s.EnsurePaymentRequest(ctx, invoiceID)
 	if errors.Is(err, ErrNoRecipientWallet) {
-		return &utils.ApiResponse{StatusCode: http.StatusConflict, Message: err.Error()}
+		return &utils.ApiResponse{StatusCode: http.StatusConflict, Message: MsgOwnerWalletRequired, Error: CodeWalletRequired}
 	}
 	if errors.Is(err, ErrInvoiceNotPayable) {
 		req, err = s.paymentRequest(ctx, "i.id = $1", invoiceID)
@@ -61,7 +61,7 @@ func (s *PaymentService) GetPublicRequest(ctx context.Context, invoiceURL string
 
 	req, err := s.EnsurePaymentRequest(ctx, invoiceID)
 	if errors.Is(err, ErrNoRecipientWallet) {
-		return &utils.ApiResponse{StatusCode: http.StatusConflict, Message: "this invoice cannot accept payment yet"}
+		return &utils.ApiResponse{StatusCode: http.StatusConflict, Message: MsgMerchantNoWallet, Error: CodeWalletRequired}
 	}
 	if errors.Is(err, ErrInvoiceNotPayable) {
 		req, err = s.paymentRequest(ctx, "i.id = $1", invoiceID)

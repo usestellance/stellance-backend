@@ -1937,6 +1937,21 @@ func (is *InvoiceService) SendInvoice(ctx context.Context, userId, invoiceId str
 		}
 	}
 
+	var hasRecipient bool
+	err := is.postgres.QueryRow(ctx, `
+		SELECT i.recipient_address IS NOT NULL OR EXISTS (
+			SELECT 1 FROM wallets w
+			WHERE w.user_id = i.created_by_id AND w.chain = 'stellar' AND w.is_primary AND w.is_active)
+		FROM invoice i WHERE i.id = $1 AND i.created_by_id = $2 AND i.status IN ('draft', 'viewed')`,
+		invoiceId, userId).Scan(&hasRecipient)
+	if err == nil && !hasRecipient {
+		return &utils.ApiResponse{StatusCode: http.StatusConflict, Message: payments.MsgSendWalletRequired, Error: payments.CodeWalletRequired}
+	}
+	if err != nil && err != pgx.ErrNoRows {
+		is.log.Error("failed to check invoice wallet", "error", err, "user_id", userId)
+		return &utils.ApiResponse{StatusCode: http.StatusInternalServerError, Message: "Failed to process request"}
+	}
+
 	var (
 		invoice_url string
 		payer_name  string
@@ -1969,7 +1984,7 @@ func (is *InvoiceService) SendInvoice(ctx context.Context, userId, invoiceId str
 		FROM invoice_update iu
 		LEFT JOIN users u ON u.id = $2`
 
-	err := is.postgres.QueryRow(ctx, query, invoiceId, userId).Scan(
+	err = is.postgres.QueryRow(ctx, query, invoiceId, userId).Scan(
 		&invoice_url, &payer_name, &payer_email, &first_name, &last_name, &status)
 
 	if err != nil {

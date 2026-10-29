@@ -41,7 +41,7 @@ func userID(w http.ResponseWriter, r *http.Request) (string, bool) {
 // @Failure      401  {object}  utils.ApiResponse  "Missing or invalid bearer token"
 // @Failure      403  {object}  utils.ApiResponse  "Not the owner"
 // @Failure      404  {object}  utils.ApiResponse  "Invoice not found"
-// @Failure      409  {object}  utils.ApiResponse  "Creator has no active Stellar wallet"
+// @Failure      409  {object}  utils.ApiResponse  "Merchant has no wallet (error=wallet_required)"
 // @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Security     BearerAuth
 // @Router       /payments/invoice/{id} [get]
@@ -62,7 +62,7 @@ func (h *PaymentHandler) GetInvoicePaymentsHandler(w http.ResponseWriter, r *htt
 // @Success      200  {object}  utils.ApiResponse{data=PaymentRequest}  "Payment request"
 // @Failure      400  {object}  utils.ApiResponse  "Invalid request body or parameters"
 // @Failure      404  {object}  utils.ApiResponse  "Invoice not found or still a draft"
-// @Failure      409  {object}  utils.ApiResponse  "Invoice cannot accept payment yet"
+// @Failure      409  {object}  utils.ApiResponse  "Merchant has not created a wallet yet (error=wallet_required)"
 // @Failure      500  {object}  utils.ApiResponse  "Unexpected server error"
 // @Router       /payments/request/{invoice_url} [get]
 func (h *PaymentHandler) GetPublicRequestHandler(w http.ResponseWriter, r *http.Request) {

@@ -570,3 +570,24 @@ func TestDuplicateToPaidInvoiceIsInvalidEvenWithWrongRecipient(t *testing.T) {
 		t.Fatalf("checks = %+v", v.Checks)
 	}
 }
+
+func TestInvoiceWithoutMerchantWalletReportsWalletRequired(t *testing.T) {
+	f := newFixture(t)
+	if _, err := f.db.Exec(context.Background(), `DELETE FROM wallets`); err != nil {
+		t.Fatal(err)
+	}
+	id, _ := f.invoice("sent", "100", nil)
+	var url string
+	if err := f.db.QueryRow(context.Background(), `SELECT invoice_url FROM invoice WHERE id = $1`, id).Scan(&url); err != nil {
+		t.Fatal(err)
+	}
+
+	owner := f.svc.GetInvoicePayments(context.Background(), f.user, id)
+	if owner.StatusCode != 409 || owner.Message != MsgOwnerWalletRequired || owner.Error != CodeWalletRequired {
+		t.Fatalf("owner response = %+v", owner)
+	}
+	public := f.svc.GetPublicRequest(context.Background(), url)
+	if public.StatusCode != 409 || public.Message != MsgMerchantNoWallet || public.Error != CodeWalletRequired {
+		t.Fatalf("public response = %+v", public)
+	}
+}
