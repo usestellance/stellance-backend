@@ -55,13 +55,14 @@ type PaginatedTransactions struct {
 }
 
 type TransactionFiltersDto struct {
-	UserId string `json:"user_id,omitempty"`
-	Page   int    `json:"page" validate:"required,min=1"`
-	Count  int    `json:"count" validate:"required,min=1,max=15"`
-	Type   string `json:"type,omitempty"`
-	Status string `json:"status,omitempty"`
-	From   string `json:"from,omitempty"`
-	To     string `json:"to,omitempty"`
+	UserId   string `json:"user_id,omitempty"`
+	Page     int    `json:"page" validate:"required,min=1"`
+	Count    int    `json:"count" validate:"required,min=1,max=15"`
+	WalletID string `json:"wallet_id,omitempty"`
+	Type     string `json:"type,omitempty"`
+	Status   string `json:"status,omitempty"`
+	From     string `json:"from,omitempty"`
+	To       string `json:"to,omitempty"`
 }
 
 type TransactionCard struct {

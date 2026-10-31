@@ -58,9 +58,10 @@ type User struct {
 }
 
 type UserWallet struct {
-	Id      *string        `json:"id,omitempty" example:"3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"`                          // Wallet id, needed by PIN, transfer and export endpoints
-	Address *string        `json:"address,omitempty" example:"GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"` // Stellar account id
-	Balance *WalletBalance `json:"balance,omitempty"`                                                                    // USDC and XLM balances
+	Id           *string        `json:"id,omitempty" example:"3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"`                          // Wallet id, needed by PIN, transfer and export endpoints
+	Address      *string        `json:"address,omitempty" example:"GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"` // Stellar account id
+	BalanceError *string        `json:"balance_error,omitempty" example:"could not read the balance from Stellar"`            // Set when the live balance could not be read; balance is then absent
+	Balance      *WalletBalance `json:"balance,omitempty"`                                                                    // USDC and XLM balances
 }
 
 type WalletBalance struct {

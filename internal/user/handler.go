@@ -130,7 +130,7 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 
 // GetMe godoc
 // @Summary      Get current authenticated user
-// @Description  Profile, completion flag and primary wallet (with `wallet.id` and balances) of the signed-in user.
+// @Description  Profile, completion flag and primary wallet (with `wallet.id`) of the signed-in user. Balances are read live from Horizon; if that fails, `wallet.balance` is absent and `wallet.balance_error` is set.
 // @Tags         user
 // @Produce      json
 // @Success      200  {object}  utils.ApiResponse{data=ProfileResult}  "Profile"

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/The-True-Hooha/stellance-backend/internal/balance"
 	"github.com/The-True-Hooha/stellance-backend/pkg/config"
 	jwt_ "github.com/The-True-Hooha/stellance-backend/pkg/jwt"
 	"github.com/The-True-Hooha/stellance-backend/pkg/utils"
@@ -258,8 +259,6 @@ func (s *UserService) GetProfileByID(ctx context.Context, userID string) *utils.
 	var (
 		walletID     sql.NullString
 		address      sql.NullString
-		usdcBalance  sql.NullFloat64
-		xlmBalance   sql.NullFloat64
 		firstName    sql.NullString
 		lastName     sql.NullString
 		businessName sql.NullString
@@ -272,7 +271,7 @@ func (s *UserService) GetProfileByID(ctx context.Context, userID string) *utils.
 		u.id, u.email, u.first_name, u.last_name, u.business_name,
 		u.phone_number, u.country, u.email_verified, u.is_active,
 		u.created_at, u.updated_at,
-		w.id, w.address, w.usdc_balance, w.xlm_balance
+		w.id, w.address
 		FROM users u
 		LEFT JOIN wallets w ON w.user_id = u.id AND w.is_primary = true AND w.is_active = true
 		WHERE u.id = $1 AND u.is_active = true
@@ -293,8 +292,6 @@ func (s *UserService) GetProfileByID(ctx context.Context, userID string) *utils.
 		&profile.UpdatedAt,
 		&walletID,
 		&address,
-		&usdcBalance,
-		&xlmBalance,
 	)
 
 	if firstName.Valid {
@@ -332,20 +329,7 @@ func (s *UserService) GetProfileByID(ctx context.Context, userID string) *utils.
 
 	profileComplete := profile.FirstName != nil && profile.LastName != nil
 
-	wallet := &UserWallet{
-		Balance: &WalletBalance{},
-	}
-
-	if walletID.Valid || address.Valid || usdcBalance.Valid || xlmBalance.Valid {
-		wallet = &UserWallet{
-			Id:      utils.NullStringPtr(walletID),
-			Address: utils.NullStringPtr(address),
-			Balance: &WalletBalance{
-				USDC: utils.NullFloatPtr(usdcBalance),
-				XLM:  utils.NullFloatPtr(xlmBalance),
-			},
-		}
-	}
+	wallet := s.liveWallet(ctx, walletID, address)
 
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
@@ -487,39 +471,15 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID string, dto Upda
 
 	log.Info("user profile updated successfully", "user_id", userID)
 
-	var address sql.NullString
-	var usdc_balance sql.NullFloat64
-	var xlm_balance sql.NullFloat64
-	var walletId sql.NullString
-	const q string = `
-			SELECT id, address, usdc_balance, xlm_balance 
-			FROM wallets 
-			WHERE user_id = $1 AND is_primary = true AND is_active = true
-		`
-	err = s.postgres.QueryRow(ctx, q, userID).Scan(&walletId, &address, &usdc_balance, &xlm_balance)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			s.log.Info("no wallet details found for user")
-		}
+	var address, walletId sql.NullString
+	err = s.postgres.QueryRow(ctx, `
+		SELECT id, address FROM wallets
+		WHERE user_id = $1 AND is_primary = true AND is_active = true`, userID).Scan(&walletId, &address)
+	if err != nil && err != pgx.ErrNoRows {
+		s.log.Error("failed to load wallet", "error", err, "user_id", userID)
 	}
 
-	wallet := &UserWallet{
-		Balance: &WalletBalance{},
-	}
-
-	if address.Valid {
-		wallet.Address = &address.String
-	}
-	if usdc_balance.Valid {
-		wallet.Balance.USDC = &usdc_balance.Float64
-	}
-	if xlm_balance.Valid {
-		wallet.Balance.XLM = &xlm_balance.Float64
-	}
-
-	if walletId.Valid {
-		wallet.Id = &walletId.String
-	}
+	wallet := s.liveWallet(ctx, walletId, address)
 
 	updatedProfile.Wallet = wallet
 
@@ -528,4 +488,21 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID string, dto Upda
 		Message:    "Profile updated successfully",
 		Data:       updatedProfile,
 	}
+}
+
+// liveWallet builds the wallet block of a profile. The balance is read from Horizon on every call; it is never stored.
+func (s *UserService) liveWallet(ctx context.Context, id, address sql.NullString) *UserWallet {
+	wallet := &UserWallet{Id: utils.NullStringPtr(id), Address: utils.NullStringPtr(address)}
+	if !address.Valid {
+		return wallet
+	}
+	b, err := balance.Fetch(ctx, address.String)
+	if err != nil {
+		s.log.Error("failed to read wallet balance from horizon", "error", err, "address", address.String)
+		msg := "could not read the balance from Stellar"
+		wallet.BalanceError = &msg
+		return wallet
+	}
+	wallet.Balance = &WalletBalance{USDC: &b.USDC, XLM: &b.XLM}
+	return wallet
 }

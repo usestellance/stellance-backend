@@ -591,3 +591,16 @@ func TestInvoiceWithoutMerchantWalletReportsWalletRequired(t *testing.T) {
 		t.Fatalf("public response = %+v", public)
 	}
 }
+
+func TestDepositToWalletWithoutInvoiceReachesLedger(t *testing.T) {
+	f := newFixture(t)
+	p := f.send(vendorAddr, chainPayment{Stroops: 7_0000000, Successful: true})
+	f.poll()
+
+	if st, _ := f.paymentStatus(p.OperationID); st != "unmatched" {
+		t.Fatalf("payment status = %s, want unmatched", st)
+	}
+	if n := f.count(`SELECT COUNT(*) FROM transactions WHERE transaction_hash = $1 AND user_id = $2 AND wallet_id IS NOT NULL`, p.TxHash, f.user); n != 1 {
+		t.Fatalf("ledger rows for the deposit = %d, want 1", n)
+	}
+}

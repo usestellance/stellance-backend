@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/The-True-Hooha/stellance-backend/internal/activitylog"
+	"github.com/The-True-Hooha/stellance-backend/internal/balance"
 	"github.com/The-True-Hooha/stellance-backend/internal/user"
-	"github.com/The-True-Hooha/stellance-backend/internal/wallet"
 	"github.com/The-True-Hooha/stellance-backend/mail"
 	"github.com/The-True-Hooha/stellance-backend/pkg/config"
 	jwt_ "github.com/The-True-Hooha/stellance-backend/pkg/jwt"
@@ -210,9 +210,15 @@ func (config *AuthServiceConfig) Login(ctx context.Context, dto AuthRequestDto) 
 				Address: &address.String,
 			}
 			userCopy.Wallet.Balance = &user.WalletBalance{}
-			bal, _ := wallet.NewWalletService().GetAccountBalance(ctx, address.String, walletId.String)
-			userCopy.Wallet.Balance.USDC = &bal.USDC
-			userCopy.Wallet.Balance.XLM = &bal.XLM
+			if bal, berr := balance.Fetch(ctx, address.String); berr != nil {
+				config.log.Error("failed to read wallet balance at login", "error", berr, "user_id", existingUser.ID)
+				msg := "could not read the balance from Stellar"
+				userCopy.Wallet.Balance = nil
+				userCopy.Wallet.BalanceError = &msg
+			} else {
+				userCopy.Wallet.Balance.USDC = &bal.USDC
+				userCopy.Wallet.Balance.XLM = &bal.XLM
+			}
 		}
 
 		if !existingUser.EmailVerified {

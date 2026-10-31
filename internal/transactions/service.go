@@ -169,6 +169,11 @@ func (s *TransactionService) GetTransactionsPaginated(ctx context.Context, page,
 	where := ` WHERE user_id = $1`
 	argN := 1
 
+	if filters.WalletID != "" {
+		argN++
+		where += fmt.Sprintf(` AND wallet_id = $%d`, argN)
+		args = append(args, filters.WalletID)
+	}
 	if filters.Type != "" {
 		argN++
 		where += fmt.Sprintf(` AND transaction_type = $%d`, argN)

@@ -1,6 +1,7 @@
 package transactions
 
 import (
+	"github.com/google/uuid"
 	"net/http"
 	"strconv"
 
@@ -100,6 +101,7 @@ func (h *TransactionHandler) DeleteTransactionByIdHandler(w http.ResponseWriter,
 // @Param        user_id     query  string  false  "Filter by user ID (admin only)"
 // @Param        page        query  int     false  "Page number, from 1 (default 1)"
 // @Param        limit       query  int     false  "Items per page, default 10 (page_count is a deprecated alias)"
+// @Param        wallet_id   query  string  false  "Only entries of this wallet (uuid)"
 // @Param        type        query  string  false  "Ledger type" Enums(payment, withdrawal, funding, path_payment)
 // @Param        status      query  string  false  "On-chain status" Enums(pending, confirmed, failed, aborted, refunded)
 // @Param        from        query  string  false  "Created on or after this date, YYYY-MM-DD"
@@ -144,11 +146,19 @@ func (handler *TransactionHandler) GetManyTransactionHandler(w http.ResponseWrit
 	}
 
 	dto := TransactionFiltersDto{
-		UserId: queryUserId,
-		Type:   r.URL.Query().Get("type"),
-		Status: r.URL.Query().Get("status"),
-		From:   r.URL.Query().Get("from"),
-		To:     r.URL.Query().Get("to"),
+		UserId:   queryUserId,
+		WalletID: r.URL.Query().Get("wallet_id"),
+		Type:     r.URL.Query().Get("type"),
+		Status:   r.URL.Query().Get("status"),
+		From:     r.URL.Query().Get("from"),
+		To:       r.URL.Query().Get("to"),
+	}
+
+	if dto.WalletID != "" {
+		if _, err := uuid.Parse(dto.WalletID); err != nil {
+			utils.WriteToJson(w, http.StatusBadRequest, utils.ApiResponse{StatusCode: http.StatusBadRequest, Message: "invalid wallet_id"})
+			return
+		}
 	}
 
 	page := r.URL.Query().Get("page")

@@ -3962,7 +3962,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Profile, completion flag and primary wallet (with ` + "`" + `wallet.id` + "`" + ` and balances) of the signed-in user.",
+                "description": "Profile, completion flag and primary wallet (with ` + "`" + `wallet.id` + "`" + `) of the signed-in user. Balances are read live from Horizon; if that fails, ` + "`" + `wallet.balance` + "`" + ` is absent and ` + "`" + `wallet.balance_error` + "`" + ` is set.",
                 "produces": [
                     "application/json"
                 ],
@@ -4419,6 +4419,12 @@ const docTemplate = `{
                         "type": "integer",
                         "description": "Items per page, default 10 (page_count is a deprecated alias)",
                         "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Only entries of this wallet (uuid)",
+                        "name": "wallet_id",
                         "in": "query"
                     },
                     {
@@ -5017,7 +5023,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Wallet details with live balances.",
+                "description": "Wallet details with live USDC and XLM balances read from Horizon on every call; balances are never stored. If Horizon cannot be reached, ` + "`" + `balance` + "`" + ` is absent and ` + "`" + `balance_error` + "`" + ` is set. Transactions are a separate call: GET /transaction?wallet_id={id}.",
                 "produces": [
                     "application/json"
                 ],
@@ -5677,6 +5683,11 @@ const docTemplate = `{
                     "type": "string",
                     "example": "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
                 },
+                "balance_error": {
+                    "description": "Set when the live balance could not be read",
+                    "type": "string",
+                    "example": "could not read the balance from Stellar"
+                },
                 "id": {
                     "description": "Wallet id",
                     "type": "string",
@@ -5693,12 +5704,12 @@ const docTemplate = `{
                     "example": "Main"
                 },
                 "usdc_balance": {
-                    "description": "Cached USDC balance",
+                    "description": "Live USDC balance from Horizon; null when it could not be read",
                     "type": "number",
                     "example": 5.03
                 },
                 "xlm_balance": {
-                    "description": "Cached XLM balance",
+                    "description": "Live XLM balance from Horizon; null when it could not be read",
                     "type": "number",
                     "example": 10002
                 }
@@ -7968,6 +7979,11 @@ const docTemplate = `{
                         }
                     ]
                 },
+                "balance_error": {
+                    "description": "Set when the live balance could not be read; balance is then absent",
+                    "type": "string",
+                    "example": "could not read the balance from Stellar"
+                },
                 "id": {
                     "description": "Wallet id, needed by PIN, transfer and export endpoints",
                     "type": "string",
@@ -8214,6 +8230,11 @@ const docTemplate = `{
             "properties": {
                 "balance": {
                     "$ref": "#/definitions/wallet.StellarWalletBalance"
+                },
+                "balance_error": {
+                    "description": "Set when the live balance could not be read; balance is then absent",
+                    "type": "string",
+                    "example": "could not read the balance from Stellar"
                 },
                 "chain": {
                     "description": "Chain",

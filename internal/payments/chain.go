@@ -158,9 +158,9 @@ func explorerTxURL(stage, hash string) string {
 	return "https://stellar.expert/explorer/testnet/tx/" + hash
 }
 
-// EnsureNetworkConfig seeds the admin network setting as testnet when it is unset.
+// EnsureNetworkConfig seeds the admin network setting from the STELLAR_STAGE environment when it is unset.
 func (s *PaymentService) EnsureNetworkConfig(ctx context.Context) error {
-	enc, err := utils.EncryptValue("testnet")
+	enc, err := utils.EncryptValue(utils.GetStellarStage())
 	if err != nil {
 		return err
 	}

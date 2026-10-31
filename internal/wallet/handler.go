@@ -46,7 +46,7 @@ func (h *WalletHandler) CreateWalletHandler(w http.ResponseWriter, r *http.Reque
 
 // GetWalletHandler godoc
 // @Summary      Get wallet by ID
-// @Description  Wallet details with live balances.
+// @Description  Wallet details with live USDC and XLM balances read from Horizon on every call; balances are never stored. If Horizon cannot be reached, `balance` is absent and `balance_error` is set. Transactions are a separate call: GET /transaction?wallet_id={id}.
 // @Tags         wallet
 // @Produce      json
 // @Param        id  path  string  true  "Wallet ID"
@@ -63,6 +63,7 @@ func (h *WalletHandler) GetWalletHandler(w http.ResponseWriter, r *http.Request)
 	id, ok := utils.GetUserIDFromContext(ctx)
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
 	}
 	walletID := r.PathValue("id")
 

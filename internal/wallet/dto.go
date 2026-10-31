@@ -39,12 +39,13 @@ type WalletResponseDto struct {
 	Tag           string                `json:"tag,omitempty" example:"Main"`                                                      // Label
 	Chain         string                `json:"chain,omitempty" example:"stellar"`                                                 // Chain
 	Balance       *StellarWalletBalance `json:"balance,omitempty"`
-	IsPrimary     bool                  `json:"is_primary,omitempty" example:"true"`                 // Receives invoice payments
-	IsActive      bool                  `json:"is_active,omitempty" example:"true"`                  // Active flag
-	CreatedAt     *time.Time            `json:"created_at,omitempty" example:"2026-10-20T09:00:00Z"` // Created
+	BalanceError  string                `json:"balance_error,omitempty" example:"could not read the balance from Stellar"` // Set when the live balance could not be read; balance is then absent
+	IsPrimary     bool                  `json:"is_primary,omitempty" example:"true"`                                       // Receives invoice payments
+	IsActive      bool                  `json:"is_active,omitempty" example:"true"`                                        // Active flag
+	CreatedAt     *time.Time            `json:"created_at,omitempty" example:"2026-10-20T09:00:00Z"`                       // Created
 }
 
 type StellarWalletBalance struct {
-	USDC float64 `json:"usdc,omitempty" example:"5.03"` // USDC balance
-	XLM  float64 `json:"xlm,omitempty" example:"10002"` // XLM balance
+	USDC float64 `json:"usdc" example:"5.03"` // USDC balance
+	XLM  float64 `json:"xlm" example:"10002"` // XLM balance
 }

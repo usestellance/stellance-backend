@@ -246,6 +246,10 @@ definitions:
         description: Stellar account id
         example: GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5
         type: string
+      balance_error:
+        description: Set when the live balance could not be read
+        example: could not read the balance from Stellar
+        type: string
       id:
         description: Wallet id
         example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
@@ -259,11 +263,11 @@ definitions:
         example: Main
         type: string
       usdc_balance:
-        description: Cached USDC balance
+        description: Live USDC balance from Horizon; null when it could not be read
         example: 5.03
         type: number
       xlm_balance:
-        description: Cached XLM balance
+        description: Live XLM balance from Horizon; null when it could not be read
         example: 10002
         type: number
     type: object
@@ -1972,6 +1976,11 @@ definitions:
         allOf:
         - $ref: '#/definitions/user.WalletBalance'
         description: USDC and XLM balances
+      balance_error:
+        description: Set when the live balance could not be read; balance is then
+          absent
+        example: could not read the balance from Stellar
+        type: string
       id:
         description: Wallet id, needed by PIN, transfer and export endpoints
         example: 3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f
@@ -2158,6 +2167,11 @@ definitions:
     properties:
       balance:
         $ref: '#/definitions/wallet.StellarWalletBalance'
+      balance_error:
+        description: Set when the live balance could not be read; balance is then
+          absent
+        example: could not read the balance from Stellar
+        type: string
       chain:
         description: Chain
         example: stellar
@@ -4743,8 +4757,9 @@ paths:
       - user
   /profile/me:
     get:
-      description: Profile, completion flag and primary wallet (with `wallet.id` and
-        balances) of the signed-in user.
+      description: Profile, completion flag and primary wallet (with `wallet.id`)
+        of the signed-in user. Balances are read live from Horizon; if that fails,
+        `wallet.balance` is absent and `wallet.balance_error` is set.
       produces:
       - application/json
       responses:
@@ -4981,6 +4996,10 @@ paths:
         in: query
         name: limit
         type: integer
+      - description: Only entries of this wallet (uuid)
+        in: query
+        name: wallet_id
+        type: string
       - description: Ledger type
         enum:
         - payment
@@ -5265,7 +5284,10 @@ paths:
       - wallet
   /wallet/{id}:
     get:
-      description: Wallet details with live balances.
+      description: 'Wallet details with live USDC and XLM balances read from Horizon
+        on every call; balances are never stored. If Horizon cannot be reached, `balance`
+        is absent and `balance_error` is set. Transactions are a separate call: GET
+        /transaction?wallet_id={id}.'
       parameters:
       - description: Wallet ID
         in: path

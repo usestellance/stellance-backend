@@ -456,8 +456,8 @@ func (s *PaymentService) notifyPaid(invoiceID, txHash string) {
 	}
 }
 
-// Poll scans every account with an open invoice or an invoice touched in the last 7 days, so late
-// duplicate payments to a just-paid invoice are still recorded. One failing account never blocks the others.
+// Poll scans every active wallet plus every invoice recipient with an open or recently touched invoice, so
+// deposits to any wallet reach the ledger and late duplicate payments to a just-paid invoice are still recorded. One failing account never blocks the others.
 func (s *PaymentService) Poll(ctx context.Context) error {
 	conn, err := s.postgres.Acquire(ctx)
 	if err != nil {
@@ -480,6 +480,8 @@ func (s *PaymentService) Poll(ctx context.Context) error {
 	}
 
 	rows, err := conn.Query(ctx, `
+		SELECT address FROM wallets WHERE chain = 'stellar' AND is_active
+		UNION
 		SELECT DISTINCT COALESCE(i.recipient_address, w.address)
 		FROM invoice i
 		LEFT JOIN wallets w ON w.user_id = i.created_by_id AND w.chain = 'stellar' AND w.is_primary AND w.is_active

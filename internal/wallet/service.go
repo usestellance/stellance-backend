@@ -11,13 +11,13 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"math"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
 
 	"github.com/The-True-Hooha/stellance-backend/internal/activitylog"
+	"github.com/The-True-Hooha/stellance-backend/internal/balance"
 	"github.com/The-True-Hooha/stellance-backend/internal/notifications"
 	"github.com/The-True-Hooha/stellance-backend/internal/payments"
 	"github.com/The-True-Hooha/stellance-backend/internal/transactions"
@@ -295,8 +295,7 @@ func (ws *WalletService) GetUserWallet(ctx context.Context, userId, walletId str
 					Message:    "Access denied",
 				}
 			}
-			balance, _ := ws.GetAccountBalance(ctx, wallet.WalletAddress, walletId)
-			wallet.Balance = balance
+			ws.attachBalance(ctx, &wallet)
 			return &utils.ApiResponse{
 				StatusCode: http.StatusOK,
 				Message:    "successful",
@@ -343,14 +342,8 @@ func (ws *WalletService) GetUserWallet(ctx context.Context, userId, walletId str
 			Message:    "Failed to fetch wallet",
 		}
 	}
-	balance, err := ws.GetAccountBalance(ctx, wallet.WalletAddress, walletId)
-	if err != nil {
-		ws.log.Error("Failed to get account balance", "error", err, "wallet", walletId)
-		balance = &StellarWalletBalance{USDC: 0, XLM: 0}
-	}
-
-	wallet.Balance = balance
 	ws.cacheWalletInfo(ctx, &wallet)
+	ws.attachBalance(ctx, &wallet)
 
 	return &utils.ApiResponse{
 		StatusCode: http.StatusOK,
@@ -393,57 +386,28 @@ func (ws *WalletService) fundTestnetAccount(ctx context.Context, address, wallet
 	}
 }
 
-func (ws *WalletService) GetAccountBalance(ctx context.Context, address, walletId string) (*StellarWalletBalance, error) {
-	account, err := ws.horizonClient.AccountDetail(horizonclient.AccountRequest{
-		AccountID: address,
-	})
-
+// GetAccountBalance reads the balance from Horizon. It is never stored.
+func (ws *WalletService) GetAccountBalance(ctx context.Context, address string) (*StellarWalletBalance, error) {
+	b, err := balance.Fetch(ctx, address)
 	if err != nil {
-		if hErr, ok := err.(*horizonclient.Error); ok && hErr.Response.StatusCode == 404 {
-			return &StellarWalletBalance{
-				USDC: 0,
-				XLM:  0,
-			}, nil
-		}
 		ws.log.Error("failed to get wallet balance", "error", err)
 		return nil, err
 	}
-
-	var usdcBalance, xlmBalance float64
-	for _, balance := range account.Balances {
-		switch {
-		case balance.Asset.Type == "native":
-			xlmBalance, _ = strconv.ParseFloat(balance.Balance, 64)
-		case balance.Asset.Code == "USDC" && balance.Asset.Issuer == ws.getUSDCIssuer():
-			usdcBalance, _ = strconv.ParseFloat(balance.Balance, 64)
-		}
-	}
-
-	usdc := math.Round(usdcBalance*100) / 100
-	xlm := math.Round(xlmBalance*100) / 100
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
-		defer cancel()
-		ws.updateWalletBalance(ctx, walletId, usdc, xlm)
-	}()
-
-	return &StellarWalletBalance{
-		USDC: usdc,
-		XLM:  xlm,
-	}, nil
+	return &StellarWalletBalance{USDC: b.USDC, XLM: b.XLM}, nil
 }
 
 func (ws *WalletService) getUSDCIssuer() string {
 	return utils.USDCIssuer(ws.stage)
 }
 
-func (ws *WalletService) updateWalletBalance(ctx context.Context, walletID string, usdc_balance, xlm_balance float64) {
-	const query string = `UPDATE wallets SET usdc_balance = $2, xlm_balance = $3, updated_at = NOW() WHERE id = $1`
-	_, err := ws.postgres.Exec(ctx, query, walletID, usdc_balance, xlm_balance)
+func (ws *WalletService) attachBalance(ctx context.Context, wallet *WalletResponseDto) {
+	b, err := ws.GetAccountBalance(ctx, wallet.WalletAddress)
 	if err != nil {
-		ws.log.Error("failed to update wallet balance", "error", err, "wallet_id", walletID)
+		wallet.Balance = nil
+		wallet.BalanceError = "could not read the balance from Stellar"
+		return
 	}
-	ws.log.Info("successfully updated wallet balance on wallet Id ===> " + walletID)
+	wallet.Balance, wallet.BalanceError = b, ""
 }
 
 func (ws *WalletService) cacheWalletInfo(ctx context.Context, wallet *WalletResponseDto) {

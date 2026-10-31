@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/The-True-Hooha/stellance-backend/internal/activitylog"
+	"github.com/The-True-Hooha/stellance-backend/internal/balance"
 	"github.com/The-True-Hooha/stellance-backend/mail"
 	"github.com/The-True-Hooha/stellance-backend/pkg/config"
 	jwt_ "github.com/The-True-Hooha/stellance-backend/pkg/jwt"
@@ -70,12 +71,13 @@ type AdminStats struct {
 }
 
 type AdminWalletRow struct {
-	ID      string  `json:"id" example:"3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"`                          // Wallet id
-	Address string  `json:"address" example:"GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"` // Stellar account id
-	Tag     string  `json:"tag" example:"Main"`                                                         // Label
-	USDC    float64 `json:"usdc_balance" example:"5.03"`                                                // Cached USDC balance
-	XLM     float64 `json:"xlm_balance" example:"10002"`                                                // Cached XLM balance
-	Primary bool    `json:"is_primary" example:"true"`                                                  // Receives invoice payments
+	ID           string   `json:"id" example:"3f2b8c1e-5d4a-4f6b-9c7d-1a2b3c4d5e6f"`                          // Wallet id
+	Address      string   `json:"address" example:"GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"` // Stellar account id
+	Tag          string   `json:"tag" example:"Main"`                                                         // Label
+	USDC         *float64 `json:"usdc_balance" example:"5.03"`                                                // Live USDC balance from Horizon; null when it could not be read
+	XLM          *float64 `json:"xlm_balance" example:"10002"`                                                // Live XLM balance from Horizon; null when it could not be read
+	BalanceError string   `json:"balance_error,omitempty" example:"could not read the balance from Stellar"`  // Set when the live balance could not be read
+	Primary      bool     `json:"is_primary" example:"true"`                                                  // Receives invoice payments
 }
 
 type AdminPaginationMeta struct {
@@ -219,7 +221,7 @@ func (as *AdminService) GetUser(ctx context.Context, userID string) *utils.ApiRe
 	}
 
 	wRows, _ := as.postgres.Query(ctx,
-		`SELECT id, address, COALESCE(tag,''), COALESCE(usdc_balance,0), COALESCE(xlm_balance,0), is_primary
+		`SELECT id, address, COALESCE(tag,''), is_primary
 		 FROM wallets WHERE user_id = $1 ORDER BY is_primary DESC`, userID,
 	)
 	wallets := []AdminWalletRow{}
@@ -227,9 +229,16 @@ func (as *AdminService) GetUser(ctx context.Context, userID string) *utils.ApiRe
 		defer wRows.Close()
 		for wRows.Next() {
 			var w AdminWalletRow
-			if err := wRows.Scan(&w.ID, &w.Address, &w.Tag, &w.USDC, &w.XLM, &w.Primary); err == nil {
-				wallets = append(wallets, w)
+			if err := wRows.Scan(&w.ID, &w.Address, &w.Tag, &w.Primary); err != nil {
+				continue
 			}
+			if b, berr := balance.Fetch(ctx, w.Address); berr != nil {
+				as.log.Error("failed to read wallet balance from horizon", "error", berr, "address", w.Address)
+				w.BalanceError = "could not read the balance from Stellar"
+			} else {
+				w.USDC, w.XLM = &b.USDC, &b.XLM
+			}
+			wallets = append(wallets, w)
 		}
 	}
 
